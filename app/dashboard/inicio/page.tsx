@@ -6,6 +6,7 @@ import {
   Activity, Star, Zap, AlertCircle
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { useRouter } from "next/navigation";
 
 const statsData = [
   { label: "Pacientes activos", value: "24", change: "+3 este mes", icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600" },
@@ -46,6 +47,7 @@ const item = {
 };
 
 export default function InicioPage() {
+  const router = useRouter();
   return (
     <motion.div
       variants={container}
@@ -156,7 +158,7 @@ export default function InicioPage() {
               </div>
             ))}
           </div>
-          <button className="mt-4 w-full text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-xl py-2.5 transition-colors">
+          <button onClick={() => router.push("/dashboard/tareas")} className="mt-4 w-full text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-xl py-2.5 transition-colors">
             Ver todas las tareas
           </button>
         </motion.div>
@@ -166,7 +168,7 @@ export default function InicioPage() {
       <motion.div variants={item} className="bg-white rounded-2xl border border-slate-200/60">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h3 className="font-semibold text-slate-800">Pacientes Recientes</h3>
-          <button className="text-sm text-violet-600 hover:text-violet-700 font-medium flex items-center gap-1">
+          <button onClick={() => router.push("/dashboard/usuarios")} className="text-sm text-violet-600 hover:text-violet-700 font-medium flex items-center gap-1">
             Ver todos <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         </div>

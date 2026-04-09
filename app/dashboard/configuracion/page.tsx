@@ -15,6 +15,7 @@ export default function ConfiguracionPage() {
   const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [saved, setSaved] = useState("");
   const [profile, setProfile] = useState({
     nombre: "Josefina",
     apellido: "Pizarro",
@@ -23,8 +24,25 @@ export default function ConfiguracionPage() {
     email: "japieaters@gmail.com",
   });
 
+  const showSaved = (msg: string) => {
+    setSaved(msg);
+    setTimeout(() => setSaved(""), 2500);
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {/* Save toast */}
+      {saved && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          className="fixed top-6 right-6 z-50 bg-emerald-500 text-white text-sm font-semibold px-5 py-3 rounded-2xl shadow-xl shadow-emerald-500/30 flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+          {saved}
+        </motion.div>
+      )}
       {/* Tab navigation */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
@@ -135,7 +153,7 @@ export default function ConfiguracionPage() {
               </div>
             </div>
 
-            <button className="mt-6 flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-6 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
+            <button onClick={() => showSaved("Perfil actualizado correctamente")} className="mt-6 flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-6 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
               <Save className="w-4 h-4" /> Actualizar perfil
             </button>
           </div>
@@ -190,7 +208,7 @@ export default function ConfiguracionPage() {
             </div>
           </div>
 
-          <button className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-6 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
+          <button onClick={() => showSaved("Contraseña actualizada correctamente")} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-6 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
             <Lock className="w-4 h-4" /> Actualizar contraseña
           </button>
         </motion.div>

@@ -109,12 +109,33 @@ export default function AsistentesPage() {
 
   const current = assistants.find((a) => a.id === activeAssistant);
 
+  const systemPrompts: Record<string, string> = {
+    informe: "Eres un asistente experto en terapia ocupacional. Genera informes iniciales estructurados, profesionales y completos en español, siguiendo estándares clínicos.",
+    cuentos: "Eres un especialista en terapia narrativa y terapia ocupacional. Crea cuentos terapéuticos personalizados, creativos y apropiados para la edad del paciente, en español.",
+    actividades: "Eres un terapeuta ocupacional experto en diseño de actividades terapéuticas. Propone actividades detalladas, creativas y adaptadas a las necesidades específicas del paciente, en español.",
+  };
+
   const handleGenerate = async () => {
     if (!input.trim()) return;
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setOutput(current?.sampleOutput || "");
-    setLoading(false);
+    setOutput(null);
+    try {
+      const res = await fetch("/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: input,
+          systemPrompt: current ? systemPrompts[current.id] : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setOutput(data.text);
+    } catch (err) {
+      setOutput("❌ Error al conectar con la IA. Por favor intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

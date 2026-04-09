@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Plus, Check, Clock, AlertCircle, Filter, Trash2, MoreVertical } from "lucide-react";
+import { Plus, Check, Clock, AlertCircle, Filter, Trash2, MoreVertical, X } from "lucide-react";
 
 type Priority = "alta" | "media" | "baja";
 type Status = "pendiente" | "en_progreso" | "completada";
@@ -43,6 +43,15 @@ const statusConfig: Record<Status, { label: string; icon: typeof Check }> = {
 export default function TareasPage() {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [filter, setFilter] = useState<"todas" | Status>("todas");
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [newTask, setNewTask] = useState({ title: "", description: "", priority: "media" as Priority, due: "", patient: "", category: "Clínico" });
+
+  const addTask = () => {
+    if (!newTask.title.trim()) return;
+    setTasks((prev) => [...prev, { ...newTask, id: Date.now(), status: "pendiente" as Status }]);
+    setNewTask({ title: "", description: "", priority: "media", due: "", patient: "", category: "Clínico" });
+    setShowNewTask(false);
+  };
 
   const toggleStatus = (id: number) => {
     setTasks((prev) =>
@@ -68,7 +77,7 @@ export default function TareasPage() {
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div />
-        <button className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 self-start">
+        <button onClick={() => setShowNewTask(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 self-start">
           <Plus className="w-4 h-4" /> Nueva Tarea
         </button>
       </div>
@@ -191,6 +200,78 @@ export default function TareasPage() {
           })}
         </AnimatePresence>
       </motion.div>
+
+      {/* New Task Modal */}
+      <AnimatePresence>
+        {showNewTask && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => e.target === e.currentTarget && setShowNewTask(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 16 }}
+              className="bg-white rounded-3xl w-full max-w-md shadow-2xl"
+            >
+              <div className="flex items-center justify-between p-6 border-b border-slate-100">
+                <h3 className="font-bold text-slate-800">Nueva Tarea</h3>
+                <button onClick={() => setShowNewTask(false)} className="w-8 h-8 hover:bg-slate-100 rounded-xl flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Título *</label>
+                  <input type="text" value={newTask.title} onChange={(e) => setNewTask({ ...newTask, title: e.target.value })} placeholder="Ej. Redactar informe de paciente..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Descripción</label>
+                  <textarea rows={2} value={newTask.description} onChange={(e) => setNewTask({ ...newTask, description: e.target.value })} placeholder="Detalles de la tarea..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Prioridad</label>
+                    <select value={newTask.priority} onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as Priority })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                      <option value="alta">Alta</option>
+                      <option value="media">Media</option>
+                      <option value="baja">Baja</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Categoría</label>
+                    <select value={newTask.category} onChange={(e) => setNewTask({ ...newTask, category: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                      <option>Clínico</option>
+                      <option>Documentación</option>
+                      <option>Preparación</option>
+                      <option>Comunicación</option>
+                      <option>Administrativo</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha límite</label>
+                    <input type="date" value={newTask.due} onChange={(e) => setNewTask({ ...newTask, due: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente</label>
+                    <input type="text" value={newTask.patient} onChange={(e) => setNewTask({ ...newTask, patient: e.target.value })} placeholder="Nombre del paciente" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all placeholder-slate-300" />
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 pb-6">
+                <button onClick={addTask} disabled={!newTask.title.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
+                  Crear Tarea
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

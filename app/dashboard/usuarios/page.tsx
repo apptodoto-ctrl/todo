@@ -1,8 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Plus, Search, Filter, Phone, Mail, MoreVertical, User, Calendar, ClipboardList } from "lucide-react";
+import { Plus, Search, Filter, Phone, Mail, MoreVertical, User, Calendar, ClipboardList, X } from "lucide-react";
 
 const patients = [
   { id: 1, name: "María González", age: 8, diagnosis: "TEA", therapist: "Josefina P.", sessions: 12, nextSession: "22 Mar 10:00", status: "activo", initials: "MG", color: "from-violet-500 to-purple-600" },
@@ -31,6 +31,19 @@ const item = {
 export default function UsuariosPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
+  const [showNewPatient, setShowNewPatient] = useState(false);
+  const [newPatient, setNewPatient] = useState({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "" });
+
+  const addPatient = () => {
+    if (!newPatient.name.trim() || !newPatient.diagnosis.trim()) return;
+    const initials = newPatient.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+    const colors = ["from-violet-500 to-purple-600", "from-blue-500 to-indigo-600", "from-emerald-500 to-teal-600", "from-amber-500 to-orange-500", "from-pink-500 to-rose-500"];
+    const color = colors[patients.length % colors.length];
+    patients.push({ id: patients.length + 1, ...newPatient, therapist: "Josefina P.", sessions: 0, initials, color });
+    setNewPatient({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "" });
+    setShowNewPatient(false);
+    setFilter("todos");
+  };
 
   const filtered = patients.filter((p) => {
     const matchSearch =
@@ -47,7 +60,7 @@ export default function UsuariosPage() {
         <div>
           <p className="text-slate-500 text-sm">{patients.length} pacientes registrados</p>
         </div>
-        <button className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 self-start sm:self-auto">
+        <button onClick={() => setShowNewPatient(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 self-start sm:self-auto">
           <Plus className="w-4 h-4" /> Nuevo Paciente
         </button>
       </div>
@@ -172,6 +185,66 @@ export default function UsuariosPage() {
           </motion.div>
         ))}
       </motion.div>
+
+      {/* New Patient Modal */}
+      <AnimatePresence>
+        {showNewPatient && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => e.target === e.currentTarget && setShowNewPatient(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 16 }}
+              className="bg-white rounded-3xl w-full max-w-md shadow-2xl"
+            >
+              <div className="flex items-center justify-between p-6 border-b border-slate-100">
+                <h3 className="font-bold text-slate-800">Nuevo Paciente</h3>
+                <button onClick={() => setShowNewPatient(false)} className="w-8 h-8 hover:bg-slate-100 rounded-xl flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nombre *</label>
+                    <input type="text" value={newPatient.name} onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })} placeholder="Nombre completo" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Edad *</label>
+                    <input type="number" min={0} max={120} value={newPatient.age || ""} onChange={(e) => setNewPatient({ ...newPatient, age: parseInt(e.target.value) || 0 })} placeholder="Años" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico *</label>
+                  <input type="text" value={newPatient.diagnosis} onChange={(e) => setNewPatient({ ...newPatient, diagnosis: e.target.value })} placeholder="Diagnóstico principal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Estado</label>
+                  <select value={newPatient.status} onChange={(e) => setNewPatient({ ...newPatient, status: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                    <option value="activo">Activo</option>
+                    <option value="evaluacion">En Evaluación</option>
+                    <option value="alta">Alta</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Próxima sesión</label>
+                  <input type="text" value={newPatient.nextSession} onChange={(e) => setNewPatient({ ...newPatient, nextSession: e.target.value })} placeholder="Ej. 25 Abr 10:00" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                </div>
+              </div>
+              <div className="px-6 pb-6">
+                <button onClick={addPatient} disabled={!newPatient.name.trim() || !newPatient.diagnosis.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
+                  Registrar Paciente
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

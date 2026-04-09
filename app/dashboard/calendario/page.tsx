@@ -1,8 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Clock, User, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, User, MapPin, X } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -33,6 +33,16 @@ const typeDots: Record<string, string> = {
 export default function CalendarioPage() {
   const [current, setCurrent] = useState(new Date(2026, 2, 1));
   const [selected, setSelected] = useState<Date | null>(new Date(2026, 2, 22));
+  const [localEvents, setLocalEvents] = useState(events);
+  const [showNewEvent, setShowNewEvent] = useState(false);
+  const [newEvent, setNewEvent] = useState({ title: "", time: "10:00", type: "sesion", location: "Sala 1" });
+
+  const addEvent = () => {
+    if (!newEvent.title.trim() || !selected) return;
+    setLocalEvents((prev) => [...prev, { date: selected, ...newEvent }]);
+    setNewEvent({ title: "", time: "10:00", type: "sesion", location: "Sala 1" });
+    setShowNewEvent(false);
+  };
 
   const monthStart = startOfMonth(current);
   const monthEnd = endOfMonth(current);
@@ -43,7 +53,7 @@ export default function CalendarioPage() {
   const paddedDays = [...Array(startDay).fill(null), ...days];
 
   const selectedEvents = selected
-    ? events.filter((e) => isSameDay(e.date, selected))
+    ? localEvents.filter((e) => isSameDay(e.date, selected))
     : [];
 
   return (
@@ -71,7 +81,7 @@ export default function CalendarioPage() {
             <ChevronRight className="w-4 h-4 text-slate-600" />
           </button>
         </div>
-        <button className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
+        <button onClick={() => setShowNewEvent(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
           <Plus className="w-4 h-4" /> Nueva Cita
         </button>
       </motion.div>
@@ -99,7 +109,7 @@ export default function CalendarioPage() {
               if (!day) return <div key={`empty-${i}`} className="h-24 border-r border-b border-slate-50" />;
               const isToday = isSameDay(day, new Date(2026, 2, 22));
               const isSelected = selected && isSameDay(day, selected);
-              const dayEvents = events.filter((e) => isSameDay(e.date, day));
+              const dayEvents = localEvents.filter((e) => isSameDay(e.date, day));
               const inMonth = isSameMonth(day, current);
 
               return (
@@ -193,11 +203,72 @@ export default function CalendarioPage() {
             </div>
           )}
 
-          <button className="mt-4 w-full text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-xl py-2.5 transition-colors flex items-center justify-center gap-2">
+          <button onClick={() => setShowNewEvent(true)} className="mt-4 w-full text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-xl py-2.5 transition-colors flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" /> Agregar cita
           </button>
         </motion.div>
       </div>
+
+      {/* New Event Modal */}
+      <AnimatePresence>
+        {showNewEvent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => e.target === e.currentTarget && setShowNewEvent(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 16 }}
+              className="bg-white rounded-3xl w-full max-w-md shadow-2xl"
+            >
+              <div className="flex items-center justify-between p-6 border-b border-slate-100">
+                <h3 className="font-bold text-slate-800">Nueva Cita</h3>
+                <button onClick={() => setShowNewEvent(false)} className="w-8 h-8 hover:bg-slate-100 rounded-xl flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                {selected && (
+                  <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-2.5 text-sm text-violet-700 font-medium">
+                    📅 {format(selected, "EEEE d 'de' MMMM", { locale: es })}
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente / Título *</label>
+                  <input type="text" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Nombre del paciente o razón" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
+                    <input type="time" value={newEvent.time} onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
+                    <select value={newEvent.type} onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                      <option value="sesion">Sesión</option>
+                      <option value="evaluacion">Evaluación</option>
+                      <option value="reunion">Reunión</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Sala / Ubicación</label>
+                  <input type="text" value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })} placeholder="Ej. Sala 1" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                </div>
+              </div>
+              <div className="px-6 pb-6">
+                <button onClick={addEvent} disabled={!newEvent.title.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
+                  Crear Cita
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

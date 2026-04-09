@@ -24,7 +24,28 @@ export default function AuthPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 1000));
+
+    if (tab === "register") {
+      if (!form.name.trim()) {
+        setError("Por favor ingresa tu nombre completo.");
+        setLoading(false);
+        return;
+      }
+      if (form.password.length < 6) {
+        setError("La contraseña debe tener al menos 6 caracteres.");
+        setLoading(false);
+        return;
+      }
+      if (form.password !== form.confirmPassword) {
+        setError("Las contraseñas no coinciden.");
+        setLoading(false);
+        return;
+      }
+      router.push("/dashboard/inicio");
+      return;
+    }
+
     const valid = DEMO_USERS.find(
       (u) => u.email === form.email && u.password === form.password
     );
