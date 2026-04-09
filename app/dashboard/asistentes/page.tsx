@@ -4,9 +4,10 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import {
   FileText, BookOpen, Lightbulb, Sparkles,
-  Loader2, ChevronRight
+  Loader2, ChevronRight, User
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import { initialPatients } from "@/lib/patientsData";
 
 const assistants = [
   {
@@ -107,6 +108,7 @@ export default function AsistentesPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
+  const [selectedPatientId, setSelectedPatientId] = useState<number | "">("");
 
   const current = assistants.find((a) => a.id === activeAssistant);
 
@@ -120,12 +122,20 @@ export default function AsistentesPage() {
     if (!input.trim()) return;
     setLoading(true);
     setOutput(null);
+
+    const patient = initialPatients.find((p) => p.id === selectedPatientId);
+    const patientContext = patient
+      ? `DATOS DEL PACIENTE SELECCIONADO:\n- Nombre: ${patient.name}\n- Edad: ${patient.age} años\n- Diagnóstico: ${patient.diagnosis}\n- Terapeuta: ${patient.therapist}\n- Sesiones realizadas: ${patient.sessions}\n- Próxima sesión: ${patient.nextSession}\n- Estado: ${patient.status}\n\n`
+      : "";
+
+    const fullPrompt = patientContext + input;
+
     try {
       const res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: input,
+          prompt: fullPrompt,
           systemPrompt: current ? systemPrompts[current.id] : undefined,
         }),
       });
@@ -176,6 +186,7 @@ export default function AsistentesPage() {
               setActiveAssistant(ast.id);
               setOutput(null);
               setInput("");
+              setSelectedPatientId("");
             }}
           >
             <div className={`h-32 bg-gradient-to-br ${ast.gradient} relative overflow-hidden`}>
@@ -257,14 +268,49 @@ export default function AsistentesPage() {
       >
         {current && (
           <div className="space-y-4">
+            {/* Patient selector */}
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-2">Información del paciente</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-violet-500" /> Paciente
+              </label>
+              <select
+                value={selectedPatientId}
+                onChange={(e) => setSelectedPatientId(e.target.value === "" ? "" : Number(e.target.value))}
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+              >
+                <option value="">Seleccionar paciente (opcional)</option>
+                {initialPatients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {p.diagnosis} · {p.age} años
+                  </option>
+                ))}
+              </select>
+              {selectedPatientId !== "" && (() => {
+                const p = initialPatients.find((x) => x.id === selectedPatientId);
+                return p ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {[
+                      { label: "Diagnóstico", value: p.diagnosis },
+                      { label: "Sesiones", value: `${p.sessions}` },
+                      { label: "Estado", value: p.status },
+                    ].map(({ label, value }) => (
+                      <span key={label} className="text-[11px] bg-violet-50 text-violet-700 border border-violet-100 rounded-lg px-2 py-0.5 font-medium">
+                        {label}: {value}
+                      </span>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-2">Información adicional</label>
               <p className="text-xs text-slate-400 mb-3">{current.prompt}</p>
               <textarea
                 rows={4}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Escribe aquí los datos del paciente..."
+                placeholder="Agrega detalles específicos, motivo de consulta, observaciones..."
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all placeholder-slate-400"
               />
             </div>
