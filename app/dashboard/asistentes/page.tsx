@@ -1,11 +1,12 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useState } from "react";
 import {
-  Bot, FileText, BookOpen, Lightbulb, Sparkles, ArrowRight,
-  Send, X, Loader2, ChevronRight, Star
+  FileText, BookOpen, Lightbulb, Sparkles,
+  Loader2, ChevronRight
 } from "lucide-react";
+import Modal from "@/components/ui/Modal";
 
 const assistants = [
   {
@@ -227,101 +228,62 @@ export default function AsistentesPage() {
         </div>
       </motion.div>
 
-      {/* Modal */}
-      <AnimatePresence>
-        {activeAssistant && current && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={(e) => e.target === e.currentTarget && setActiveAssistant(null)}
+      {/* Assistant Modal */}
+      <Modal
+        open={!!activeAssistant && !!current}
+        onClose={() => setActiveAssistant(null)}
+        title={current?.title ?? ""}
+        subtitle={current?.tag}
+        maxWidth="max-w-2xl"
+        footer={
+          <button
+            onClick={handleGenerate}
+            disabled={loading || !input.trim()}
+            className="w-full bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-violet-500/30"
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
-            >
-              {/* Header */}
-              <div className={`bg-gradient-to-r ${current.gradient} p-6 text-white`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                      <current.icon className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{current.tag}</p>
-                      <h3 className="font-bold">{current.title}</h3>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setActiveAssistant(null)}
-                    className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors"
-                  >
-                    <X className="w-4 h-4 text-white" />
-                  </button>
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generando con IA...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Generar con IA
+              </>
+            )}
+          </button>
+        }
+      >
+        {current && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-2">Información del paciente</label>
+              <p className="text-xs text-slate-400 mb-3">{current.prompt}</p>
+              <textarea
+                rows={4}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Escribe aquí los datos del paciente..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all placeholder-slate-400"
+              />
+            </div>
+            {output && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-slate-50 border border-slate-200 rounded-xl p-4 max-h-64 overflow-y-auto"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-violet-500" />
+                  <span className="text-sm font-semibold text-violet-700">Resultado generado</span>
                 </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {/* Prompt area */}
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 block mb-2">
-                    Información del paciente
-                  </label>
-                  <p className="text-xs text-slate-400 mb-3">{current.prompt}</p>
-                  <textarea
-                    rows={4}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Escribe aquí los datos del paciente..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all placeholder-slate-400"
-                  />
-                </div>
-
-                {/* Output */}
-                {output && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-slate-50 border border-slate-200 rounded-xl p-4"
-                  >
-                    <div className="flex items-center gap-2 mb-3">
-                      <Sparkles className="w-4 h-4 text-violet-500" />
-                      <span className="text-sm font-semibold text-violet-700">Resultado generado</span>
-                    </div>
-                    <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed font-sans">
-                      {output}
-                    </pre>
-                  </motion.div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="border-t border-slate-100 p-4">
-                <button
-                  onClick={handleGenerate}
-                  disabled={loading || !input.trim()}
-                  className="w-full bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-violet-500/30"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Generando con IA...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      Generar con IA
-                    </>
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+                <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed font-sans">{output}</pre>
+              </motion.div>
+            )}
+          </div>
         )}
-      </AnimatePresence>
+      </Modal>
     </div>
   );
 }

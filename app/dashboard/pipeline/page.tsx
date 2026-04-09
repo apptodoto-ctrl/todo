@@ -1,8 +1,9 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useState } from "react";
-import { Plus, GripVertical, MoreVertical, User, Clock, AlertTriangle, X } from "lucide-react";
+import { Plus, GripVertical, MoreVertical, Clock, AlertTriangle } from "lucide-react";
+import Modal from "@/components/ui/Modal";
 
 type CaseStatus = "compromiso" | "evaluacion" | "factores" | "priorizacion" | "plan" | "intervencion" | "alta";
 
@@ -164,59 +165,38 @@ export default function PipelinePage() {
       </motion.div>
 
       {/* Add Case Modal */}
-      <AnimatePresence>
-        {showModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 16 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 16 }}
-              className="bg-white rounded-3xl w-full max-w-sm shadow-2xl"
-            >
-              <div className="flex items-center justify-between p-6 border-b border-slate-100">
-                <div>
-                  <h3 className="font-bold text-slate-800">Agregar Caso</h3>
-                  {activeColumn && <p className="text-xs text-slate-400 mt-0.5">{columns.find(c => c.key === activeColumn)?.label}</p>}
-                </div>
-                <button onClick={() => setShowModal(false)} className="w-8 h-8 hover:bg-slate-100 rounded-xl flex items-center justify-center transition-colors">
-                  <X className="w-4 h-4 text-slate-500" />
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nombre del paciente *</label>
-                  <input type="text" value={newCase.patient} onChange={(e) => setNewCase({ ...newCase, patient: e.target.value })} placeholder="Nombre completo" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Edad</label>
-                    <input type="number" min={0} value={newCase.age || ""} onChange={(e) => setNewCase({ ...newCase, age: parseInt(e.target.value) || 0 })} placeholder="Años" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Días en etapa</label>
-                    <input type="number" min={0} value={newCase.days || ""} onChange={(e) => setNewCase({ ...newCase, days: parseInt(e.target.value) || 0 })} placeholder="0" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico</label>
-                  <input type="text" value={newCase.diagnosis} onChange={(e) => setNewCase({ ...newCase, diagnosis: e.target.value })} placeholder="Diagnóstico principal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-                </div>
-              </div>
-              <div className="px-6 pb-6">
-                <button onClick={addCase} disabled={!newCase.patient.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
-                  Agregar Caso
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title="Agregar Caso"
+        subtitle={activeColumn ? columns.find(c => c.key === activeColumn)?.label : undefined}
+        footer={
+          <button onClick={addCase} disabled={!newCase.patient.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
+            Agregar Caso
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nombre del paciente *</label>
+            <input autoFocus type="text" value={newCase.patient} onChange={(e) => setNewCase({ ...newCase, patient: e.target.value })} placeholder="Nombre completo" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Edad</label>
+              <input type="number" min={0} value={newCase.age || ""} onChange={(e) => setNewCase({ ...newCase, age: parseInt(e.target.value) || 0 })} placeholder="Años" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Días en etapa</label>
+              <input type="number" min={0} value={newCase.days || ""} onChange={(e) => setNewCase({ ...newCase, days: parseInt(e.target.value) || 0 })} placeholder="0" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico</label>
+            <input type="text" value={newCase.diagnosis} onChange={(e) => setNewCase({ ...newCase, diagnosis: e.target.value })} placeholder="Diagnóstico principal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

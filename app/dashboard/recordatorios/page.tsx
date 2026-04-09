@@ -2,7 +2,8 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Bell, Plus, RefreshCw, Calendar, Clock, Trash2, Edit2, CheckCircle2, X, AlertCircle } from "lucide-react";
+import { Bell, Plus, RefreshCw, Calendar, Clock, Trash2, Edit2, CheckCircle2 } from "lucide-react";
+import Modal from "@/components/ui/Modal";
 
 interface Reminder {
   id: number;
@@ -172,98 +173,47 @@ export default function RecordatoriosPage() {
         </div>
       )}
 
-      {/* New reminder modal */}
-      <AnimatePresence>
-        {showNew && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={(e) => e.target === e.currentTarget && setShowNew(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 16 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 16 }}
-              className="bg-white rounded-3xl w-full max-w-md shadow-2xl"
-            >
-              <div className="flex items-center justify-between p-6 border-b border-slate-100">
-                <h3 className="font-bold text-slate-800">Nuevo Recordatorio</h3>
-                <button
-                  onClick={() => setShowNew(false)}
-                  className="w-8 h-8 hover:bg-slate-100 rounded-xl flex items-center justify-center transition-colors"
-                >
-                  <X className="w-4 h-4 text-slate-500" />
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Título</label>
-                  <input
-                    type="text"
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    placeholder="Ej. Llamar a paciente..."
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Descripción</label>
-                  <textarea
-                    rows={2}
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    placeholder="Detalles adicionales..."
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha</label>
-                    <input
-                      type="date"
-                      value={form.date}
-                      onChange={(e) => setForm({ ...form, date: e.target.value })}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
-                    <input
-                      type="time"
-                      value={form.time}
-                      onChange={(e) => setForm({ ...form, time: e.target.value })}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
-                  <select
-                    value={form.type}
-                    onChange={(e) => setForm({ ...form, type: e.target.value as Reminder["type"] })}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
-                  >
-                    <option value="general">General</option>
-                    <option value="cita">Cita</option>
-                    <option value="tarea">Tarea</option>
-                    <option value="pago">Pago</option>
-                  </select>
-                </div>
-              </div>
-              <div className="px-6 pb-6">
-                <button
-                  onClick={addReminder}
-                  className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30"
-                >
-                  Crear Recordatorio
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* New Reminder Modal */}
+      <Modal
+        open={showNew}
+        onClose={() => setShowNew(false)}
+        title="Nuevo Recordatorio"
+        footer={
+          <button onClick={addReminder} disabled={!form.title.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
+            Crear Recordatorio
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Título *</label>
+            <input autoFocus type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ej. Llamar a paciente..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Descripción</label>
+            <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalles adicionales..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha</label>
+              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
+              <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as Reminder["type"] })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+              <option value="general">General</option>
+              <option value="cita">Cita</option>
+              <option value="tarea">Tarea</option>
+              <option value="pago">Pago</option>
+            </select>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
