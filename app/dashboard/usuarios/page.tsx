@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 
 const initialPatients = [
@@ -35,6 +35,7 @@ export default function UsuariosPage() {
   const [filter, setFilter] = useState("todos");
   const [showNewPatient, setShowNewPatient] = useState(false);
   const [newPatient, setNewPatient] = useState({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "" });
+  const [selectedPatient, setSelectedPatient] = useState<typeof initialPatients[0] | null>(null);
 
   const addPatient = () => {
     if (!newPatient.name.trim() || !newPatient.diagnosis.trim()) return;
@@ -178,7 +179,7 @@ export default function UsuariosPage() {
                   <button className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all">
                     <Phone className="w-3.5 h-3.5" />
                   </button>
-                  <button className="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-white hover:bg-gradient-to-r hover:from-violet-500 hover:to-purple-600 border border-violet-200 hover:border-transparent rounded-lg transition-all">
+                  <button onClick={() => setSelectedPatient(p)} className="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-white hover:bg-gradient-to-r hover:from-violet-500 hover:to-purple-600 border border-violet-200 hover:border-transparent rounded-lg transition-all">
                     Ver perfil
                   </button>
                 </div>
@@ -187,6 +188,60 @@ export default function UsuariosPage() {
           </motion.div>
         ))}
       </motion.div>
+
+      {/* Profile Modal */}
+      <Modal
+        open={!!selectedPatient}
+        onClose={() => setSelectedPatient(null)}
+        title="Perfil del Paciente"
+        maxWidth="max-w-lg"
+      >
+        {selectedPatient && (
+          <div className="space-y-5">
+            {/* Avatar + name */}
+            <div className="flex items-center gap-4">
+              <div className={`w-16 h-16 bg-gradient-to-br ${selectedPatient.color} rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg`}>
+                {selectedPatient.initials}
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">{selectedPatient.name}</h3>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${statusConfig[selectedPatient.status]?.cls}`}>
+                  {statusConfig[selectedPatient.status]?.label}
+                </span>
+              </div>
+            </div>
+
+            {/* Info grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { icon: User, label: "Edad", value: `${selectedPatient.age} años` },
+                { icon: Activity, label: "Terapeuta", value: selectedPatient.therapist },
+                { icon: ClipboardList, label: "Diagnóstico", value: selectedPatient.diagnosis },
+                { icon: Hash, label: "Sesiones", value: `${selectedPatient.sessions} realizadas` },
+                { icon: Calendar, label: "Próxima sesión", value: selectedPatient.nextSession || "—" },
+              ].map(({ icon: Icon, label, value }) => (
+                <div key={label} className="bg-slate-50 rounded-xl p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Icon className="w-3.5 h-3.5 text-violet-500" />
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-700">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-1">
+              <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:border-violet-300 hover:text-violet-600 transition-all">
+                <Mail className="w-4 h-4" /> Enviar email
+              </button>
+              <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:border-violet-300 hover:text-violet-600 transition-all">
+                <Phone className="w-4 h-4" /> Llamar
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* New Patient Modal */}
       <Modal
