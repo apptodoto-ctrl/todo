@@ -1,12 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error("ANTHROPIC_API_KEY is not set in environment variables");
+function getClient() {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error("ANTHROPIC_API_KEY is not set in environment variables");
+  }
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
-
-export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 /**
  * Sends a message to Claude and returns the text response.
@@ -26,7 +25,7 @@ export async function askClaude(
     systemPrompt,
   } = options ?? {};
 
-  const message = await anthropic.messages.create({
+  const message = await getClient().messages.create({
     model,
     max_tokens: maxTokens,
     ...(systemPrompt && { system: systemPrompt }),
