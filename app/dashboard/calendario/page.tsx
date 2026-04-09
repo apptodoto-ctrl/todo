@@ -35,12 +35,24 @@ export default function CalendarioPage() {
   const [selected, setSelected] = useState<Date | null>(new Date(2026, 2, 22));
   const [localEvents, setLocalEvents] = useState(events);
   const [showNewEvent, setShowNewEvent] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: "", time: "10:00", type: "sesion", location: "Sala 1" });
+  const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "Sala 1" });
+
+  const openNewEvent = () => {
+    const defaultDate = selected
+      ? format(selected, "yyyy-MM-dd")
+      : format(new Date(), "yyyy-MM-dd");
+    setNewEvent({ title: "", date: defaultDate, time: "10:00", type: "sesion", location: "Sala 1" });
+    setShowNewEvent(true);
+  };
 
   const addEvent = () => {
-    if (!newEvent.title.trim() || !selected) return;
-    setLocalEvents((prev) => [...prev, { date: selected, ...newEvent }]);
-    setNewEvent({ title: "", time: "10:00", type: "sesion", location: "Sala 1" });
+    if (!newEvent.title.trim() || !newEvent.date) return;
+    const [y, m, d] = newEvent.date.split("-").map(Number);
+    const eventDate = new Date(y, m - 1, d);
+    setLocalEvents((prev) => [...prev, { date: eventDate, title: newEvent.title, time: newEvent.time, type: newEvent.type, location: newEvent.location }]);
+    setSelected(eventDate);
+    setCurrent(new Date(y, m - 1, 1));
+    setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "Sala 1" });
     setShowNewEvent(false);
   };
 
@@ -81,7 +93,7 @@ export default function CalendarioPage() {
             <ChevronRight className="w-4 h-4 text-slate-600" />
           </button>
         </div>
-        <button onClick={() => setShowNewEvent(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
+        <button onClick={openNewEvent} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
           <Plus className="w-4 h-4" /> Nueva Cita
         </button>
       </motion.div>
@@ -203,7 +215,7 @@ export default function CalendarioPage() {
             </div>
           )}
 
-          <button onClick={() => setShowNewEvent(true)} className="mt-4 w-full text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-xl py-2.5 transition-colors flex items-center justify-center gap-2">
+          <button onClick={openNewEvent} className="mt-4 w-full text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-xl py-2.5 transition-colors flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" /> Agregar cita
           </button>
         </motion.div>
@@ -232,11 +244,15 @@ export default function CalendarioPage() {
                 </button>
               </div>
               <div className="p-6 space-y-4">
-                {selected && (
-                  <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-2.5 text-sm text-violet-700 font-medium">
-                    📅 {format(selected, "EEEE d 'de' MMMM", { locale: es })}
-                  </div>
-                )}
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha *</label>
+                  <input
+                    type="date"
+                    value={newEvent.date}
+                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                  />
+                </div>
                 <div>
                   <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente / Título *</label>
                   <input type="text" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Nombre del paciente o razón" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
