@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { Plus, Check, Clock, AlertCircle, Trash2, MoreVertical } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import { initialPatients } from "@/lib/patientsData";
 
 type Priority = "alta" | "media" | "baja";
 type Status = "pendiente" | "en_progreso" | "completada";
@@ -269,13 +270,16 @@ export default function TareasPage() {
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente</label>
-              <input
-                type="text"
+              <select
                 value={newTask.patient}
                 onChange={(e) => setNewTask({ ...newTask, patient: e.target.value })}
-                placeholder="Nombre del paciente"
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all placeholder-slate-300"
-              />
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+              >
+                <option value="">Sin paciente asignado</option>
+                {initialPatients.map((p) => (
+                  <option key={p.id} value={p.name}>{p.name}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
