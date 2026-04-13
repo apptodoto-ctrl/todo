@@ -9,19 +9,19 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { useRouter } from "next/navigation";
 
 const statsData = [
-  { label: "Pacientes activos", value: "24", change: "+3 este mes", icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600" },
-  { label: "Citas esta semana", value: "12", change: "3 hoy", icon: Calendar, color: "from-blue-500 to-indigo-600", bg: "bg-blue-50", text: "text-blue-600" },
-  { label: "Tareas pendientes", value: "8", change: "2 vencidas", icon: CheckSquare, color: "from-amber-500 to-orange-500", bg: "bg-amber-50", text: "text-amber-600" },
-  { label: "Recordatorios", value: "5", change: "1 próximo", icon: Bell, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", text: "text-emerald-600" },
+  { label: "Usuarios activos", value: "24", change: "+3 este mes", icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600", href: "/dashboard/usuarios" },
+  { label: "Citas esta semana", value: "12", change: "3 hoy", icon: Calendar, color: "from-blue-500 to-indigo-600", bg: "bg-blue-50", text: "text-blue-600", href: "/dashboard/calendario" },
+  { label: "Tareas pendientes", value: "8", change: "2 vencidas", icon: CheckSquare, color: "from-amber-500 to-orange-500", bg: "bg-amber-50", text: "text-amber-600", href: "/dashboard/tareas" },
+  { label: "Recordatorios", value: "5", change: "1 próximo", icon: Bell, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", text: "text-emerald-600", href: "/dashboard/recordatorios" },
 ];
 
 const chartData = [
-  { mes: "Oct", sesiones: 32, pacientes: 18 },
-  { mes: "Nov", sesiones: 38, pacientes: 20 },
-  { mes: "Dic", sesiones: 28, pacientes: 19 },
-  { mes: "Ene", sesiones: 45, pacientes: 22 },
-  { mes: "Feb", sesiones: 52, pacientes: 24 },
-  { mes: "Mar", sesiones: 48, pacientes: 24 },
+  { mes: "Oct", sesiones: 32, usuarios: 18 },
+  { mes: "Nov", sesiones: 38, usuarios: 20 },
+  { mes: "Dic", sesiones: 28, usuarios: 19 },
+  { mes: "Ene", sesiones: 45, usuarios: 22 },
+  { mes: "Feb", sesiones: 52, usuarios: 24 },
+  { mes: "Mar", sesiones: 48, usuarios: 24 },
 ];
 
 const recentPatients = [
@@ -74,7 +74,8 @@ export default function InicioPage() {
         {statsData.map((stat) => (
           <div
             key={stat.label}
-            className="bg-white rounded-2xl p-5 border border-slate-200/60 hover:border-violet-200 hover:shadow-lg hover:shadow-violet-500/5 transition-all duration-300 group"
+            onClick={() => router.push(stat.href)}
+            className="bg-white rounded-2xl p-5 border border-slate-200/60 hover:border-violet-200 hover:shadow-lg hover:shadow-violet-500/5 transition-all duration-300 group cursor-pointer"
           >
             <div className="flex items-center justify-between mb-4">
               <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center`}>
@@ -98,14 +99,14 @@ export default function InicioPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="font-semibold text-slate-800">Actividad Clínica</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Sesiones y pacientes últimos 6 meses</p>
+              <p className="text-xs text-slate-400 mt-0.5">Sesiones y usuarios últimos 6 meses</p>
             </div>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5 text-slate-500">
                 <span className="w-3 h-0.5 bg-violet-500 rounded inline-block" /> Sesiones
               </span>
               <span className="flex items-center gap-1.5 text-slate-500">
-                <span className="w-3 h-0.5 bg-indigo-400 rounded inline-block" /> Pacientes
+                <span className="w-3 h-0.5 bg-indigo-400 rounded inline-block" /> Usuarios
               </span>
             </div>
           </div>
@@ -129,7 +130,7 @@ export default function InicioPage() {
                 cursor={{ stroke: "#8b5cf6", strokeWidth: 1, strokeDasharray: "4 4" }}
               />
               <Area type="monotone" dataKey="sesiones" stroke="#8b5cf6" strokeWidth={2} fill="url(#gradSesiones)" dot={false} />
-              <Area type="monotone" dataKey="pacientes" stroke="#6366f1" strokeWidth={2} fill="url(#gradPacientes)" dot={false} />
+              <Area type="monotone" dataKey="usuarios" stroke="#6366f1" strokeWidth={2} fill="url(#gradPacientes)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </motion.div>
@@ -167,7 +168,7 @@ export default function InicioPage() {
       {/* Recent patients */}
       <motion.div variants={item} className="bg-white rounded-2xl border border-slate-200/60">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h3 className="font-semibold text-slate-800">Pacientes Recientes</h3>
+          <h3 className="font-semibold text-slate-800">Usuarios Recientes</h3>
           <button onClick={() => router.push("/dashboard/usuarios")} className="text-sm text-violet-600 hover:text-violet-700 font-medium flex items-center gap-1">
             Ver todos <ArrowUpRight className="w-3.5 h-3.5" />
           </button>

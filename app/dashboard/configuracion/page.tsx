@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { Camera, Save, Eye, EyeOff, Shield, AlertTriangle, User, Lock, Trash2, Upload } from "lucide-react";
+import { useRef } from "react";
 
 const tabs = [
   { id: "perfil", label: "Perfil", icon: User },
@@ -16,6 +17,8 @@ export default function ConfiguracionPage() {
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [saved, setSaved] = useState("");
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState({
     nombre: "Josefina",
     apellido: "Pizarro",
@@ -23,6 +26,17 @@ export default function ConfiguracionPage() {
     especialidad: "Terapeuta Ocupacional",
     email: "japieaters@gmail.com",
   });
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setProfileImage(ev.target?.result as string);
+      showSaved("Foto de perfil actualizada");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const showSaved = (msg: string) => {
     setSaved(msg);
@@ -80,17 +94,34 @@ export default function ConfiguracionPage() {
             <p className="text-xs text-slate-400 mb-5">
               Actualiza tu foto de perfil. Formatos permitidos: JPG, PNG. Tamaño máximo: 5MB.
             </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg"
+              className="hidden"
+              onChange={handleImageUpload}
+            />
             <div className="flex items-center gap-6">
               <div className="relative">
-                <div className="w-20 h-20 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-violet-500/30">
-                  JP
-                </div>
-                <button className="absolute -bottom-1 -right-1 w-7 h-7 bg-violet-500 hover:bg-violet-600 text-white rounded-lg flex items-center justify-center transition-colors shadow-md">
+                {profileImage ? (
+                  <img src={profileImage} alt="Perfil" className="w-20 h-20 rounded-2xl object-cover shadow-lg" />
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-violet-500/30">
+                    JP
+                  </div>
+                )}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-violet-500 hover:bg-violet-600 text-white rounded-lg flex items-center justify-center transition-colors shadow-md"
+                >
                   <Camera className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div>
-                <button className="flex items-center gap-2 text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 px-4 py-2.5 rounded-xl transition-colors">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 px-4 py-2.5 rounded-xl transition-colors"
+                >
                   <Upload className="w-4 h-4" /> Seleccionar imagen
                 </button>
                 <p className="text-xs text-slate-400 mt-2">JPG, PNG hasta 5MB</p>
@@ -129,7 +160,7 @@ export default function ConfiguracionPage() {
                   value={profile.telefono}
                   onChange={(e) => setProfile({ ...profile, telefono: e.target.value })}
                   placeholder="Tu número de teléfono"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all placeholder-slate-300"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all placeholder-slate-400"
                 />
               </div>
               <div>
@@ -242,7 +273,7 @@ export default function ConfiguracionPage() {
             },
             {
               title: "Exportar mis datos",
-              description: "Descarga todos tus datos personales y de pacientes en formato JSON.",
+              description: "Descarga todos tus datos personales y de usuarios en formato JSON.",
               action: "Exportar datos",
               variant: "info",
             },

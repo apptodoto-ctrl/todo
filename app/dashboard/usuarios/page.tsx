@@ -1,8 +1,8 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash } from "lucide-react";
+import { useState, useRef } from "react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Edit2, MessageCircle, X } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { initialPatients } from "@/lib/patientsData";
 
@@ -26,8 +26,10 @@ export default function UsuariosPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
   const [showNewPatient, setShowNewPatient] = useState(false);
-  const [newPatient, setNewPatient] = useState({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "" });
+  const [newPatient, setNewPatient] = useState({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "" });
   const [selectedPatient, setSelectedPatient] = useState<typeof initialPatients[0] | null>(null);
+  const [editingPatient, setEditingPatient] = useState<typeof initialPatients[0] | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
 
   const addPatient = () => {
     if (!newPatient.name.trim() || !newPatient.diagnosis.trim()) return;
@@ -35,9 +37,15 @@ export default function UsuariosPage() {
     const colors = ["from-violet-500 to-purple-600", "from-blue-500 to-indigo-600", "from-emerald-500 to-teal-600", "from-amber-500 to-orange-500", "from-pink-500 to-rose-500"];
     const color = colors[patients.length % colors.length];
     setPatients((prev) => [...prev, { id: Date.now(), ...newPatient, therapist: "Josefina P.", sessions: 0, initials, color }]);
-    setNewPatient({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "" });
+    setNewPatient({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "" });
     setShowNewPatient(false);
     setFilter("todos");
+  };
+
+  const saveEdit = () => {
+    if (!editingPatient) return;
+    setPatients((prev) => prev.map((p) => p.id === editingPatient.id ? editingPatient : p));
+    setEditingPatient(null);
   };
 
   const filtered = patients.filter((p) => {
@@ -53,10 +61,10 @@ export default function UsuariosPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="text-slate-500 text-sm">{patients.length} pacientes registrados</p>
+          <p className="text-slate-500 text-sm">{patients.length} usuarios registrados</p>
         </div>
         <button onClick={() => setShowNewPatient(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 self-start sm:self-auto">
-          <Plus className="w-4 h-4" /> Nuevo Paciente
+          <Plus className="w-4 h-4" /> Nuevo Usuario
         </button>
       </div>
 
@@ -73,7 +81,7 @@ export default function UsuariosPage() {
             placeholder="Buscar por nombre o diagnóstico..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
           />
         </div>
         <div className="flex gap-2">
@@ -101,7 +109,7 @@ export default function UsuariosPage() {
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Pacientes activos", value: patients.filter(p => p.status === "activo").length, color: "text-emerald-600" },
+          { label: "Usuarios activos", value: patients.filter(p => p.status === "activo").length, color: "text-emerald-600" },
           { label: "En evaluación", value: patients.filter(p => p.status === "evaluacion").length, color: "text-blue-600" },
           { label: "Dados de alta", value: patients.filter(p => p.status === "alta").length, color: "text-slate-600" },
         ].map((s) => (
@@ -143,9 +151,40 @@ export default function UsuariosPage() {
                   <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg ${statusConfig[p.status]?.cls}`}>
                     {statusConfig[p.status]?.label}
                   </span>
-                  <button className="p-1 text-slate-300 hover:text-slate-600 transition-colors">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === p.id ? null : p.id); }}
+                      className="p-1 text-slate-300 hover:text-slate-600 transition-colors"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                    {menuOpenId === p.id && (
+                      <div className="absolute right-0 top-8 bg-white border border-slate-200 rounded-xl shadow-lg z-20 w-44 py-1 overflow-hidden">
+                        <button
+                          onClick={() => { setEditingPatient({ ...p }); setMenuOpenId(null); }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" /> Editar usuario
+                        </button>
+                        <a
+                          href={`https://wa.me/${(p as Record<string, unknown>).phone || ""}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => setMenuOpenId(null)}
+                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                        </a>
+                        <a
+                          href={`mailto:${(p as Record<string, unknown>).email || ""}`}
+                          onClick={() => setMenuOpenId(null)}
+                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                        >
+                          <Mail className="w-3.5 h-3.5" /> Enviar correo
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -165,12 +204,12 @@ export default function UsuariosPage() {
                   <span className="font-semibold text-slate-600">{p.sessions}</span> sesiones
                 </div>
                 <div className="flex gap-1.5">
-                  <button className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all">
+                  <a href={`mailto:${(p as Record<string, unknown>).email || ""}`} className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all">
                     <Mail className="w-3.5 h-3.5" />
-                  </button>
-                  <button className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all">
-                    <Phone className="w-3.5 h-3.5" />
-                  </button>
+                  </a>
+                  <a href={`https://wa.me/${(p as Record<string, unknown>).phone || ""}`} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all">
+                    <MessageCircle className="w-3.5 h-3.5" />
+                  </a>
                   <button onClick={() => setSelectedPatient(p)} className="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-white hover:bg-gradient-to-r hover:from-violet-500 hover:to-purple-600 border border-violet-200 hover:border-transparent rounded-lg transition-all">
                     Ver perfil
                   </button>
@@ -181,16 +220,20 @@ export default function UsuariosPage() {
         ))}
       </motion.div>
 
+      {/* Click outside to close menu */}
+      {menuOpenId !== null && (
+        <div className="fixed inset-0 z-10" onClick={() => setMenuOpenId(null)} />
+      )}
+
       {/* Profile Modal */}
       <Modal
         open={!!selectedPatient}
         onClose={() => setSelectedPatient(null)}
-        title="Perfil del Paciente"
+        title="Perfil del Usuario"
         maxWidth="max-w-lg"
       >
         {selectedPatient && (
           <div className="space-y-5">
-            {/* Avatar + name */}
             <div className="flex items-center gap-4">
               <div className={`w-16 h-16 bg-gradient-to-br ${selectedPatient.color} rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg`}>
                 {selectedPatient.initials}
@@ -203,7 +246,6 @@ export default function UsuariosPage() {
               </div>
             </div>
 
-            {/* Info grid */}
             <div className="grid grid-cols-2 gap-3">
               {[
                 { icon: User, label: "Edad", value: `${selectedPatient.age} años` },
@@ -222,14 +264,56 @@ export default function UsuariosPage() {
               ))}
             </div>
 
-            {/* Actions */}
             <div className="flex gap-2 pt-1">
-              <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:border-violet-300 hover:text-violet-600 transition-all">
+              <a href={`mailto:${(selectedPatient as Record<string, unknown>).email || ""}`} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:border-violet-300 hover:text-violet-600 transition-all">
                 <Mail className="w-4 h-4" /> Enviar email
-              </button>
-              <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:border-violet-300 hover:text-violet-600 transition-all">
-                <Phone className="w-4 h-4" /> Llamar
-              </button>
+              </a>
+              <a href={`https://wa.me/${(selectedPatient as Record<string, unknown>).phone || ""}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:border-emerald-300 hover:text-emerald-600 transition-all">
+                <MessageCircle className="w-4 h-4" /> WhatsApp
+              </a>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Patient Modal */}
+      <Modal
+        open={!!editingPatient}
+        onClose={() => setEditingPatient(null)}
+        title="Editar Usuario"
+        footer={
+          <button onClick={saveEdit} disabled={!editingPatient?.name.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
+            Guardar Cambios
+          </button>
+        }
+      >
+        {editingPatient && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nombre *</label>
+                <input type="text" value={editingPatient.name} onChange={(e) => setEditingPatient({ ...editingPatient, name: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Edad</label>
+                <input type="number" min={0} max={120} value={editingPatient.age || ""} onChange={(e) => setEditingPatient({ ...editingPatient, age: parseInt(e.target.value) || 0 })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico</label>
+              <input type="text" value={editingPatient.diagnosis} onChange={(e) => setEditingPatient({ ...editingPatient, diagnosis: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Estado</label>
+              <select value={editingPatient.status} onChange={(e) => setEditingPatient({ ...editingPatient, status: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                <option value="activo">Activo</option>
+                <option value="evaluacion">En Evaluación</option>
+                <option value="alta">Alta</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Próxima sesión</label>
+              <input type="text" value={editingPatient.nextSession} onChange={(e) => setEditingPatient({ ...editingPatient, nextSession: e.target.value })} placeholder="Ej. 25 Abr 10:00" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
           </div>
         )}
@@ -239,10 +323,10 @@ export default function UsuariosPage() {
       <Modal
         open={showNewPatient}
         onClose={() => setShowNewPatient(false)}
-        title="Nuevo Paciente"
+        title="Nuevo Usuario"
         footer={
           <button onClick={addPatient} disabled={!newPatient.name.trim() || !newPatient.diagnosis.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
-            Registrar Paciente
+            Registrar Usuario
           </button>
         }
       >
@@ -250,20 +334,20 @@ export default function UsuariosPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nombre *</label>
-              <input autoFocus type="text" value={newPatient.name} onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })} placeholder="Nombre completo" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input autoFocus type="text" value={newPatient.name} onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })} placeholder="Nombre completo" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Edad</label>
-              <input type="number" min={0} max={120} value={newPatient.age || ""} onChange={(e) => setNewPatient({ ...newPatient, age: parseInt(e.target.value) || 0 })} placeholder="Años" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input type="number" min={0} max={120} value={newPatient.age || ""} onChange={(e) => setNewPatient({ ...newPatient, age: parseInt(e.target.value) || 0 })} placeholder="Años" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico *</label>
-            <input type="text" value={newPatient.diagnosis} onChange={(e) => setNewPatient({ ...newPatient, diagnosis: e.target.value })} placeholder="Diagnóstico principal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input type="text" value={newPatient.diagnosis} onChange={(e) => setNewPatient({ ...newPatient, diagnosis: e.target.value })} placeholder="Diagnóstico principal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Estado</label>
-            <select value={newPatient.status} onChange={(e) => setNewPatient({ ...newPatient, status: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+            <select value={newPatient.status} onChange={(e) => setNewPatient({ ...newPatient, status: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
               <option value="activo">Activo</option>
               <option value="evaluacion">En Evaluación</option>
               <option value="alta">Alta</option>
@@ -271,7 +355,7 @@ export default function UsuariosPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Próxima sesión</label>
-            <input type="text" value={newPatient.nextSession} onChange={(e) => setNewPatient({ ...newPatient, nextSession: e.target.value })} placeholder="Ej. 25 Abr 10:00" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input type="text" value={newPatient.nextSession} onChange={(e) => setNewPatient({ ...newPatient, nextSession: e.target.value })} placeholder="Ej. 25 Abr 10:00" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
         </div>
       </Modal>

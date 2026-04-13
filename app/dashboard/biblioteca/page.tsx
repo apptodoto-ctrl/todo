@@ -1,12 +1,22 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Upload, Search, FileText, File, Image, Archive, Download, Trash2, Eye, FolderOpen } from "lucide-react";
 
 const categories = ["Todas", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios"];
 
-const mockDocuments = [
+interface Doc {
+  id: number;
+  name: string;
+  category: string;
+  size: string;
+  date: string;
+  type: string;
+  url?: string;
+}
+
+const mockDocuments: Doc[] = [
   { id: 1, name: "Protocolo Evaluación TEA.pdf", category: "Protocolos", size: "2.4 MB", date: "15 Mar 2026", type: "pdf" },
   { id: 2, name: "Guía Actividades Motoras Finas.pdf", category: "Guías", size: "1.8 MB", date: "10 Mar 2026", type: "pdf" },
   { id: 3, name: "Formulario Anamnesis.docx", category: "Formularios", size: "450 KB", date: "05 Mar 2026", type: "doc" },
@@ -22,12 +32,77 @@ const fileIcons: Record<string, { icon: typeof FileText; color: string; bg: stri
   img: { icon: Image, color: "text-amber-500", bg: "bg-amber-50" },
 };
 
+function getFileType(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  if (["pdf"].includes(ext)) return "pdf";
+  if (["doc", "docx"].includes(ext)) return "doc";
+  if (["xls", "xlsx", "csv"].includes(ext)) return "excel";
+  if (["jpg", "jpeg", "png", "gif", "svg"].includes(ext)) return "img";
+  return "pdf";
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
 export default function BibliotecaPage() {
   const [category, setCategory] = useState("Todas");
   const [search, setSearch] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [documents, setDocuments] = useState<Doc[]>(mockDocuments);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = mockDocuments.filter((d) => {
+  const handleFiles = (files: FileList | null) => {
+    if (!files) return;
+    const newDocs: Doc[] = Array.from(files).map((f) => ({
+      id: Date.now() + Math.random(),
+      name: f.name,
+      category: "Todas",
+      size: formatFileSize(f.size),
+      date: new Date().toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" }),
+      type: getFileType(f.name),
+      url: URL.createObjectURL(f),
+    }));
+    setDocuments((prev) => [...newDocs, ...prev]);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(false);
+    handleFiles(e.dataTransfer.files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(true);
+  };
+
+  const deleteDoc = (id: number) => setDocuments((prev) => prev.filter((d) => d.id !== id));
+
+  const viewDoc = (doc: Doc) => {
+    if (doc.url) {
+      window.open(doc.url, "_blank");
+    } else {
+      alert(`Vista previa de "${doc.name}" (archivo de demo)`);
+    }
+  };
+
+  const downloadDoc = (doc: Doc) => {
+    if (doc.url) {
+      const a = document.createElement("a");
+      a.href = doc.url;
+      a.download = doc.name;
+      a.click();
+    } else {
+      alert(`Descargando "${doc.name}" (archivo de demo)`);
+    }
+  };
+
+  const filtered = documents.filter((d) => {
     const matchCat = category === "Todas" || d.category === category;
     const matchSearch = d.name.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
@@ -35,6 +110,15 @@ export default function BibliotecaPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+
       {/* Header toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative flex-1 max-w-sm">
@@ -44,10 +128,13 @@ export default function BibliotecaPage() {
             placeholder="Buscar documentos..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
           />
         </div>
-        <button className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 shrink-0">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 shrink-0"
+        >
           <Upload className="w-4 h-4" /> Subir Documento
         </button>
       </div>
@@ -56,10 +143,11 @@ export default function BibliotecaPage() {
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={() => setDragging(false)}
-        className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all ${
+        onDragOver={handleDragOver}
+        onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all cursor-pointer ${
           dragging
             ? "border-violet-400 bg-violet-50"
             : "border-slate-200 hover:border-violet-300 hover:bg-violet-50/30"
@@ -70,7 +158,7 @@ export default function BibliotecaPage() {
         </div>
         <p className="font-semibold text-slate-700">Arrastra archivos aquí</p>
         <p className="text-sm text-slate-400 mt-1">o haz clic para seleccionar · PDF, Word, Excel, Imágenes</p>
-        <p className="text-xs text-slate-300 mt-2">Tamaño máximo: 20MB por archivo</p>
+        <p className="text-xs text-slate-400 mt-2">Tamaño máximo: 20MB por archivo</p>
       </motion.div>
 
       {/* Category filters */}
@@ -130,13 +218,22 @@ export default function BibliotecaPage() {
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-all">
-                  <button className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-600 hover:text-violet-600 bg-slate-100 hover:bg-violet-50 rounded-xl py-2 transition-colors">
+                  <button
+                    onClick={() => viewDoc(doc)}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-600 hover:text-violet-600 bg-slate-100 hover:bg-violet-50 rounded-xl py-2 transition-colors"
+                  >
                     <Eye className="w-3.5 h-3.5" /> Ver
                   </button>
-                  <button className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-600 hover:text-violet-600 bg-slate-100 hover:bg-violet-50 rounded-xl py-2 transition-colors">
+                  <button
+                    onClick={() => downloadDoc(doc)}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-600 hover:text-violet-600 bg-slate-100 hover:bg-violet-50 rounded-xl py-2 transition-colors"
+                  >
                     <Download className="w-3.5 h-3.5" /> Descargar
                   </button>
-                  <button className="flex items-center justify-center text-xs font-medium text-slate-400 hover:text-red-500 bg-slate-100 hover:bg-red-50 rounded-xl px-3 py-2 transition-colors">
+                  <button
+                    onClick={() => deleteDoc(doc.id)}
+                    className="flex items-center justify-center text-xs font-medium text-slate-400 hover:text-red-500 bg-slate-100 hover:bg-red-50 rounded-xl px-3 py-2 transition-colors"
+                  >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>

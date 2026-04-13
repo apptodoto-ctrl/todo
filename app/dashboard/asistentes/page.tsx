@@ -14,20 +14,20 @@ const assistants = [
     id: "informe",
     title: "Asistente Informe Inicial",
     subtitle: "Redacción de Informes Iniciales",
-    description: "Genera informes iniciales estructurados basados en la información del paciente y las mejores prácticas clínicas.",
+    description: "Genera informes iniciales estructurados basados en la información del usuario y las mejores prácticas clínicas.",
     icon: FileText,
     gradient: "from-violet-500 to-purple-700",
     bgGlow: "bg-violet-500/10",
     tag: "INFORME INICIAL",
-    prompt: "Ingresa el nombre del paciente, edad, diagnóstico y motivo de consulta para generar el informe inicial.",
+    prompt: "Ingresa el nombre del usuario, edad, diagnóstico y motivo de consulta para generar el informe inicial.",
     sampleOutput: `**INFORME INICIAL DE EVALUACIÓN TERAPÉUTICA**
 
-**Datos del Paciente:** [Nombre], [Edad] años
+**Datos del Usuario:** [Nombre], [Edad] años
 **Diagnóstico Principal:** [Diagnóstico]
 **Fecha de Evaluación:** ${new Date().toLocaleDateString("es-CL")}
 
 **I. Motivo de Consulta**
-El paciente es derivado por [especialidad] debido a [motivo], presentando dificultades en las áreas de desempeño ocupacional...
+El usuario es derivado por [especialidad] debido a [motivo], presentando dificultades en las áreas de desempeño ocupacional...
 
 **II. Historia Ocupacional**
 Se observa un patrón de desempeño [descripción], con impacto significativo en actividades de vida diaria...
@@ -48,12 +48,12 @@ Se propone intervención de terapia ocupacional con frecuencia [semanal/quincena
     id: "cuentos",
     title: "Asistente Creadora de Cuentos",
     subtitle: "Creadora Cuentos para Exposición",
-    description: "Crea cuentos terapéuticos personalizados para ayudar en el proceso de exposición y tratamiento.",
+    description: "Crea cuentos terapéuticos personalizados para ayudar en el proceso de exposición y tratamiento del usuario.",
     icon: BookOpen,
     gradient: "from-blue-500 to-indigo-700",
     bgGlow: "bg-blue-500/10",
     tag: "CREADORA DE CUENTOS",
-    prompt: "Describe el miedo o situación a trabajar, la edad del paciente y el contexto para crear el cuento personalizado.",
+    prompt: "Describe el miedo o situación a trabajar, la edad del usuario y el contexto para crear el cuento personalizado.",
     sampleOutput: `**EL VALIENTE VIAJE DE LUNA** 🌙
 
 Había una vez una niña llamada Luna que vivía en un hermoso pueblo entre montañas verdes...
@@ -72,7 +72,7 @@ Un día, Luna conoció a Pinto, un pequeño pájaro colorido que también había
     id: "actividades",
     title: "Asistente Ideas para Actividades",
     subtitle: "Creadora Actividades Creativas",
-    description: "Sugiere actividades creativas y terapéuticas adaptadas a las necesidades específicas de cada paciente.",
+    description: "Sugiere actividades creativas y terapéuticas adaptadas a las necesidades específicas de cada usuario.",
     icon: Lightbulb,
     gradient: "from-amber-500 to-orange-600",
     bgGlow: "bg-amber-500/10",
@@ -114,8 +114,8 @@ export default function AsistentesPage() {
 
   const systemPrompts: Record<string, string> = {
     informe: "Eres un asistente experto en terapia ocupacional. Genera informes iniciales estructurados, profesionales y completos en español, siguiendo estándares clínicos.",
-    cuentos: "Eres un especialista en terapia narrativa y terapia ocupacional. Crea cuentos terapéuticos personalizados, creativos y apropiados para la edad del paciente, en español.",
-    actividades: "Eres un terapeuta ocupacional experto en diseño de actividades terapéuticas. Propone actividades detalladas, creativas y adaptadas a las necesidades específicas del paciente, en español.",
+    cuentos: "Eres un especialista en terapia narrativa y terapia ocupacional. Crea cuentos terapéuticos personalizados, creativos y apropiados para la edad del usuario, en español.",
+    actividades: "Eres un terapeuta ocupacional experto en diseño de actividades terapéuticas. Propone actividades detalladas, creativas y adaptadas a las necesidades específicas del usuario, en español.",
   };
 
   const handleGenerate = async () => {
@@ -125,7 +125,7 @@ export default function AsistentesPage() {
 
     const patient = initialPatients.find((p) => p.id === selectedPatientId);
     const patientContext = patient
-      ? `DATOS DEL PACIENTE SELECCIONADO:\n- Nombre: ${patient.name}\n- Edad: ${patient.age} años\n- Diagnóstico: ${patient.diagnosis}\n- Terapeuta: ${patient.therapist}\n- Sesiones realizadas: ${patient.sessions}\n- Próxima sesión: ${patient.nextSession}\n- Estado: ${patient.status}\n\n`
+      ? `DATOS DEL USUARIO SELECCIONADO:\n- Nombre: ${patient.name}\n- Edad: ${patient.age} años\n- Diagnóstico: ${patient.diagnosis}\n- Terapeuta: ${patient.therapist}\n- Sesiones realizadas: ${patient.sessions}\n- Próxima sesión: ${patient.nextSession}\n- Estado: ${patient.status}\n\n`
       : "";
 
     const fullPrompt = patientContext + input;
@@ -271,14 +271,14 @@ export default function AsistentesPage() {
             {/* Patient selector */}
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-violet-500" /> Paciente
+                <User className="w-3.5 h-3.5 text-violet-500" /> Usuario
               </label>
               <select
                 value={selectedPatientId}
                 onChange={(e) => setSelectedPatientId(e.target.value === "" ? "" : Number(e.target.value))}
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
               >
-                <option value="">Seleccionar paciente (opcional)</option>
+                <option value="">Seleccionar usuario (opcional)</option>
                 {initialPatients.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} — {p.diagnosis} · {p.age} años
@@ -311,7 +311,7 @@ export default function AsistentesPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Agrega detalles específicos, motivo de consulta, observaciones..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all placeholder-slate-400"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all placeholder-slate-400"
               />
             </div>
             {output && (
