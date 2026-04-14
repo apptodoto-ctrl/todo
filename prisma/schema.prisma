@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Patient {
+  id          Int      @id @default(autoincrement())
+  name        String
+  age         Int
+  diagnosis   String
+  therapist   String   @default("Josefina P.")
+  sessions    Int      @default(0)
+  nextSession String   @default("")
+  status      String   @default("activo")
+  initials    String
+  color       String   @default("from-violet-500 to-purple-600")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks         Task[]
+  pipelineCases PipelineCase[]
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @default("")
+  priority    String   @default("media")
+  status      String   @default("pendiente")
+  due         String   @default("")
+  category    String   @default("Clínico")
+  patientName String   @default("")
+  patientId   Int?
+  patient     Patient? @relation(fields: [patientId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Appointment {
+  id        Int      @id @default(autoincrement())
+  title     String
+  date      String
+  time      String
+  type      String   @default("sesion")
+  location  String   @default("Sala 1")
+  createdAt DateTime @default(now())
+}
+
+model PipelineColumn {
+  id        String   @id @default(cuid())
+  label     String
+  color     String
+  accent    String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  cases     PipelineCase[]
+}
+
+model PipelineCase {
+  id        Int            @id @default(autoincrement())
+  patient   String
+  age       Int
+  diagnosis String
+  therapist String         @default("JP")
+  days      Int            @default(0)
+  overdue   Boolean        @default(false)
+  initials  String
+  columnId  String
+  column    PipelineColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  patientId Int?
+  patientRef Patient?      @relation(fields: [patientId], references: [id])
+  createdAt DateTime       @default(now())
+}

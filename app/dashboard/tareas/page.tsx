@@ -1,10 +1,9 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Check, Clock, AlertCircle, Trash2, MoreVertical } from "lucide-react";
 import Modal from "@/components/ui/Modal";
-import { initialPatients } from "@/lib/patientsData";
 
 type Priority = "alta" | "media" | "baja";
 type Status = "pendiente" | "en_progreso" | "completada";
@@ -20,45 +19,65 @@ interface Task {
   category: string;
 }
 
-const initialTasks: Task[] = [
-  { id: 1, title: "Redactar informe inicial de María G.", description: "Completar evaluación inicial y documentar diagnóstico", priority: "alta", status: "pendiente", due: "Hoy", patient: "María González", category: "Documentación" },
-  { id: 2, title: "Revisar plan de tratamiento Carlos M.", description: "Actualizar objetivos de la semana 8", priority: "alta", status: "en_progreso", due: "Hoy", patient: "Carlos Morales", category: "Clínico" },
-  { id: 3, title: "Preparar materiales sesión Sofía R.", description: "Actividades de coordinación motora fina", priority: "media", status: "pendiente", due: "Mañana", patient: "Sofía Reyes", category: "Preparación" },
-  { id: 4, title: "Enviar recordatorio a Pedro V.", description: "Confirmar cita del martes", priority: "baja", status: "completada", due: "Ayer", patient: "Pedro Vargas", category: "Comunicación" },
-  { id: 5, title: "Actualizar tabla de factores pipeline", description: "Mover casos de semana 4 a intervención", priority: "media", status: "pendiente", due: "Vie 28", category: "Administrativo" },
-  { id: 6, title: "Subir documentos a biblioteca", description: "Protocolos actualizados de evaluación", priority: "baja", status: "pendiente", due: "Próx. semana", category: "Documentación" },
-  { id: 7, title: "Crear cuento terapéutico para Ana T.", description: "Historia para exposición gradual", priority: "alta", status: "completada", due: "Completada", patient: "Ana Torres", category: "Clínico" },
-];
-
 const priorityConfig: Record<Priority, { label: string; badge: string }> = {
   alta: { label: "Alta", badge: "bg-red-50 text-red-600 border-red-200" },
   media: { label: "Media", badge: "bg-amber-50 text-amber-600 border-amber-200" },
   baja: { label: "Baja", badge: "bg-emerald-50 text-emerald-600 border-emerald-200" },
 };
 
+const initialTasks: Task[] = [];
+
 export default function TareasPage() {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [patients, setPatients] = useState<{ id: number; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"todas" | Status>("todas");
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTask, setNewTask] = useState({ title: "", description: "", priority: "media" as Priority, due: "", patient: "", category: "Clínico" });
 
-  const addTask = () => {
+  useEffect(() => {
+    Promise.all([fetch("/api/tasks"), fetch("/api/patients")])
+      .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
+      .then(([tasksData, patientsData]) => {
+        setTasks(tasksData);
+        setPatients(patientsData);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const addTask = async () => {
     if (!newTask.title.trim()) return;
-    setTasks((prev) => [...prev, { ...newTask, id: Date.now(), status: "pendiente" as Status }]);
-    setNewTask({ title: "", description: "", priority: "media", due: "", patient: "", category: "Clínico" });
-    setShowNewTask(false);
-    setFilter("todas");
+    const res = await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...newTask, status: "pendiente" as Status, patientName: newTask.patient }),
+    });
+    if (res.ok) {
+      const task = await res.json();
+      setTasks((prev) => [...prev, task]);
+      setNewTask({ title: "", description: "", priority: "media", due: "", patient: "", category: "Clínico" });
+      setShowNewTask(false);
+      setFilter("todas");
+    }
   };
 
-  const toggleStatus = (id: number) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, status: t.status === "completada" ? "pendiente" : "completada" } : t
-      )
-    );
+  const toggleStatus = async (id: number) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    const newStatus = task.status === "completada" ? "pendiente" : "completada";
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: newStatus as Status } : t));
+    await fetch(`/api/tasks/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
   };
 
-  const deleteTask = (id: number) => setTasks((prev) => prev.filter((t) => t.id !== id));
+  const deleteTask = async (id: number) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+  };
 
   const filtered = filter === "todas" ? tasks : tasks.filter((t) => t.status === filter);
 
@@ -276,7 +295,7 @@ export default function TareasPage() {
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
               >
                 <option value="">Sin paciente asignado</option>
-                {initialPatients.map((p) => (
+                {patients.map((p) => (
                   <option key={p.id} value={p.name}>{p.name}</option>
                 ))}
               </select>

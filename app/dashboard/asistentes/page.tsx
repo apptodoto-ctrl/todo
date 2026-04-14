@@ -1,13 +1,25 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FileText, BookOpen, Lightbulb, Sparkles,
   Loader2, ChevronRight, User, Download
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
-import { initialPatients } from "@/lib/patientsData";
+
+interface Patient {
+  id: number;
+  name: string;
+  age: number;
+  diagnosis: string;
+  therapist: string;
+  sessions: number;
+  nextSession: string;
+  status: string;
+  initials: string;
+  color: string;
+}
 
 const assistants = [
   {
@@ -109,6 +121,14 @@ export default function AsistentesPage() {
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<number | "">("");
+  const [patients, setPatients] = useState<Patient[]>([]);
+
+  useEffect(() => {
+    fetch("/api/patients")
+      .then((r) => r.json())
+      .then((data) => setPatients(data))
+      .catch(() => {});
+  }, []);
 
   const current = assistants.find((a) => a.id === activeAssistant);
 
@@ -123,7 +143,7 @@ export default function AsistentesPage() {
     setLoading(true);
     setOutput(null);
 
-    const patient = initialPatients.find((p) => p.id === selectedPatientId);
+    const patient = patients.find((p) => p.id === selectedPatientId);
     const patientContext = patient
       ? `DATOS DEL PACIENTE SELECCIONADO:\n- Nombre: ${patient.name}\n- Edad: ${patient.age} años\n- Diagnóstico: ${patient.diagnosis}\n- Terapeuta: ${patient.therapist}\n- Sesiones realizadas: ${patient.sessions}\n- Próxima sesión: ${patient.nextSession}\n- Estado: ${patient.status}\n\n`
       : "";
@@ -151,7 +171,7 @@ export default function AsistentesPage() {
 
   const downloadPDF = () => {
     if (!output || !current) return;
-    const patient = initialPatients.find((p) => p.id === selectedPatientId);
+    const patient = patients.find((p) => p.id === selectedPatientId);
     const patientLine = patient
       ? `Paciente: ${patient.name} &nbsp;·&nbsp; Diagnóstico: ${patient.diagnosis} &nbsp;·&nbsp; ${patient.age} años`
       : "";
@@ -312,14 +332,14 @@ export default function AsistentesPage() {
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
               >
                 <option value="">Seleccionar paciente (opcional)</option>
-                {initialPatients.map((p) => (
+                {patients.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} — {p.diagnosis} · {p.age} años
                   </option>
                 ))}
               </select>
               {selectedPatientId !== "" && (() => {
-                const p = initialPatients.find((x) => x.id === selectedPatientId);
+                const p = patients.find((x) => x.id === selectedPatientId);
                 return p ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {[

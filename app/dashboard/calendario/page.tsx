@@ -1,53 +1,55 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Plus, Clock, MapPin } from "lucide-react";
 import Modal from "@/components/ui/Modal";
-import { initialPatients } from "@/lib/patientsData";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
-const events = [
-  { date: new Date(2026, 2, 22), title: "María González", time: "10:00", type: "sesion", location: "Sala 1" },
-  { date: new Date(2026, 2, 22), title: "Carlos Morales", time: "14:30", type: "sesion", location: "Sala 2" },
-  { date: new Date(2026, 2, 23), title: "Sofía Reyes", time: "09:00", type: "evaluacion", location: "Sala 1" },
-  { date: new Date(2026, 2, 24), title: "Pedro Vargas", time: "11:00", type: "sesion", location: "Sala 3" },
-  { date: new Date(2026, 2, 25), title: "Reunión equipo", time: "16:00", type: "reunion", location: "Sala conf." },
-  { date: new Date(2026, 2, 27), title: "Ana Torres", time: "10:30", type: "sesion", location: "Sala 2" },
-  { date: new Date(2026, 2, 27), title: "Luis Campos", time: "12:00", type: "evaluacion", location: "Sala 1" },
-];
+interface CalEvent {
+  id?: number;
+  date: Date;
+  title: string;
+  time: string;
+  type: string;
+  location: string;
+}
 
 const typeColors: Record<string, string> = {
   sesion: "bg-violet-100 text-violet-700 border-violet-200",
   evaluacion: "bg-blue-100 text-blue-700 border-blue-200",
   reunion: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  tarea: "bg-amber-100 text-amber-700 border-amber-200",
 };
 
 const typeDots: Record<string, string> = {
   sesion: "bg-violet-500",
   evaluacion: "bg-blue-500",
   reunion: "bg-emerald-500",
-  tarea: "bg-amber-500",
 };
 
-// Sample tasks that should show on calendar
-const calendarTasks = [
-  { date: new Date(2026, 2, 22), title: "Informe María G.", time: "—", type: "tarea", location: "" },
-  { date: new Date(2026, 2, 24), title: "Actualizar tabla factores", time: "—", type: "tarea", location: "" },
-];
-
-const savedLocations = ["Sala 1", "Sala 2", "Sala 3", "Sala conf.", "Domicilio", "Centro Norte", "Centro Sur"];
-
 export default function CalendarioPage() {
-  const [current, setCurrent] = useState(new Date(2026, 2, 1));
-  const [selected, setSelected] = useState<Date | null>(new Date(2026, 2, 22));
-  const [localEvents, setLocalEvents] = useState([...events, ...calendarTasks]);
+  const [current, setCurrent] = useState(new Date());
+  const [selected, setSelected] = useState<Date | null>(new Date());
+  const [localEvents, setLocalEvents] = useState<CalEvent[]>([]);
   const [showNewEvent, setShowNewEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "Sala 1" });
+
+  useEffect(() => {
+    fetch("/api/appointments")
+      .then((r) => r.json())
+      .then((data: { id: number; date: string; title: string; time: string; type: string; location: string }[]) => {
+        setLocalEvents(
+          data.map((a) => {
+            const [y, m, d] = a.date.split("-").map(Number);
+            return { id: a.id, date: new Date(y, m - 1, d), title: a.title, time: a.time, type: a.type, location: a.location };
+          })
+        );
+      })
+      .catch(() => {});
+  }, []);
 
   const openNewEvent = () => {
     const defaultDate = selected
@@ -57,15 +59,23 @@ export default function CalendarioPage() {
     setShowNewEvent(true);
   };
 
-  const addEvent = () => {
+  const addEvent = async () => {
     if (!newEvent.title.trim() || !newEvent.date) return;
     const [y, m, d] = newEvent.date.split("-").map(Number);
     const eventDate = new Date(y, m - 1, d);
-    setLocalEvents((prev) => [...prev, { date: eventDate, title: newEvent.title, time: newEvent.time, type: newEvent.type, location: newEvent.location }]);
-    setSelected(eventDate);
-    setCurrent(new Date(y, m - 1, 1));
-    setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "Sala 1" });
-    setShowNewEvent(false);
+    const res = await fetch("/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location }),
+    });
+    if (res.ok) {
+      const saved = await res.json();
+      setLocalEvents((prev: CalEvent[]) => [...prev, { id: saved.id, date: eventDate, title: newEvent.title, time: newEvent.time, type: newEvent.type, location: newEvent.location }]);
+      setSelected(eventDate);
+      setCurrent(new Date(y, m - 1, 1));
+      setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "Sala 1" });
+      setShowNewEvent(false);
+    }
   };
 
   const monthStart = startOfMonth(current);
@@ -161,7 +171,7 @@ export default function CalendarioPage() {
                         key={ei}
                         className={`text-[10px] font-medium px-1.5 py-0.5 rounded truncate border ${typeColors[ev.type]}`}
                       >
-                        {ev.time !== "—" ? ev.time : "📋"} {ev.title.split(" ")[0]}
+                        {ev.time} {ev.title.split(" ")[0]}
                       </div>
                     ))}
                     {dayEvents.length > 2 && (
@@ -193,7 +203,7 @@ export default function CalendarioPage() {
           <div className="flex flex-wrap gap-2 mb-4">
             {Object.entries(typeDots).map(([key, dot]) => (
               <span key={key} className="flex items-center gap-1.5 text-xs text-slate-500 capitalize">
-                <span className={`w-2 h-2 rounded-full ${dot}`} /> {key === "tarea" ? "tarea" : key}
+                <span className={`w-2 h-2 rounded-full ${dot}`} /> {key}
               </span>
             ))}
           </div>
@@ -217,13 +227,11 @@ export default function CalendarioPage() {
                     <span className="text-xs text-slate-500 font-medium">{ev.time}</span>
                   </div>
                   <p className="text-sm font-semibold text-slate-700">{ev.title}</p>
-                  {ev.location && (
-                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> {ev.location}
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3" /> {ev.location}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -249,38 +257,20 @@ export default function CalendarioPage() {
         <div className="space-y-4">
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha *</label>
-            <input autoFocus type="date" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input autoFocus type="date" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario / Título *</label>
-            <select
-              value={newEvent.title}
-              onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
-            >
-              <option value="">Seleccionar usuario o escribir...</option>
-              {initialPatients.map((p) => (
-                <option key={p.id} value={p.name}>{p.name} — {p.diagnosis}</option>
-              ))}
-              <option value="__custom">Otro (escribir manualmente)</option>
-            </select>
-            {newEvent.title === "__custom" && (
-              <input
-                type="text"
-                placeholder="Nombre del usuario o razón"
-                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                className="w-full mt-2 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
-              />
-            )}
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente / Título *</label>
+            <input type="text" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Nombre del paciente o razón" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
-              <input type="time" value={newEvent.time} onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input type="time" value={newEvent.time} onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
-              <select value={newEvent.type} onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+              <select value={newEvent.type} onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
                 <option value="sesion">Sesión</option>
                 <option value="evaluacion">Evaluación</option>
                 <option value="reunion">Reunión</option>
@@ -289,15 +279,7 @@ export default function CalendarioPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Sala / Ubicación</label>
-            <select
-              value={newEvent.location}
-              onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
-            >
-              {savedLocations.map((loc) => (
-                <option key={loc} value={loc}>{loc}</option>
-              ))}
-            </select>
+            <input type="text" value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })} placeholder="Ej. Sala 1" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
         </div>
       </Modal>
