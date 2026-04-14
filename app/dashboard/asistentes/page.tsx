@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import {
   FileText, BookOpen, Lightbulb, Sparkles,
-  Loader2, ChevronRight, User
+  Loader2, ChevronRight, User, Download
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { initialPatients } from "@/lib/patientsData";
@@ -14,20 +14,20 @@ const assistants = [
     id: "informe",
     title: "Asistente Informe Inicial",
     subtitle: "Redacción de Informes Iniciales",
-    description: "Genera informes iniciales estructurados basados en la información del usuario y las mejores prácticas clínicas.",
+    description: "Genera informes iniciales estructurados basados en la información del paciente y las mejores prácticas clínicas.",
     icon: FileText,
     gradient: "from-violet-500 to-purple-700",
     bgGlow: "bg-violet-500/10",
     tag: "INFORME INICIAL",
-    prompt: "Ingresa el nombre del usuario, edad, diagnóstico y motivo de consulta para generar el informe inicial.",
+    prompt: "Ingresa el nombre del paciente, edad, diagnóstico y motivo de consulta para generar el informe inicial.",
     sampleOutput: `**INFORME INICIAL DE EVALUACIÓN TERAPÉUTICA**
 
-**Datos del Usuario:** [Nombre], [Edad] años
+**Datos del Paciente:** [Nombre], [Edad] años
 **Diagnóstico Principal:** [Diagnóstico]
 **Fecha de Evaluación:** ${new Date().toLocaleDateString("es-CL")}
 
 **I. Motivo de Consulta**
-El usuario es derivado por [especialidad] debido a [motivo], presentando dificultades en las áreas de desempeño ocupacional...
+El paciente es derivado por [especialidad] debido a [motivo], presentando dificultades en las áreas de desempeño ocupacional...
 
 **II. Historia Ocupacional**
 Se observa un patrón de desempeño [descripción], con impacto significativo en actividades de vida diaria...
@@ -48,12 +48,12 @@ Se propone intervención de terapia ocupacional con frecuencia [semanal/quincena
     id: "cuentos",
     title: "Asistente Creadora de Cuentos",
     subtitle: "Creadora Cuentos para Exposición",
-    description: "Crea cuentos terapéuticos personalizados para ayudar en el proceso de exposición y tratamiento del usuario.",
+    description: "Crea cuentos terapéuticos personalizados para ayudar en el proceso de exposición y tratamiento.",
     icon: BookOpen,
     gradient: "from-blue-500 to-indigo-700",
     bgGlow: "bg-blue-500/10",
     tag: "CREADORA DE CUENTOS",
-    prompt: "Describe el miedo o situación a trabajar, la edad del usuario y el contexto para crear el cuento personalizado.",
+    prompt: "Describe el miedo o situación a trabajar, la edad del paciente y el contexto para crear el cuento personalizado.",
     sampleOutput: `**EL VALIENTE VIAJE DE LUNA** 🌙
 
 Había una vez una niña llamada Luna que vivía en un hermoso pueblo entre montañas verdes...
@@ -72,7 +72,7 @@ Un día, Luna conoció a Pinto, un pequeño pájaro colorido que también había
     id: "actividades",
     title: "Asistente Ideas para Actividades",
     subtitle: "Creadora Actividades Creativas",
-    description: "Sugiere actividades creativas y terapéuticas adaptadas a las necesidades específicas de cada usuario.",
+    description: "Sugiere actividades creativas y terapéuticas adaptadas a las necesidades específicas de cada paciente.",
     icon: Lightbulb,
     gradient: "from-amber-500 to-orange-600",
     bgGlow: "bg-amber-500/10",
@@ -114,8 +114,8 @@ export default function AsistentesPage() {
 
   const systemPrompts: Record<string, string> = {
     informe: "Eres un asistente experto en terapia ocupacional. Genera informes iniciales estructurados, profesionales y completos en español, siguiendo estándares clínicos.",
-    cuentos: "Eres un especialista en terapia narrativa y terapia ocupacional. Crea cuentos terapéuticos personalizados, creativos y apropiados para la edad del usuario, en español.",
-    actividades: "Eres un terapeuta ocupacional experto en diseño de actividades terapéuticas. Propone actividades detalladas, creativas y adaptadas a las necesidades específicas del usuario, en español.",
+    cuentos: "Eres un especialista en terapia narrativa y terapia ocupacional. Crea cuentos terapéuticos personalizados, creativos y apropiados para la edad del paciente, en español.",
+    actividades: "Eres un terapeuta ocupacional experto en diseño de actividades terapéuticas. Propone actividades detalladas, creativas y adaptadas a las necesidades específicas del paciente, en español.",
   };
 
   const handleGenerate = async () => {
@@ -125,7 +125,7 @@ export default function AsistentesPage() {
 
     const patient = initialPatients.find((p) => p.id === selectedPatientId);
     const patientContext = patient
-      ? `DATOS DEL USUARIO SELECCIONADO:\n- Nombre: ${patient.name}\n- Edad: ${patient.age} años\n- Diagnóstico: ${patient.diagnosis}\n- Terapeuta: ${patient.therapist}\n- Sesiones realizadas: ${patient.sessions}\n- Próxima sesión: ${patient.nextSession}\n- Estado: ${patient.status}\n\n`
+      ? `DATOS DEL PACIENTE SELECCIONADO:\n- Nombre: ${patient.name}\n- Edad: ${patient.age} años\n- Diagnóstico: ${patient.diagnosis}\n- Terapeuta: ${patient.therapist}\n- Sesiones realizadas: ${patient.sessions}\n- Próxima sesión: ${patient.nextSession}\n- Estado: ${patient.status}\n\n`
       : "";
 
     const fullPrompt = patientContext + input;
@@ -146,6 +146,39 @@ export default function AsistentesPage() {
       setOutput("❌ Error al conectar con la IA. Por favor intenta de nuevo.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadPDF = () => {
+    if (!output || !current) return;
+    const patient = initialPatients.find((p) => p.id === selectedPatientId);
+    const patientLine = patient
+      ? `Paciente: ${patient.name} &nbsp;·&nbsp; Diagnóstico: ${patient.diagnosis} &nbsp;·&nbsp; ${patient.age} años`
+      : "";
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>${current.title}</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 780px; margin: 40px auto; padding: 0 24px; color: #1e293b; line-height: 1.7; }
+    h1 { font-size: 20px; color: #4f46e5; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; margin-bottom: 4px; }
+    .meta { font-size: 12px; color: #64748b; margin-bottom: 28px; }
+    pre { white-space: pre-wrap; font-family: Arial, sans-serif; font-size: 13px; }
+    @media print { body { margin: 20px; } }
+  </style>
+</head>
+<body>
+  <h1>${current.title}</h1>
+  <div class="meta">${patientLine}${patientLine ? " &nbsp;·&nbsp; " : ""}Generado el ${new Date().toLocaleDateString("es-CL")}</div>
+  <pre>${output.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+</body>
+</html>`;
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => win.print(), 300);
     }
   };
 
@@ -271,14 +304,14 @@ export default function AsistentesPage() {
             {/* Patient selector */}
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-violet-500" /> Usuario
+                <User className="w-3.5 h-3.5 text-violet-500" /> Paciente
               </label>
               <select
                 value={selectedPatientId}
                 onChange={(e) => setSelectedPatientId(e.target.value === "" ? "" : Number(e.target.value))}
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
               >
-                <option value="">Seleccionar usuario (opcional)</option>
+                <option value="">Seleccionar paciente (opcional)</option>
                 {initialPatients.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} — {p.diagnosis} · {p.age} años
@@ -311,20 +344,27 @@ export default function AsistentesPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Agrega detalles específicos, motivo de consulta, observaciones..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all placeholder-slate-400"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all placeholder-slate-400"
               />
             </div>
             {output && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-slate-50 border border-slate-200 rounded-xl p-4 max-h-64 overflow-y-auto"
+                className="bg-white border border-slate-200 rounded-xl overflow-hidden"
               >
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-4 h-4 text-violet-500" />
-                  <span className="text-sm font-semibold text-violet-700">Resultado generado</span>
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Resultado</span>
+                  <button
+                    onClick={downloadPDF}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Descargar PDF
+                  </button>
                 </div>
-                <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed font-sans">{output}</pre>
+                <div className="p-4 max-h-72 overflow-y-auto">
+                  <pre className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-sans">{output}</pre>
+                </div>
               </motion.div>
             )}
           </div>
