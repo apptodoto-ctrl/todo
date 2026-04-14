@@ -309,7 +309,7 @@ export default function AsistentesPage() {
               <select
                 value={selectedPatientId}
                 onChange={(e) => setSelectedPatientId(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
               >
                 <option value="">Seleccionar paciente (opcional)</option>
                 {initialPatients.map((p) => (

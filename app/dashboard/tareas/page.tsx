@@ -1,8 +1,8 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useMemo } from "react";
-import { Plus, Check, Clock, AlertCircle, Trash2, Edit2, X } from "lucide-react";
+import { useState } from "react";
+import { Plus, Check, Clock, AlertCircle, Trash2, MoreVertical } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { initialPatients } from "@/lib/patientsData";
 
@@ -21,13 +21,13 @@ interface Task {
 }
 
 const initialTasks: Task[] = [
-  { id: 1, title: "Redactar informe inicial de María G.", description: "Completar evaluación inicial y documentar diagnóstico", priority: "alta", status: "pendiente", due: "2026-04-13", patient: "María González", category: "Documentación" },
-  { id: 2, title: "Revisar plan de tratamiento Carlos M.", description: "Actualizar objetivos de la semana 8", priority: "alta", status: "en_progreso", due: "2026-04-13", patient: "Carlos Morales", category: "Clínico" },
-  { id: 3, title: "Preparar materiales sesión Sofía R.", description: "Actividades de coordinación motora fina", priority: "media", status: "pendiente", due: "2026-04-14", patient: "Sofía Reyes", category: "Preparación" },
-  { id: 4, title: "Enviar recordatorio a Pedro V.", description: "Confirmar cita del martes", priority: "baja", status: "completada", due: "2026-04-12", patient: "Pedro Vargas", category: "Comunicación" },
-  { id: 5, title: "Actualizar tabla de factores pipeline", description: "Mover casos de semana 4 a intervención", priority: "media", status: "pendiente", due: "2026-04-18", category: "Administrativo" },
-  { id: 6, title: "Subir documentos a biblioteca", description: "Protocolos actualizados de evaluación", priority: "baja", status: "pendiente", due: "2026-04-21", category: "Documentación" },
-  { id: 7, title: "Crear cuento terapéutico para Ana T.", description: "Historia para exposición gradual", priority: "alta", status: "completada", due: "2026-04-10", patient: "Ana Torres", category: "Clínico" },
+  { id: 1, title: "Redactar informe inicial de María G.", description: "Completar evaluación inicial y documentar diagnóstico", priority: "alta", status: "pendiente", due: "Hoy", patient: "María González", category: "Documentación" },
+  { id: 2, title: "Revisar plan de tratamiento Carlos M.", description: "Actualizar objetivos de la semana 8", priority: "alta", status: "en_progreso", due: "Hoy", patient: "Carlos Morales", category: "Clínico" },
+  { id: 3, title: "Preparar materiales sesión Sofía R.", description: "Actividades de coordinación motora fina", priority: "media", status: "pendiente", due: "Mañana", patient: "Sofía Reyes", category: "Preparación" },
+  { id: 4, title: "Enviar recordatorio a Pedro V.", description: "Confirmar cita del martes", priority: "baja", status: "completada", due: "Ayer", patient: "Pedro Vargas", category: "Comunicación" },
+  { id: 5, title: "Actualizar tabla de factores pipeline", description: "Mover casos de semana 4 a intervención", priority: "media", status: "pendiente", due: "Vie 28", category: "Administrativo" },
+  { id: 6, title: "Subir documentos a biblioteca", description: "Protocolos actualizados de evaluación", priority: "baja", status: "pendiente", due: "Próx. semana", category: "Documentación" },
+  { id: 7, title: "Crear cuento terapéutico para Ana T.", description: "Historia para exposición gradual", priority: "alta", status: "completada", due: "Completada", patient: "Ana Torres", category: "Clínico" },
 ];
 
 const priorityConfig: Record<Priority, { label: string; badge: string }> = {
@@ -36,27 +36,10 @@ const priorityConfig: Record<Priority, { label: string; badge: string }> = {
   baja: { label: "Baja", badge: "bg-emerald-50 text-emerald-600 border-emerald-200" },
 };
 
-function getDueLabel(dateStr: string): { label: string; color: string } {
-  if (!dateStr) return { label: "", color: "text-slate-400" };
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(dateStr + "T00:00:00");
-  const diff = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diff < 0) {
-    if (diff === -1) return { label: "Ayer", color: "text-red-600 font-semibold" };
-    return { label: `Hace ${Math.abs(diff)} días`, color: "text-red-600 font-semibold" };
-  }
-  if (diff === 0) return { label: "Hoy", color: "text-orange-600 font-semibold" };
-  if (diff === 1) return { label: "Mañana", color: "text-orange-600 font-semibold" };
-  return { label: due.toLocaleDateString("es-CL", { day: "numeric", month: "short" }), color: "text-slate-400" };
-}
-
 export default function TareasPage() {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [filter, setFilter] = useState<"todas" | Status>("todas");
   const [showNewTask, setShowNewTask] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [newTask, setNewTask] = useState({ title: "", description: "", priority: "media" as Priority, due: "", patient: "", category: "Clínico" });
 
   const addTask = () => {
@@ -65,12 +48,6 @@ export default function TareasPage() {
     setNewTask({ title: "", description: "", priority: "media", due: "", patient: "", category: "Clínico" });
     setShowNewTask(false);
     setFilter("todas");
-  };
-
-  const updateTask = () => {
-    if (!editingTask) return;
-    setTasks((prev) => prev.map((t) => t.id === editingTask.id ? editingTask : t));
-    setEditingTask(null);
   };
 
   const toggleStatus = (id: number) => {
@@ -85,103 +62,11 @@ export default function TareasPage() {
 
   const filtered = filter === "todas" ? tasks : tasks.filter((t) => t.status === filter);
 
-  // Sort: overdue first, then today/tomorrow, then by date ascending. Completed at end.
-  const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      if (a.status === "completada" && b.status !== "completada") return 1;
-      if (a.status !== "completada" && b.status === "completada") return -1;
-      if (!a.due && !b.due) return 0;
-      if (!a.due) return 1;
-      if (!b.due) return -1;
-      return new Date(a.due).getTime() - new Date(b.due).getTime();
-    });
-  }, [filtered]);
-
   const counts = {
     pendiente: tasks.filter((t) => t.status === "pendiente").length,
     en_progreso: tasks.filter((t) => t.status === "en_progreso").length,
     completada: tasks.filter((t) => t.status === "completada").length,
   };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const taskFormFields = (values: any, onChange: (v: any) => void) => (
-    <div className="space-y-4">
-      <div>
-        <label className="text-sm font-semibold text-slate-700 block mb-1.5">Título *</label>
-        <input
-          autoFocus
-          type="text"
-          value={values.title}
-          onChange={(e) => onChange({ ...values, title: e.target.value })}
-          placeholder="Ej. Redactar informe de usuario..."
-          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
-        />
-      </div>
-      <div>
-        <label className="text-sm font-semibold text-slate-700 block mb-1.5">Descripción</label>
-        <textarea
-          rows={2}
-          value={values.description}
-          onChange={(e) => onChange({ ...values, description: e.target.value })}
-          placeholder="Detalles de la tarea..."
-          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Prioridad</label>
-          <select
-            value={values.priority}
-            onChange={(e) => onChange({ ...values, priority: e.target.value as Priority })}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
-          >
-            <option value="alta">Alta</option>
-            <option value="media">Media</option>
-            <option value="baja">Baja</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Categoría</label>
-          <select
-            value={values.category}
-            onChange={(e) => onChange({ ...values, category: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
-          >
-            <option>Clínico</option>
-            <option>Documentación</option>
-            <option>Preparación</option>
-            <option>Comunicación</option>
-            <option>Administrativo</option>
-            <option>Planificación</option>
-          </select>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha límite</label>
-          <input
-            type="date"
-            value={values.due}
-            onChange={(e) => onChange({ ...values, due: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
-          />
-        </div>
-        <div>
-          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario</label>
-          <select
-            value={values.patient || ""}
-            onChange={(e) => onChange({ ...values, patient: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
-          >
-            <option value="">Sin usuario asignado</option>
-            {initialPatients.map((p) => (
-              <option key={p.id} value={p.name}>{p.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -242,9 +127,8 @@ export default function TareasPage() {
       {/* Task list */}
       <div className="space-y-3">
         <AnimatePresence mode="popLayout">
-          {sorted.map((task) => {
+          {filtered.map((task) => {
             const pConf = priorityConfig[task.priority];
-            const dueInfo = getDueLabel(task.due);
             return (
               <motion.div
                 key={task.id}
@@ -272,20 +156,12 @@ export default function TareasPage() {
                       <h3 className={`text-sm font-semibold text-slate-800 ${task.status === "completada" ? "line-through text-slate-400" : ""}`}>
                         {task.title}
                       </h3>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => setEditingTask({ ...task })}
-                          className="p-1 text-slate-300 hover:text-violet-500 hover:bg-violet-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => deleteTask(task.id)}
-                          className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => deleteTask(task.id)}
+                        className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{task.description}</p>
                     <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -297,8 +173,8 @@ export default function TareasPage() {
                         <span className="text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-lg">{task.patient}</span>
                       )}
                       {task.due && (
-                        <span className={`ml-auto flex items-center gap-1 text-xs font-medium ${dueInfo.color}`}>
-                          <Clock className="w-3 h-3" /> {dueInfo.label}
+                        <span className="ml-auto flex items-center gap-1 text-xs text-slate-400 font-medium">
+                          <Clock className="w-3 h-3" /> {task.due}
                         </span>
                       )}
                     </div>
@@ -308,7 +184,7 @@ export default function TareasPage() {
             );
           })}
         </AnimatePresence>
-        {sorted.length === 0 && (
+        {filtered.length === 0 && (
           <div className="text-center py-16 text-slate-400">
             <Check className="w-12 h-12 mx-auto mb-3 text-slate-200" />
             <p className="font-medium">No hay tareas en esta categoría</p>
@@ -331,25 +207,82 @@ export default function TareasPage() {
           </button>
         }
       >
-        {taskFormFields(newTask, (v) => setNewTask(v as typeof newTask))}
-      </Modal>
-
-      {/* Editar Tarea Modal */}
-      <Modal
-        open={!!editingTask}
-        onClose={() => setEditingTask(null)}
-        title="Editar Tarea"
-        footer={
-          <button
-            onClick={updateTask}
-            disabled={!editingTask?.title.trim()}
-            className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30"
-          >
-            Guardar Cambios
-          </button>
-        }
-      >
-        {editingTask && taskFormFields(editingTask, (v) => setEditingTask(v as Task))}
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Título *</label>
+            <input
+              autoFocus
+              type="text"
+              value={newTask.title}
+              onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && addTask()}
+              placeholder="Ej. Redactar informe de paciente..."
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Descripción</label>
+            <textarea
+              rows={2}
+              value={newTask.description}
+              onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+              placeholder="Detalles de la tarea..."
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Prioridad</label>
+              <select
+                value={newTask.priority}
+                onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as Priority })}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+              >
+                <option value="alta">Alta</option>
+                <option value="media">Media</option>
+                <option value="baja">Baja</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Categoría</label>
+              <select
+                value={newTask.category}
+                onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+              >
+                <option>Clínico</option>
+                <option>Documentación</option>
+                <option>Preparación</option>
+                <option>Comunicación</option>
+                <option>Administrativo</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha límite</label>
+              <input
+                type="date"
+                value={newTask.due}
+                onChange={(e) => setNewTask({ ...newTask, due: e.target.value })}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente</label>
+              <select
+                value={newTask.patient}
+                onChange={(e) => setNewTask({ ...newTask, patient: e.target.value })}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+              >
+                <option value="">Sin paciente asignado</option>
+                {initialPatients.map((p) => (
+                  <option key={p.id} value={p.name}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
       </Modal>
     </div>
   );
