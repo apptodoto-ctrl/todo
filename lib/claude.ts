@@ -20,7 +20,7 @@ export async function askClaude(
   }
 ): Promise<string> {
   const {
-    model = "claude-sonnet-4-6",
+    model = "claude-opus-4-5",
     maxTokens = 1024,
     systemPrompt,
   } = options ?? {};

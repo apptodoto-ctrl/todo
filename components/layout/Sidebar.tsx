@@ -148,12 +148,12 @@ export default function Sidebar() {
       {/* Collapse toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-[72px] w-6 h-6 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-all z-10 shadow-lg"
+        className="absolute -right-4 top-[72px] w-8 h-8 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-violet-600 hover:border-violet-500 transition-all z-10 shadow-lg"
       >
         {collapsed ? (
-          <ChevronRight className="w-3 h-3" />
+          <ChevronRight className="w-4 h-4" />
         ) : (
-          <ChevronLeft className="w-3 h-3" />
+          <ChevronLeft className="w-4 h-4" />
         )}
       </button>
     </motion.aside>

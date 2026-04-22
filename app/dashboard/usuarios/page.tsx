@@ -16,6 +16,8 @@ interface Patient {
   status: string;
   initials: string;
   color: string;
+  phone: string;
+  email: string;
 }
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
@@ -39,7 +41,7 @@ export default function UsuariosPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
   const [showNewPatient, setShowNewPatient] = useState(false);
-  const [newPatient, setNewPatient] = useState({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "" });
+  const [newPatient, setNewPatient] = useState({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "" });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   useEffect(() => {
@@ -62,7 +64,7 @@ export default function UsuariosPage() {
     if (res.ok) {
       const patient = await res.json();
       setPatients((prev) => [...prev, patient]);
-      setNewPatient({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "" });
+      setNewPatient({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "" });
       setShowNewPatient(false);
       setFilter("todos");
     }
@@ -101,7 +103,7 @@ export default function UsuariosPage() {
             placeholder="Buscar por nombre o diagnóstico..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
           />
         </div>
         <div className="flex gap-2">
@@ -129,7 +131,7 @@ export default function UsuariosPage() {
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Pacientes activos", value: patients.filter(p => p.status === "activo").length, color: "text-emerald-600" },
+          { label: "Usuarios activos", value: patients.filter(p => p.status === "activo").length, color: "text-emerald-600" },
           { label: "En evaluación", value: patients.filter(p => p.status === "evaluacion").length, color: "text-blue-600" },
           { label: "Dados de alta", value: patients.filter(p => p.status === "alta").length, color: "text-slate-600" },
         ].map((s) => (
@@ -159,7 +161,10 @@ export default function UsuariosPage() {
             <div className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 bg-gradient-to-br ${p.color} rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-md`}>
+                  <div
+                    className={`w-11 h-11 ${p.color.startsWith('#') ? '' : `bg-gradient-to-br ${p.color}`} rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-md`}
+                    style={p.color.startsWith('#') ? { background: p.color } : {}}
+                  >
                     {p.initials}
                   </div>
                   <div>
@@ -178,11 +183,11 @@ export default function UsuariosPage() {
               </div>
 
               <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2 text-xs text-slate-600">
                   <ClipboardList className="w-3.5 h-3.5 text-slate-400" />
                   <span>{p.diagnosis}</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2 text-xs text-slate-600">
                   <Calendar className="w-3.5 h-3.5 text-slate-400" />
                   <span>Próxima: {p.nextSession}</span>
                 </div>
@@ -220,7 +225,10 @@ export default function UsuariosPage() {
           <div className="space-y-5">
             {/* Avatar + name */}
             <div className="flex items-center gap-4">
-              <div className={`w-16 h-16 bg-gradient-to-br ${selectedPatient.color} rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg`}>
+              <div
+                className={`w-16 h-16 ${selectedPatient.color.startsWith('#') ? '' : `bg-gradient-to-br ${selectedPatient.color}`} rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg`}
+                style={selectedPatient.color.startsWith('#') ? { background: selectedPatient.color } : {}}
+              >
                 {selectedPatient.initials}
               </div>
               <div>
@@ -252,12 +260,30 @@ export default function UsuariosPage() {
 
             {/* Actions */}
             <div className="flex gap-2 pt-1">
-              <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:border-violet-300 hover:text-violet-600 transition-all">
-                <Mail className="w-4 h-4" /> Enviar email
-              </button>
-              <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:border-violet-300 hover:text-violet-600 transition-all">
-                <Phone className="w-4 h-4" /> Llamar
-              </button>
+              <a
+                href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(selectedPatient.email || '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                  selectedPatient.email
+                    ? 'border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300'
+                    : 'border-slate-200 text-slate-400 cursor-not-allowed opacity-50 pointer-events-none'
+                }`}
+              >
+                <Mail className="w-4 h-4" /> Gmail
+              </a>
+              <a
+                href={`https://wa.me/${(selectedPatient.phone || '').replace(/[^0-9]/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                  selectedPatient.phone
+                    ? 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300'
+                    : 'border-slate-200 text-slate-400 cursor-not-allowed opacity-50 pointer-events-none'
+                }`}
+              >
+                <Phone className="w-4 h-4" /> WhatsApp
+              </a>
             </div>
           </div>
         )}
@@ -300,6 +326,16 @@ export default function UsuariosPage() {
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Próxima sesión</label>
             <input type="text" value={newPatient.nextSession} onChange={(e) => setNewPatient({ ...newPatient, nextSession: e.target.value })} placeholder="Ej. 25 Abr 10:00" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Teléfono / WhatsApp</label>
+              <input type="tel" value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })} placeholder="+56912345678" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Email</label>
+              <input type="email" value={newPatient.email} onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })} placeholder="correo@email.com" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
           </div>
         </div>
       </Modal>

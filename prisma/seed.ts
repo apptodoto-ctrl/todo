@@ -21,10 +21,12 @@ async function main() {
         diagnosis: "Ansiedad generalizada",
         therapist: "Dra. López",
         sessions: 12,
-        nextSession: "2025-07-15",
+        nextSession: "2026-07-15",
         status: "activo",
         initials: "MG",
-        color: "#6366f1",
+        color: "from-violet-500 to-purple-600",
+        phone: "+56912345678",
+        email: "maria.garcia@email.com",
       },
     }),
     prisma.patient.create({
@@ -34,10 +36,12 @@ async function main() {
         diagnosis: "Depresión moderada",
         therapist: "Dr. Martínez",
         sessions: 8,
-        nextSession: "2025-07-18",
+        nextSession: "2026-07-18",
         status: "activo",
         initials: "CR",
-        color: "#8b5cf6",
+        color: "from-blue-500 to-indigo-600",
+        phone: "+56923456789",
+        email: "carlos.rodriguez@email.com",
       },
     }),
     prisma.patient.create({
@@ -47,10 +51,12 @@ async function main() {
         diagnosis: "TDAH",
         therapist: "Dra. López",
         sessions: 20,
-        nextSession: "2025-07-20",
+        nextSession: "2026-07-20",
         status: "activo",
         initials: "AM",
-        color: "#ec4899",
+        color: "from-pink-500 to-rose-500",
+        phone: "+56934567890",
+        email: "ana.martinez@email.com",
       },
     }),
     prisma.patient.create({
@@ -60,10 +66,12 @@ async function main() {
         diagnosis: "Trastorno bipolar",
         therapist: "Dr. Martínez",
         sessions: 35,
-        nextSession: "2025-07-22",
+        nextSession: "2026-07-22",
         status: "activo",
         initials: "LH",
-        color: "#f59e0b",
+        color: "from-amber-500 to-orange-500",
+        phone: "+56945678901",
+        email: "luis.hernandez@email.com",
       },
     }),
     prisma.patient.create({
@@ -73,10 +81,12 @@ async function main() {
         diagnosis: "Fobia social",
         therapist: "Dra. López",
         sessions: 5,
-        nextSession: "2025-07-16",
+        nextSession: "2026-07-16",
         status: "activo",
         initials: "ST",
-        color: "#10b981",
+        color: "from-emerald-500 to-teal-600",
+        phone: "+56956789012",
+        email: "sofia.torres@email.com",
       },
     }),
     prisma.patient.create({
@@ -86,10 +96,12 @@ async function main() {
         diagnosis: "TEPT",
         therapist: "Dr. Martínez",
         sessions: 15,
-        nextSession: "2025-07-25",
+        nextSession: "2026-07-25",
         status: "inactivo",
         initials: "RS",
-        color: "#3b82f6",
+        color: "from-sky-500 to-blue-600",
+        phone: "+56967890123",
+        email: "roberto.sanchez@email.com",
       },
     }),
   ]);
@@ -255,26 +267,30 @@ async function main() {
   console.log(`✅ ${appointments.length} citas creadas`);
 
   // ─── PIPELINE ────────────────────────────────────────────────────────────────
+  const defaultPipeline = await prisma.pipeline.create({
+    data: { name: "Pipeline Principal" },
+  });
+
   const col1 = await prisma.pipelineColumn.create({
-    data: { label: "Evaluación Inicial", color: "#dbeafe", accent: "#3b82f6", order: 0 },
+    data: { label: "Evaluación Inicial", color: "bg-blue-50 border-blue-200", accent: "bg-blue-500", order: 0, pipelineId: defaultPipeline.id },
   });
   const col2 = await prisma.pipelineColumn.create({
-    data: { label: "En Tratamiento", color: "#d1fae5", accent: "#10b981", order: 1 },
+    data: { label: "En Tratamiento", color: "bg-emerald-50 border-emerald-200", accent: "bg-emerald-500", order: 1, pipelineId: defaultPipeline.id },
   });
   const col3 = await prisma.pipelineColumn.create({
-    data: { label: "Seguimiento", color: "#fef3c7", accent: "#f59e0b", order: 2 },
+    data: { label: "Seguimiento", color: "bg-amber-50 border-amber-200", accent: "bg-amber-500", order: 2, pipelineId: defaultPipeline.id },
   });
   const col4 = await prisma.pipelineColumn.create({
-    data: { label: "Alta Temporal", color: "#fce7f3", accent: "#ec4899", order: 3 },
+    data: { label: "Alta Temporal", color: "bg-pink-50 border-pink-200", accent: "bg-pink-500", order: 3, pipelineId: defaultPipeline.id },
   });
   const col5 = await prisma.pipelineColumn.create({
-    data: { label: "Alta Definitiva", color: "#ede9fe", accent: "#8b5cf6", order: 4 },
+    data: { label: "Alta Definitiva", color: "bg-violet-50 border-violet-200", accent: "bg-violet-500", order: 4, pipelineId: defaultPipeline.id },
   });
   const col6 = await prisma.pipelineColumn.create({
-    data: { label: "Urgencias", color: "#fee2e2", accent: "#ef4444", order: 5 },
+    data: { label: "Urgencias", color: "bg-orange-50 border-orange-200", accent: "bg-orange-500", order: 5, pipelineId: defaultPipeline.id },
   });
   const col7 = await prisma.pipelineColumn.create({
-    data: { label: "Lista de Espera", color: "#f1f5f9", accent: "#94a3b8", order: 6 },
+    data: { label: "Lista de Espera", color: "bg-slate-50 border-slate-200", accent: "bg-slate-500", order: 6, pipelineId: defaultPipeline.id },
   });
 
   // Cases para cada columna

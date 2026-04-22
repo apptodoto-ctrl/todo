@@ -6,12 +6,12 @@ type Params = Promise<{ id: string }>;
 export async function PUT(req: Request, { params }: { params: Params }) {
   try {
     const { id } = await params;
-    const body = await req.json();
-    const updated = await prisma.pipelineCase.update({
-      where: { id: Number(id) },
-      data: body,
+    const { name } = await req.json();
+    const pipeline = await prisma.pipeline.update({
+      where: { id },
+      data: { name },
     });
-    return NextResponse.json(updated);
+    return NextResponse.json(pipeline);
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }
@@ -20,7 +20,7 @@ export async function PUT(req: Request, { params }: { params: Params }) {
 export async function DELETE(_: Request, { params }: { params: Params }) {
   try {
     const { id } = await params;
-    await prisma.pipelineCase.delete({ where: { id: Number(id) } });
+    await prisma.pipeline.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });

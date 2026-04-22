@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Check, Clock, AlertCircle, Trash2, MoreVertical } from "lucide-react";
+import { Plus, Check, Clock, AlertCircle, Trash2, ArrowUpDown } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 
 type Priority = "alta" | "media" | "baja";
@@ -32,6 +32,7 @@ export default function TareasPage() {
   const [patients, setPatients] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"todas" | Status>("todas");
+  const [sortAsc, setSortAsc] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTask, setNewTask] = useState({ title: "", description: "", priority: "media" as Priority, due: "", patient: "", category: "Clínico" });
 
@@ -79,7 +80,16 @@ export default function TareasPage() {
     await fetch(`/api/tasks/${id}`, { method: "DELETE" });
   };
 
-  const filtered = filter === "todas" ? tasks : tasks.filter((t) => t.status === filter);
+  const filtered = (filter === "todas" ? tasks : tasks.filter((t) => t.status === filter))
+    .slice()
+    .sort((a, b) => {
+      if (!a.due && !b.due) return 0;
+      if (!a.due) return 1;
+      if (!b.due) return -1;
+      return sortAsc
+        ? a.due.localeCompare(b.due)
+        : b.due.localeCompare(a.due);
+    });
 
   const counts = {
     pendiente: tasks.filter((t) => t.status === "pendiente").length,
@@ -91,13 +101,23 @@ export default function TareasPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Toolbar */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{tasks.length} tareas en total</p>
-        <button
-          onClick={() => setShowNewTask(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30"
-        >
-          <Plus className="w-4 h-4" /> Nueva Tarea
-        </button>
+        <p className="text-sm text-slate-600">{tasks.length} tareas en total</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSortAsc(!sortAsc)}
+            title={sortAsc ? "Más recientes primero" : "Más antiguas primero"}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:text-violet-600 text-xs font-medium transition-all"
+          >
+            <ArrowUpDown className="w-3.5 h-3.5" />
+            {sortAsc ? "Antiguas primero" : "Recientes primero"}
+          </button>
+          <button
+            onClick={() => setShowNewTask(true)}
+            className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30"
+          >
+            <Plus className="w-4 h-4" /> Nueva Tarea
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -182,7 +202,7 @@ export default function TareasPage() {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{task.description}</p>
+                    <p className="text-xs text-slate-600 mt-0.5 line-clamp-1">{task.description}</p>
                     <div className="flex flex-wrap items-center gap-2 mt-3">
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${pConf.badge}`}>
                         {pConf.label}
@@ -192,7 +212,7 @@ export default function TareasPage() {
                         <span className="text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-lg">{task.patient}</span>
                       )}
                       {task.due && (
-                        <span className="ml-auto flex items-center gap-1 text-xs text-slate-400 font-medium">
+                        <span className="ml-auto flex items-center gap-1 text-xs text-slate-600 font-medium">
                           <Clock className="w-3 h-3" /> {task.due}
                         </span>
                       )}

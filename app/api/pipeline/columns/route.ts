@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const pipelineId = searchParams.get("pipelineId");
     const columns = await prisma.pipelineColumn.findMany({
+      where: pipelineId ? { pipelineId } : {},
       include: { cases: { orderBy: { createdAt: "asc" } } },
       orderBy: { order: "asc" },
     });

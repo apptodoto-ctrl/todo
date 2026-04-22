@@ -19,15 +19,17 @@ interface CalEvent {
 }
 
 const typeColors: Record<string, string> = {
-  sesion: "bg-violet-100 text-violet-700 border-violet-200",
-  evaluacion: "bg-blue-100 text-blue-700 border-blue-200",
-  reunion: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  sesion: "bg-violet-200 text-violet-900 border-violet-300",
+  evaluacion: "bg-blue-200 text-blue-900 border-blue-300",
+  reunion: "bg-emerald-200 text-emerald-900 border-emerald-300",
+  grupal: "bg-amber-200 text-amber-900 border-amber-300",
 };
 
 const typeDots: Record<string, string> = {
-  sesion: "bg-violet-500",
-  evaluacion: "bg-blue-500",
-  reunion: "bg-emerald-500",
+  sesion: "bg-violet-600",
+  evaluacion: "bg-blue-600",
+  reunion: "bg-emerald-600",
+  grupal: "bg-amber-600",
 };
 
 export default function CalendarioPage() {
