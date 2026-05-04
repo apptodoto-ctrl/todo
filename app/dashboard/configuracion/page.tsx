@@ -124,7 +124,7 @@ export default function ConfiguracionPage() {
                   type="text"
                   value={profile.nombre}
                   onChange={(e) => setProfile({ ...profile, nombre: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
                 />
               </div>
               <div>
@@ -133,7 +133,7 @@ export default function ConfiguracionPage() {
                   type="text"
                   value={profile.apellido}
                   onChange={(e) => setProfile({ ...profile, apellido: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
                 />
               </div>
               <div>
@@ -143,7 +143,7 @@ export default function ConfiguracionPage() {
                   value={profile.telefono}
                   onChange={(e) => setProfile({ ...profile, telefono: e.target.value })}
                   placeholder="Tu número de teléfono"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all placeholder-slate-300"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all placeholder-slate-300"
                 />
               </div>
               <div>
@@ -152,7 +152,7 @@ export default function ConfiguracionPage() {
                   type="text"
                   value={profile.especialidad}
                   onChange={(e) => setProfile({ ...profile, especialidad: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
                 />
               </div>
               <div className="sm:col-span-2">
