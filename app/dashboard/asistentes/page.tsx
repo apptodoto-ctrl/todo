@@ -324,14 +324,14 @@ export default function AsistentesPage() {
             {/* Patient selector */}
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-violet-500" /> Paciente
+                <User className="w-3.5 h-3.5 text-violet-500" /> Usuario
               </label>
               <select
                 value={selectedPatientId}
                 onChange={(e) => setSelectedPatientId(e.target.value === "" ? "" : Number(e.target.value))}
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
               >
-                <option value="">Seleccionar paciente (opcional)</option>
+                <option value="">Seleccionar usuario (opcional)</option>
                 {patients.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} — {p.diagnosis} · {p.age} años

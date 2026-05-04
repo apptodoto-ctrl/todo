@@ -341,13 +341,13 @@ export default function TareasPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario</label>
               <select
                 value={newTask.patient}
                 onChange={(e) => setNewTask({ ...newTask, patient: e.target.value })}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
               >
-                <option value="">Sin paciente asignado</option>
+                <option value="">Sin usuario asignado</option>
                 {patients.map((p) => (
                   <option key={p.id} value={p.name}>{p.name}</option>
                 ))}
@@ -433,13 +433,13 @@ export default function TareasPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente</label>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario</label>
                 <select
                   value={editingTask.patient ?? ""}
                   onChange={(e) => setEditingTask({ ...editingTask, patient: e.target.value })}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
                 >
-                  <option value="">Sin paciente asignado</option>
+                  <option value="">Sin usuario asignado</option>
                   {patients.map((p) => (
                     <option key={p.id} value={p.name}>{p.name}</option>
                   ))}

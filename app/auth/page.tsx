@@ -115,7 +115,7 @@ export default function AuthPage() {
               con IA
             </h1>
             <p className="mt-6 text-lg text-violet-200/70 max-w-md leading-relaxed">
-              La plataforma integral para terapeutas ocupacionales. Gestiona pacientes, citas y genera informes con inteligencia artificial.
+              La plataforma integral para terapeutas ocupacionales. Gestiona usuarios, citas y genera informes con inteligencia artificial.
             </p>
           </motion.div>
 

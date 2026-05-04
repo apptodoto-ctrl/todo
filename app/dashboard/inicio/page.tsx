@@ -9,7 +9,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { useRouter } from "next/navigation";
 
 const statsData = [
-  { label: "Pacientes activos", value: "24", change: "+3 este mes", icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600" },
+  { label: "Usuarios activos", value: "24", change: "+3 este mes", icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600" },
   { label: "Citas esta semana", value: "12", change: "3 hoy", icon: Calendar, color: "from-blue-500 to-indigo-600", bg: "bg-blue-50", text: "text-blue-600" },
   { label: "Tareas pendientes", value: "8", change: "2 vencidas", icon: CheckSquare, color: "from-amber-500 to-orange-500", bg: "bg-amber-50", text: "text-amber-600" },
   { label: "Recordatorios", value: "5", change: "1 próximo", icon: Bell, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", text: "text-emerald-600" },
@@ -98,14 +98,14 @@ export default function InicioPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="font-semibold text-slate-800">Actividad Clínica</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Sesiones y pacientes últimos 6 meses</p>
+              <p className="text-xs text-slate-400 mt-0.5">Sesiones y usuarios últimos 6 meses</p>
             </div>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5 text-slate-500">
                 <span className="w-3 h-0.5 bg-violet-500 rounded inline-block" /> Sesiones
               </span>
               <span className="flex items-center gap-1.5 text-slate-500">
-                <span className="w-3 h-0.5 bg-indigo-400 rounded inline-block" /> Pacientes
+                <span className="w-3 h-0.5 bg-indigo-400 rounded inline-block" /> Usuarios
               </span>
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function InicioPage() {
       {/* Recent patients */}
       <motion.div variants={item} className="bg-white rounded-2xl border border-slate-200/60">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h3 className="font-semibold text-slate-800">Pacientes Recientes</h3>
+          <h3 className="font-semibold text-slate-800">Usuarios Recientes</h3>
           <button onClick={() => router.push("/dashboard/usuarios")} className="text-sm text-violet-600 hover:text-violet-700 font-medium flex items-center gap-1">
             Ver todos <ArrowUpRight className="w-3.5 h-3.5" />
           </button>

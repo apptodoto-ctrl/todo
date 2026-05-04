@@ -239,7 +239,7 @@ function KanbanColumn({
             <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center mb-2">
               <Users className="w-4 h-4 text-slate-400" />
             </div>
-            <p className="text-xs text-slate-400 font-medium">Sin pacientes</p>
+            <p className="text-xs text-slate-400 font-medium">Sin usuarios</p>
           </div>
         )}
 
@@ -257,7 +257,7 @@ function KanbanColumn({
           className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 border-dashed text-xs font-semibold transition-all ${pal.text} hover:${pal.light} border-slate-200 hover:border-current`}
         >
           <Plus className="w-3.5 h-3.5" />
-          Agregar paciente
+          Agregar usuario
         </button>
       </div>
     </motion.div>
@@ -587,7 +587,7 @@ export default function PipelinePage() {
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "Pacientes activos", value: allCases.length, icon: Users, from: "from-violet-500", to: "to-purple-600", bg: "bg-violet-50", text: "text-violet-700" },
+            { label: "Usuarios activos", value: allCases.length, icon: Users, from: "from-violet-500", to: "to-purple-600", bg: "bg-violet-50", text: "text-violet-700" },
             { label: "Etapas", value: columns.length, icon: Layers, from: "from-blue-500", to: "to-cyan-500", bg: "bg-blue-50", text: "text-blue-700" },
             { label: "Vencidos", value: totalOverdue, icon: AlertTriangle, from: "from-red-500", to: "to-rose-600", bg: "bg-red-50", text: "text-red-700" },
             { label: "Alta definitiva", value: altaCol?.cases.length ?? 0, icon: Award, from: "from-emerald-500", to: "to-teal-500", bg: "bg-emerald-50", text: "text-emerald-700" },
@@ -617,7 +617,7 @@ export default function PipelinePage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar paciente o diagnóstico…"
+              placeholder="Buscar usuario o diagnóstico…"
               className="w-full pl-9 pr-4 py-2.5 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all placeholder:text-slate-400"
             />
           </div>
@@ -770,7 +770,7 @@ export default function PipelinePage() {
       <Modal
         open={showCaseModal}
         onClose={() => setShowCaseModal(false)}
-        title="Agregar Paciente"
+        title="Agregar Usuario"
         subtitle={activeColumnId ? columns.find((c) => c.id === activeColumnId)?.label : undefined}
         footer={
           <button
@@ -778,13 +778,13 @@ export default function PipelinePage() {
             disabled={!newCase.patient.trim()}
             className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30"
           >
-            Agregar Paciente
+            Agregar Usuario
           </button>
         }
       >
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente *</label>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario *</label>
             <select
               autoFocus
               value={newCase.patient}
@@ -794,7 +794,7 @@ export default function PipelinePage() {
               }}
               className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
             >
-              <option value="">Seleccionar paciente registrado…</option>
+              <option value="">Seleccionar usuario registrado…</option>
               {pipelinePatients.map((p) => (<option key={p.id} value={p.name}>{p.name}</option>))}
             </select>
             <input
