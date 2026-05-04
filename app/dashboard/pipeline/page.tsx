@@ -15,6 +15,7 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  useDroppable,
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
@@ -182,9 +183,11 @@ function KanbanColumn({
 }) {
   const pal = getPaletteByAccent(col.accent);
   const caseIds = col.cases.map((c) => c.id);
+  const { setNodeRef: setColRef } = useDroppable({ id: col.id });
 
   return (
     <motion.div
+      ref={setColRef}
       layout
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
