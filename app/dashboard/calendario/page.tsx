@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Plus, Clock, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, CheckSquare } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -16,6 +16,15 @@ interface CalEvent {
   time: string;
   type: string;
   location: string;
+}
+
+interface CalTask {
+  id: number;
+  title: string;
+  due: string;
+  patient?: string;
+  priority: string;
+  status: string;
 }
 
 const typeColors: Record<string, string> = {
@@ -39,11 +48,19 @@ export default function CalendarioPage() {
   const [showNewEvent, setShowNewEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "Sala 1" });
   const [patients, setPatients] = useState<{ id: number; name: string }[]>([]);
+  const [tasks, setTasks] = useState<CalTask[]>([]);
 
   useEffect(() => {
     fetch("/api/patients")
       .then((r) => r.json())
       .then((data) => setPatients(Array.isArray(data) ? data.map((p: { id: number; name: string }) => ({ id: p.id, name: p.name })) : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/tasks")
+      .then((r) => r.json())
+      .then((data) => setTasks(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
@@ -99,6 +116,10 @@ export default function CalendarioPage() {
 
   const selectedEvents = selected
     ? localEvents.filter((e) => isSameDay(e.date, selected))
+    : [];
+
+  const selectedTasks = selected
+    ? tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), selected) && t.status !== "completada")
     : [];
 
   return (
@@ -163,6 +184,7 @@ export default function CalendarioPage() {
               const isToday = isSameDay(day, new Date(2026, 2, 22));
               const isSelected = selected && isSameDay(day, selected);
               const dayEvents = localEvents.filter((e) => isSameDay(e.date, day));
+              const dayTasks = tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), day) && t.status !== "completada");
               const inMonth = isSameMonth(day, current);
 
               return (
@@ -193,9 +215,14 @@ export default function CalendarioPage() {
                         {ev.time} {ev.title.split(" ")[0]}
                       </div>
                     ))}
-                    {dayEvents.length > 2 && (
+                    {dayTasks.slice(0, dayEvents.length >= 2 ? 0 : 1).map((t, ti) => (
+                      <div key={ti} className="text-[10px] font-medium px-1.5 py-0.5 rounded truncate border bg-slate-100 text-slate-700 border-slate-300">
+                        ✓ {t.title.split(" ")[0]}
+                      </div>
+                    ))}
+                    {dayEvents.length + dayTasks.length > 2 && (
                       <div className="text-[10px] text-slate-400 font-medium pl-1">
-                        +{dayEvents.length - 2} más
+                        +{dayEvents.length + dayTasks.length - 2} más
                       </div>
                     )}
                   </div>
@@ -227,7 +254,7 @@ export default function CalendarioPage() {
             ))}
           </div>
 
-          {selectedEvents.length === 0 ? (
+          {selectedEvents.length === 0 && selectedTasks.length === 0 ? (
             <div className="text-center py-10 text-slate-400">
               <Clock className="w-10 h-10 mx-auto mb-3 text-slate-200" />
               <p className="text-sm">Sin eventos este día</p>
@@ -253,6 +280,25 @@ export default function CalendarioPage() {
                   </div>
                 </div>
               ))}
+              {selectedTasks.length > 0 && (
+                <>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide pt-1">Tareas pendientes</p>
+                  {selectedTasks.map((t) => (
+                    <div key={t.id} className="p-3.5 rounded-xl border border-slate-100 hover:border-amber-200 hover:bg-amber-50/40 transition-all">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${
+                          t.priority === "alta" ? "bg-red-50 text-red-600 border-red-200" :
+                          t.priority === "media" ? "bg-amber-50 text-amber-600 border-amber-200" :
+                          "bg-emerald-50 text-emerald-600 border-emerald-200"
+                        } capitalize`}>{t.priority}</span>
+                        <CheckSquare className="w-3.5 h-3.5 text-slate-300" />
+                      </div>
+                      <p className="text-sm font-semibold text-slate-700">{t.title}</p>
+                      {t.patient && <p className="text-xs text-slate-400 mt-1">{t.patient}</p>}
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
 
