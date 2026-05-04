@@ -42,6 +42,7 @@ export default function AuthPage() {
         setLoading(false);
         return;
       }
+      localStorage.setItem("currentUser", JSON.stringify({ name: form.name, email: form.email, role: "Terapeuta" }));
       router.push("/dashboard/inicio");
       return;
     }
@@ -54,6 +55,7 @@ export default function AuthPage() {
       setLoading(false);
       return;
     }
+    localStorage.setItem("currentUser", JSON.stringify({ name: valid.role === "Admin" ? "Administrador" : "Josefina Pizarro", email: valid.email, role: valid.role }));
     router.push("/dashboard/inicio");
   };
 

@@ -18,7 +18,7 @@ import {
   ChevronRight,
   LogOut,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -37,6 +37,17 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; role: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("currentUser");
+      if (stored) setCurrentUser(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, []);
+
+  const displayName = currentUser?.name ?? "Josefina Pizarro";
+  const displayInitials = displayName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <motion.aside
@@ -114,7 +125,7 @@ export default function Sidebar() {
       <div className="p-3 border-t border-slate-800/60">
         <div className={cn("flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-800/60 transition-colors cursor-pointer", collapsed && "justify-center")}>
           <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0">
-            JP
+            {displayInitials}
           </div>
           <AnimatePresence>
             {!collapsed && (
@@ -124,8 +135,8 @@ export default function Sidebar() {
                 exit={{ opacity: 0 }}
                 className="flex-1 min-w-0 overflow-hidden"
               >
-                <p className="text-sm font-medium text-slate-200 truncate">Josefina Pizarro</p>
-                <p className="text-xs text-slate-500 truncate">Terapeuta Ocupacional</p>
+                <p className="text-sm font-medium text-slate-200 truncate">{displayName}</p>
+                <p className="text-xs text-slate-500 truncate">{currentUser?.role === "Admin" ? "Administrador" : "Terapeuta Ocupacional"}</p>
               </motion.div>
             )}
           </AnimatePresence>

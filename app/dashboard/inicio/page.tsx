@@ -6,6 +6,7 @@ import {
   Activity, Star, Zap, AlertCircle
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 const statsData = [
@@ -48,6 +49,18 @@ const item = {
 
 export default function InicioPage() {
   const router = useRouter();
+  const [greeting, setGreeting] = useState("Josefina");
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("currentUser");
+      if (stored) {
+        const u = JSON.parse(stored);
+        setGreeting(u.name?.split(" ")[0] ?? "Josefina");
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   return (
     <motion.div
       variants={container}
@@ -59,7 +72,7 @@ export default function InicioPage() {
       <motion.div variants={item} className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">
-            Buenos días, <span className="text-violet-600">Josefina</span> 👋
+            Buenos días, <span className="text-violet-600">{greeting}</span> 👋
           </h2>
           <p className="text-slate-500 mt-0.5">Aquí tienes el resumen de tu práctica clínica</p>
         </div>
