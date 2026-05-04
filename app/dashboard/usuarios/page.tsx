@@ -304,20 +304,20 @@ export default function UsuariosPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nombre *</label>
-              <input autoFocus type="text" value={newPatient.name} onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })} placeholder="Nombre completo" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input autoFocus type="text" value={newPatient.name} onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })} placeholder="Nombre completo" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Edad</label>
-              <input type="number" min={0} max={120} value={newPatient.age || ""} onChange={(e) => setNewPatient({ ...newPatient, age: parseInt(e.target.value) || 0 })} placeholder="Años" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input type="number" min={0} max={120} value={newPatient.age || ""} onChange={(e) => setNewPatient({ ...newPatient, age: parseInt(e.target.value) || 0 })} placeholder="Años" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico *</label>
-            <input type="text" value={newPatient.diagnosis} onChange={(e) => setNewPatient({ ...newPatient, diagnosis: e.target.value })} placeholder="Diagnóstico principal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input type="text" value={newPatient.diagnosis} onChange={(e) => setNewPatient({ ...newPatient, diagnosis: e.target.value })} placeholder="Diagnóstico principal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Estado</label>
-            <select value={newPatient.status} onChange={(e) => setNewPatient({ ...newPatient, status: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+            <select value={newPatient.status} onChange={(e) => setNewPatient({ ...newPatient, status: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
               <option value="activo">Activo</option>
               <option value="evaluacion">En Evaluación</option>
               <option value="alta">Alta</option>
@@ -325,16 +325,16 @@ export default function UsuariosPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Próxima sesión</label>
-            <input type="text" value={newPatient.nextSession} onChange={(e) => setNewPatient({ ...newPatient, nextSession: e.target.value })} placeholder="Ej. 25 Abr 10:00" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input type="text" value={newPatient.nextSession} onChange={(e) => setNewPatient({ ...newPatient, nextSession: e.target.value })} placeholder="Ej. 25 Abr 10:00" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Teléfono / WhatsApp</label>
-              <input type="tel" value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })} placeholder="+56912345678" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input type="tel" value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })} placeholder="+56912345678" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Email</label>
-              <input type="email" value={newPatient.email} onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })} placeholder="correo@email.com" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input type="email" value={newPatient.email} onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })} placeholder="correo@email.com" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
           </div>
         </div>

@@ -194,25 +194,25 @@ export default function RecordatoriosPage() {
         <div className="space-y-4">
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Título *</label>
-            <input autoFocus type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ej. Llamar a paciente..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input autoFocus type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ej. Llamar a paciente..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Descripción</label>
-            <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalles adicionales..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all" />
+            <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalles adicionales..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha</label>
-              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
-              <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as Reminder["type"] })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as Reminder["type"] })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
               <option value="general">General</option>
               <option value="cita">Cita</option>
               <option value="tarea">Tarea</option>
@@ -237,25 +237,25 @@ export default function RecordatoriosPage() {
           <div className="space-y-4">
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Título *</label>
-              <input autoFocus type="text" value={editingReminder.title} onChange={(e) => setEditingReminder({ ...editingReminder, title: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input autoFocus type="text" value={editingReminder.title} onChange={(e) => setEditingReminder({ ...editingReminder, title: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Descripción</label>
-              <textarea rows={2} value={editingReminder.description} onChange={(e) => setEditingReminder({ ...editingReminder, description: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all" />
+              <textarea rows={2} value={editingReminder.description} onChange={(e) => setEditingReminder({ ...editingReminder, description: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha</label>
-                <input type="date" value={editingReminder.date} onChange={(e) => setEditingReminder({ ...editingReminder, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                <input type="date" value={editingReminder.date} onChange={(e) => setEditingReminder({ ...editingReminder, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
               </div>
               <div>
                 <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
-                <input type="time" value={editingReminder.time} onChange={(e) => setEditingReminder({ ...editingReminder, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                <input type="time" value={editingReminder.time} onChange={(e) => setEditingReminder({ ...editingReminder, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
               </div>
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
-              <select value={editingReminder.type} onChange={(e) => setEditingReminder({ ...editingReminder, type: e.target.value as Reminder["type"] })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+              <select value={editingReminder.type} onChange={(e) => setEditingReminder({ ...editingReminder, type: e.target.value as Reminder["type"] })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
                 <option value="general">General</option>
                 <option value="cita">Cita</option>
                 <option value="tarea">Tarea</option>

@@ -288,7 +288,7 @@ export default function TareasPage() {
               onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && addTask()}
               placeholder="Ej. Redactar informe de paciente..."
-              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
             />
           </div>
           <div>
@@ -298,7 +298,7 @@ export default function TareasPage() {
               value={newTask.description}
               onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
               placeholder="Detalles de la tarea..."
-              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -337,7 +337,7 @@ export default function TareasPage() {
                 type="date"
                 value={newTask.due}
                 onChange={(e) => setNewTask({ ...newTask, due: e.target.value })}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
               />
             </div>
             <div>
@@ -381,7 +381,7 @@ export default function TareasPage() {
                 type="text"
                 value={editingTask.title}
                 onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
               />
             </div>
             <div>
@@ -390,7 +390,7 @@ export default function TareasPage() {
                 rows={2}
                 value={editingTask.description}
                 onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all"
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -429,7 +429,7 @@ export default function TareasPage() {
                   type="date"
                   value={editingTask.due ?? ""}
                   onChange={(e) => setEditingTask({ ...editingTask, due: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
                 />
               </div>
               <div>
