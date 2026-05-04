@@ -38,11 +38,14 @@ export default function Sidebar() {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name: string; email: string; role: string } | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem("currentUser");
       if (stored) setCurrentUser(JSON.parse(stored));
+      const avatar = localStorage.getItem("profileAvatar");
+      if (avatar) setAvatarUrl(avatar);
     } catch { /* ignore */ }
   }, []);
 
@@ -124,8 +127,12 @@ export default function Sidebar() {
       {/* User profile */}
       <div className="p-3 border-t border-slate-800/60">
         <div className={cn("flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-800/60 transition-colors cursor-pointer", collapsed && "justify-center")}>
-          <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0">
-            {displayInitials}
+          <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Perfil" className="w-full h-full object-cover" />
+            ) : (
+              displayInitials
+            )}
           </div>
           <AnimatePresence>
             {!collapsed && (

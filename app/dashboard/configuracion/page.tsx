@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Camera, Save, Eye, EyeOff, Shield, AlertTriangle, User, Lock, Trash2, Upload } from "lucide-react";
 
 const tabs = [
@@ -18,11 +18,35 @@ export default function ConfiguracionPage() {
   const [saved, setSaved] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
+  useEffect(() => {
+    try {
+      const storedAvatar = localStorage.getItem("profileAvatar");
+      if (storedAvatar) setAvatarUrl(storedAvatar);
+      const storedUser = localStorage.getItem("currentUser");
+      if (storedUser) {
+        const u = JSON.parse(storedUser);
+        const parts = (u.name ?? "").split(" ");
+        setProfile({
+          nombre: parts[0] ?? "Josefina",
+          apellido: parts.slice(1).join(" ") || "Pizarro",
+          telefono: u.phone ?? "",
+          especialidad: u.role === "Admin" ? "Administrador" : "Terapeuta Ocupacional",
+          email: u.email ?? "japieaters@gmail.com",
+        });
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setAvatarUrl(url);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      setAvatarUrl(base64);
+      localStorage.setItem("profileAvatar", base64);
+    };
+    reader.readAsDataURL(file);
   };
   const [profile, setProfile] = useState({
     nombre: "Josefina",
@@ -34,6 +58,12 @@ export default function ConfiguracionPage() {
 
   const showSaved = (msg: string) => {
     setSaved(msg);
+    // Also persist profile name to currentUser
+    try {
+      const stored = localStorage.getItem("currentUser");
+      const u = stored ? JSON.parse(stored) : {};
+      localStorage.setItem("currentUser", JSON.stringify({ ...u, name: `${profile.nombre} ${profile.apellido}`.trim(), phone: profile.telefono }));
+    } catch { /* ignore */ }
     setTimeout(() => setSaved(""), 2500);
   };
 
