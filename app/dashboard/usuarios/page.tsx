@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 
 interface Patient {
@@ -43,6 +43,15 @@ export default function UsuariosPage() {
   const [showNewPatient, setShowNewPatient] = useState(false);
   const [newPatient, setNewPatient] = useState({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "" });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
+  const [editPatient, setEditPatient] = useState<Patient | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Patient>>({});
+
+  useEffect(() => {
+    const close = () => setMenuOpenId(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, []);
 
   useEffect(() => {
     fetch("/api/patients")
@@ -67,6 +76,32 @@ export default function UsuariosPage() {
       setNewPatient({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "" });
       setShowNewPatient(false);
       setFilter("todos");
+    }
+  };
+
+  const deletePatient = async (id: number) => {
+    if (!confirm("¿Eliminar este paciente?")) return;
+    const res = await fetch(`/api/patients/${id}`, { method: "DELETE" });
+    if (res.ok) setPatients((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const openEdit = (p: Patient) => {
+    setEditForm({ name: p.name, age: p.age, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, phone: p.phone, email: p.email });
+    setEditPatient(p);
+    setMenuOpenId(null);
+  };
+
+  const saveEdit = async () => {
+    if (!editPatient) return;
+    const res = await fetch(`/api/patients/${editPatient.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editForm),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setPatients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      setEditPatient(null);
     }
   };
 
@@ -176,9 +211,21 @@ export default function UsuariosPage() {
                   <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg ${statusConfig[p.status]?.cls}`}>
                     {statusConfig[p.status]?.label}
                   </span>
-                  <button onClick={() => setSelectedPatient(p)} className="p-1 text-slate-300 hover:text-slate-600 transition-colors">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
+                  <div className="relative">
+                    <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === p.id ? null : p.id); }} className="p-1 text-slate-300 hover:text-slate-600 transition-colors">
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                    {menuOpenId === p.id && (
+                      <div className="absolute right-0 top-7 z-20 bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/60 py-1 w-36" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => openEdit(p)} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors">
+                          <Pencil className="w-3.5 h-3.5" /> Editar
+                        </button>
+                        <button onClick={() => { setMenuOpenId(null); deletePatient(p.id); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -213,6 +260,57 @@ export default function UsuariosPage() {
           </motion.div>
         ))}
       </motion.div>
+
+      {/* Edit Modal */}
+      <Modal
+        open={!!editPatient}
+        onClose={() => setEditPatient(null)}
+        title="Editar Paciente"
+        footer={
+          <button onClick={saveEdit} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
+            Guardar cambios
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nombre</label>
+              <input type="text" value={editForm.name || ""} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Edad</label>
+              <input type="number" min={0} max={120} value={editForm.age || ""} onChange={(e) => setEditForm({ ...editForm, age: parseInt(e.target.value) || 0 })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico</label>
+            <input type="text" value={editForm.diagnosis || ""} onChange={(e) => setEditForm({ ...editForm, diagnosis: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Estado</label>
+            <select value={editForm.status || "activo"} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+              <option value="activo">Activo</option>
+              <option value="evaluacion">En Evaluación</option>
+              <option value="alta">Alta</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Próxima sesión</label>
+            <input type="date" value={editForm.nextSession || ""} onChange={(e) => setEditForm({ ...editForm, nextSession: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Teléfono</label>
+              <input type="tel" value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Email</label>
+              <input type="email" value={editForm.email || ""} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       {/* Profile Modal */}
       <Modal
