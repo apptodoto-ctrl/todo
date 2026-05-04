@@ -38,6 +38,14 @@ export default function CalendarioPage() {
   const [localEvents, setLocalEvents] = useState<CalEvent[]>([]);
   const [showNewEvent, setShowNewEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "Sala 1" });
+  const [patients, setPatients] = useState<{ id: number; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/patients")
+      .then((r) => r.json())
+      .then((data) => setPatients(Array.isArray(data) ? data.map((p: { id: number; name: string }) => ({ id: p.id, name: p.name })) : []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/appointments")
@@ -54,11 +62,11 @@ export default function CalendarioPage() {
       .catch(() => {});
   }, []);
 
-  const openNewEvent = () => {
+  const openNewEvent = (type = "sesion") => {
     const defaultDate = selected
       ? format(selected, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    setNewEvent({ title: "", date: defaultDate, time: "10:00", type: "sesion", location: "Sala 1" });
+    setNewEvent({ title: "", date: defaultDate, time: "10:00", type, location: "Sala 1" });
     setShowNewEvent(true);
   };
 
@@ -118,9 +126,17 @@ export default function CalendarioPage() {
             <ChevronRight className="w-4 h-4 text-slate-600" />
           </button>
         </div>
-        <button onClick={openNewEvent} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
-          <Plus className="w-4 h-4" /> Nueva Cita
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => openNewEvent("sesion")} className="flex items-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-3 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
+            <Plus className="w-4 h-4" /> Sesión
+          </button>
+          <button onClick={() => openNewEvent("evaluacion")} className="flex items-center gap-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-2.5 rounded-xl font-medium text-sm hover:from-blue-400 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/30">
+            <Plus className="w-4 h-4" /> Evaluación
+          </button>
+          <button onClick={() => openNewEvent("reunion")} className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-3 py-2.5 rounded-xl font-medium text-sm hover:from-emerald-400 hover:to-teal-500 transition-all shadow-lg shadow-emerald-500/30">
+            <Plus className="w-4 h-4" /> Reunión
+          </button>
+        </div>
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -263,8 +279,17 @@ export default function CalendarioPage() {
             <input autoFocus type="date" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente / Título *</label>
-            <input type="text" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Nombre del paciente o razón" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente *</label>
+            {patients.length > 0 ? (
+              <select value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                <option value="">Seleccionar paciente...</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.name}>{p.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input type="text" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Nombre del paciente" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
