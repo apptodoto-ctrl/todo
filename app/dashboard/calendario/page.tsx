@@ -43,8 +43,9 @@ export default function CalendarioPage() {
     fetch("/api/appointments")
       .then((r) => r.json())
       .then((data: { id: number; date: string; title: string; time: string; type: string; location: string }[]) => {
+        const list = Array.isArray(data) ? data : [];
         setLocalEvents(
-          data.map((a) => {
+          list.map((a) => {
             const [y, m, d] = a.date.split("-").map(Number);
             return { id: a.id, date: new Date(y, m - 1, d), title: a.title, time: a.time, type: a.type, location: a.location };
           })

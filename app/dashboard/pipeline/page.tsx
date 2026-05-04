@@ -68,8 +68,9 @@ export default function PipelinePage() {
     fetch("/api/pipelines")
       .then((r) => r.json())
       .then((data: Pipeline[]) => {
-        setPipelines(data);
-        if (data.length > 0) setActivePipelineId(data[0].id);
+        const list = Array.isArray(data) ? data : [];
+        setPipelines(list);
+        if (list.length > 0) setActivePipelineId(list[0].id);
         setLoading(false);
       })
       .catch(() => setLoading(false));

@@ -126,7 +126,7 @@ export default function AsistentesPage() {
   useEffect(() => {
     fetch("/api/patients")
       .then((r) => r.json())
-      .then((data) => setPatients(data))
+      .then((data) => setPatients(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
