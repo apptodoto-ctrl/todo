@@ -21,6 +21,15 @@ interface Patient {
   rut: string;
 }
 
+function formatRut(value: string): string {
+  const clean = value.replace(/[^0-9kK]/g, "").toUpperCase();
+  if (clean.length === 0) return "";
+  const dv = clean.slice(-1);
+  const body = clean.slice(0, -1);
+  const formatted = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return formatted ? `${formatted}-${dv}` : dv;
+}
+
 const statusConfig: Record<string, { label: string; cls: string }> = {
   activo: { label: "Activo", cls: "bg-emerald-100 text-emerald-700" },
   evaluacion: { label: "En Evaluación", cls: "bg-blue-100 text-blue-700" },
@@ -275,7 +284,8 @@ export default function UsuariosPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT</label>
-            <input type="text" value={editForm.rut || ""} onChange={(e) => setEditForm({ ...editForm, rut: e.target.value })} placeholder="12.345.678-9" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input type="text" value={editForm.rut || ""} onChange={(e) => setEditForm({ ...editForm, rut: formatRut(e.target.value) })} placeholder="12.345.678-9" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico</label>
             <input type="text" value={editForm.diagnosis || ""} onChange={(e) => setEditForm({ ...editForm, diagnosis: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
@@ -404,7 +414,8 @@ export default function UsuariosPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT</label>
-            <input type="text" value={newPatient.rut} onChange={(e) => setNewPatient({ ...newPatient, rut: e.target.value })} placeholder="12.345.678-9" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input type="text" value={newPatient.rut} onChange={(e) => setNewPatient({ ...newPatient, rut: formatRut(e.target.value) })} placeholder="12.345.678-9" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico *</label>
             <input type="text" value={newPatient.diagnosis} onChange={(e) => setNewPatient({ ...newPatient, diagnosis: e.target.value })} placeholder="Diagnóstico principal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
