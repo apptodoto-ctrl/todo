@@ -316,7 +316,7 @@ export default function CalendarioPage() {
             </div>
           )}
 
-          <button onClick={openNewEvent} className="mt-4 w-full text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-xl py-2.5 transition-colors flex items-center justify-center gap-2">
+          <button onClick={() => openNewEvent()} className="mt-4 w-full text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-xl py-2.5 transition-colors flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" /> Agregar cita
           </button>
         </motion.div>
