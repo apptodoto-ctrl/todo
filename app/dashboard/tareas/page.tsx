@@ -40,8 +40,8 @@ export default function TareasPage() {
     Promise.all([fetch("/api/tasks"), fetch("/api/patients")])
       .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
       .then(([tasksData, patientsData]) => {
-        setTasks(tasksData);
-        setPatients(patientsData);
+        setTasks(Array.isArray(tasksData) ? tasksData : []);
+        setPatients(Array.isArray(patientsData) ? patientsData : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));

@@ -47,7 +47,7 @@ export default function UsuariosPage() {
   useEffect(() => {
     fetch("/api/patients")
       .then((r) => r.json())
-      .then((data) => { setPatients(data); setLoading(false); })
+      .then((data) => { setPatients(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
