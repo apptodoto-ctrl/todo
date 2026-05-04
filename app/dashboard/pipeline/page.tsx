@@ -60,6 +60,7 @@ export default function PipelinePage() {
   const [newPipelineName, setNewPipelineName] = useState("");
   const [confirmDeletePipelineId, setConfirmDeletePipelineId] = useState<string | null>(null);
   const [showPipelineDropdown, setShowPipelineDropdown] = useState(false);
+  const [pipelinePatients, setPipelinePatients] = useState<{ id: number; name: string; age: number; diagnosis: string }[]>([]);
   const dragCaseId = useRef<number | null>(null);
   const dragFromColId = useRef<string | null>(null);
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
@@ -74,6 +75,10 @@ export default function PipelinePage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    fetch("/api/patients")
+      .then((r) => r.json())
+      .then((data) => setPipelinePatients(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, []);
 
   const activePipeline = pipelines.find((p) => p.id === activePipelineId) ?? null;
@@ -400,9 +405,25 @@ export default function PipelinePage() {
         </div>
       </motion.div>
 
-      <Modal open={showCaseModal} onClose={() => setShowCaseModal(false)} title="Agregar Caso" subtitle={activeColumnId ? columns.find((c) => c.id === activeColumnId)?.label : undefined} footer={<button onClick={addCase} disabled={!newCase.patient.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">Agregar Caso</button>}>
+      <Modal open={showCaseModal} onClose={() => setShowCaseModal(false)} title="Agregar Usuario" subtitle={activeColumnId ? columns.find((c) => c.id === activeColumnId)?.label : undefined} footer={<button onClick={addCase} disabled={!newCase.patient.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">Agregar Usuario</button>}>
         <div className="space-y-4">
-          <div><label className="text-sm font-semibold text-slate-700 block mb-1.5">Nombre del paciente *</label><input autoFocus type="text" value={newCase.patient} onChange={(e) => setNewCase({ ...newCase, patient: e.target.value })} onKeyDown={(e) => e.key === "Enter" && addCase()} placeholder="Nombre completo" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" /></div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario *</label>
+            <select
+              autoFocus
+              value={newCase.patient}
+              onChange={(e) => {
+                const p = pipelinePatients.find((x) => x.name === e.target.value);
+                setNewCase({ ...newCase, patient: e.target.value, age: p?.age ?? newCase.age, diagnosis: p?.diagnosis ?? newCase.diagnosis });
+              }}
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+            >
+              <option value="">Seleccionar usuario...</option>
+              {pipelinePatients.map((p) => (<option key={p.id} value={p.name}>{p.name}</option>))}
+              <option value="__manual__" disabled>── o escribe manualmente ──</option>
+            </select>
+            <input type="text" value={newCase.patient} onChange={(e) => setNewCase({ ...newCase, patient: e.target.value })} placeholder="O escribe nombre manualmente" className="mt-2 w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="text-sm font-semibold text-slate-700 block mb-1.5">Edad</label><input type="number" min={0} value={newCase.age || ""} onChange={(e) => setNewCase({ ...newCase, age: parseInt(e.target.value) || 0 })} placeholder="Años" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" /></div>
             <div><label className="text-sm font-semibold text-slate-700 block mb-1.5">Días en etapa</label><input type="number" min={0} value={newCase.days || ""} onChange={(e) => setNewCase({ ...newCase, days: parseInt(e.target.value) || 0 })} placeholder="0" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" /></div>

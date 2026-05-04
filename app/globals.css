@@ -6,6 +6,12 @@
   }
 }
 
+/* Darker placeholders */
+::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
