@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/dashboard/inicio", icon: LayoutDashboard, label: "Inicio" },
   { href: "/dashboard/calendario", icon: Calendar, label: "Calendario" },
-  { href: "/dashboard/usuarios", icon: Users, label: "Usuarios" },
+  { href: "/dashboard/usuarios", icon: Users, label: "Pacientes" },
   { href: "/dashboard/tareas", icon: CheckSquare, label: "Tareas" },
   { href: "/dashboard/asistentes", icon: Bot, label: "Asistentes IA" },
   { href: "/dashboard/pipeline", icon: Kanban, label: "Pipeline" },
