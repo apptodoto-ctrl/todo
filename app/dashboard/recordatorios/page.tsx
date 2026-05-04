@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, Plus, RefreshCw, Calendar, Clock, Trash2, Edit2, CheckCircle2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 
@@ -29,7 +29,19 @@ const initial: Reminder[] = [
 ];
 
 export default function RecordatoriosPage() {
-  const [reminders, setReminders] = useState<Reminder[]>(initial);
+  const [reminders, setReminders] = useState<Reminder[]>(() => {
+    if (typeof window === "undefined") return initial;
+    try {
+      const stored = localStorage.getItem("reminders");
+      return stored ? JSON.parse(stored) : initial;
+    } catch {
+      return initial;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("reminders", JSON.stringify(reminders));
+  }, [reminders]);
   const [showNew, setShowNew] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [form, setForm] = useState({ title: "", description: "", date: "", time: "", type: "general" as Reminder["type"] });

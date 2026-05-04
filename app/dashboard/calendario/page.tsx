@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, CheckSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, CheckSquare, Bell } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -27,6 +27,15 @@ interface CalTask {
   status: string;
 }
 
+interface CalReminder {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+  type: string;
+  done: boolean;
+}
+
 const typeColors: Record<string, string> = {
   sesion: "bg-violet-200 text-violet-900 border-violet-300",
   evaluacion: "bg-blue-200 text-blue-900 border-blue-300",
@@ -49,6 +58,19 @@ export default function CalendarioPage() {
   const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "Sala 1" });
   const [patients, setPatients] = useState<{ id: number; name: string }[]>([]);
   const [tasks, setTasks] = useState<CalTask[]>([]);
+  const [reminders, setReminders] = useState<CalReminder[]>([]);
+
+  useEffect(() => {
+    const load = () => {
+      try {
+        const stored = localStorage.getItem("reminders");
+        setReminders(stored ? JSON.parse(stored) : []);
+      } catch { setReminders([]); }
+    };
+    load();
+    window.addEventListener("storage", load);
+    return () => window.removeEventListener("storage", load);
+  }, []);
 
   useEffect(() => {
     fetch("/api/patients")
@@ -122,6 +144,10 @@ export default function CalendarioPage() {
     ? tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), selected))
     : [];
 
+  const selectedReminders = selected
+    ? reminders.filter((r) => r.date && !r.done && (() => { try { return isSameDay(new Date(r.date + "T00:00:00"), selected); } catch { return false; } })())
+    : [];
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Toolbar */}
@@ -185,6 +211,7 @@ export default function CalendarioPage() {
               const isSelected = selected && isSameDay(day, selected);
               const dayEvents = localEvents.filter((e) => isSameDay(e.date, day));
               const dayTasks = tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), day));
+              const dayReminders = reminders.filter((r) => r.date && !r.done && (() => { try { return isSameDay(new Date(r.date + "T00:00:00"), day); } catch { return false; } })());
               const inMonth = isSameMonth(day, current);
 
               return (
@@ -224,9 +251,14 @@ export default function CalendarioPage() {
                         ✓ {t.title.split(" ")[0]}
                       </div>
                     ))}
-                    {dayEvents.length + dayTasks.length > 2 && (
+                    {dayReminders.slice(0, Math.max(0, 2 - dayEvents.length - dayTasks.length)).map((r, ri) => (
+                      <div key={ri} className="text-[10px] font-medium px-1.5 py-0.5 rounded truncate border bg-orange-50 text-orange-700 border-orange-200">
+                        🔔 {r.title.split(" ")[0]}
+                      </div>
+                    ))}
+                    {dayEvents.length + dayTasks.length + dayReminders.length > 2 && (
                       <div className="text-[10px] text-slate-400 font-medium pl-1">
-                        +{dayEvents.length + dayTasks.length - 2} más
+                        +{dayEvents.length + dayTasks.length + dayReminders.length - 2} más
                       </div>
                     )}
                   </div>
@@ -258,7 +290,7 @@ export default function CalendarioPage() {
             ))}
           </div>
 
-          {selectedEvents.length === 0 && selectedTasks.length === 0 ? (
+          {selectedEvents.length === 0 && selectedTasks.length === 0 && selectedReminders.length === 0 ? (
             <div className="text-center py-10 text-slate-400">
               <Clock className="w-10 h-10 mx-auto mb-3 text-slate-200" />
               <p className="text-sm">Sin eventos este día</p>
@@ -311,6 +343,22 @@ export default function CalendarioPage() {
                       </div>
                     );
                   })}
+                </>
+              )}
+              {selectedReminders.length > 0 && (
+                <>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide pt-1">Recordatorios</p>
+                  {selectedReminders.map((r) => (
+                    <div key={r.id} className="p-3.5 rounded-xl border border-orange-100 bg-orange-50/60 hover:bg-orange-50 transition-all">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-lg border bg-orange-100 text-orange-700 border-orange-200 capitalize">{r.type}</span>
+                        <span className="flex items-center gap-1 text-xs text-orange-500 font-medium">
+                          <Bell className="w-3 h-3" /> {r.time}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-slate-700">{r.title}</p>
+                    </div>
+                  ))}
                 </>
               )}
             </div>
