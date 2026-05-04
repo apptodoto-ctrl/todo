@@ -119,7 +119,7 @@ export default function CalendarioPage() {
     : [];
 
   const selectedTasks = selected
-    ? tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), selected) && t.status !== "completada")
+    ? tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), selected))
     : [];
 
   return (
@@ -184,7 +184,7 @@ export default function CalendarioPage() {
               const isToday = isSameDay(day, new Date(2026, 2, 22));
               const isSelected = selected && isSameDay(day, selected);
               const dayEvents = localEvents.filter((e) => isSameDay(e.date, day));
-              const dayTasks = tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), day) && t.status !== "completada");
+              const dayTasks = tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), day));
               const inMonth = isSameMonth(day, current);
 
               return (
@@ -216,7 +216,11 @@ export default function CalendarioPage() {
                       </div>
                     ))}
                     {dayTasks.slice(0, dayEvents.length >= 2 ? 0 : 1).map((t, ti) => (
-                      <div key={ti} className="text-[10px] font-medium px-1.5 py-0.5 rounded truncate border bg-slate-100 text-slate-700 border-slate-300">
+                      <div key={ti} className={`text-[10px] font-medium px-1.5 py-0.5 rounded truncate border ${
+                        t.status === "completada"
+                          ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                          : "bg-slate-100 text-slate-700 border-slate-300"
+                      }`}>
                         ✓ {t.title.split(" ")[0]}
                       </div>
                     ))}
@@ -282,21 +286,31 @@ export default function CalendarioPage() {
               ))}
               {selectedTasks.length > 0 && (
                 <>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide pt-1">Tareas pendientes</p>
-                  {selectedTasks.map((t) => (
-                    <div key={t.id} className="p-3.5 rounded-xl border border-slate-100 hover:border-amber-200 hover:bg-amber-50/40 transition-all">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${
-                          t.priority === "alta" ? "bg-red-50 text-red-600 border-red-200" :
-                          t.priority === "media" ? "bg-amber-50 text-amber-600 border-amber-200" :
-                          "bg-emerald-50 text-emerald-600 border-emerald-200"
-                        } capitalize`}>{t.priority}</span>
-                        <CheckSquare className="w-3.5 h-3.5 text-slate-300" />
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide pt-1">Tareas</p>
+                  {selectedTasks.map((t) => {
+                    const done = t.status === "completada";
+                    return (
+                      <div key={t.id} className={`p-3.5 rounded-xl border transition-all ${
+                        done
+                          ? "border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50"
+                          : "border-slate-100 hover:border-amber-200 hover:bg-amber-50/40"
+                      }`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${
+                            done ? "bg-emerald-100 text-emerald-700 border-emerald-300" :
+                            t.priority === "alta" ? "bg-red-50 text-red-600 border-red-200" :
+                            t.priority === "media" ? "bg-amber-50 text-amber-600 border-amber-200" :
+                            "bg-emerald-50 text-emerald-600 border-emerald-200"
+                          } capitalize`}>{done ? "completada" : t.priority}</span>
+                          <CheckSquare className={`w-3.5 h-3.5 ${done ? "text-emerald-500" : "text-slate-300"}`} />
+                        </div>
+                        <p className={`text-sm font-semibold ${
+                          done ? "line-through text-slate-400" : "text-slate-700"
+                        }`}>{t.title}</p>
+                        {t.patient && <p className="text-xs text-slate-400 mt-1">{t.patient}</p>}
                       </div>
-                      <p className="text-sm font-semibold text-slate-700">{t.title}</p>
-                      {t.patient && <p className="text-xs text-slate-400 mt-1">{t.patient}</p>}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
             </div>
