@@ -83,10 +83,10 @@ export default function UsuariosPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="text-slate-500 text-sm">{patients.length} usuarios registrados</p>
+          <p className="text-slate-500 text-sm">{patients.length} pacientes registrados</p>
         </div>
         <button onClick={() => setShowNewPatient(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 self-start sm:self-auto">
-          <Plus className="w-4 h-4" /> Nuevo Usuario
+          <Plus className="w-4 h-4" /> Nuevo Paciente
         </button>
       </div>
 
@@ -218,7 +218,7 @@ export default function UsuariosPage() {
       <Modal
         open={!!selectedPatient}
         onClose={() => setSelectedPatient(null)}
-        title="Perfil del Usuario"
+        title="Perfil del Paciente"
         maxWidth="max-w-lg"
       >
         {selectedPatient && (

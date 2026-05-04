@@ -405,10 +405,10 @@ export default function PipelinePage() {
         </div>
       </motion.div>
 
-      <Modal open={showCaseModal} onClose={() => setShowCaseModal(false)} title="Agregar Usuario" subtitle={activeColumnId ? columns.find((c) => c.id === activeColumnId)?.label : undefined} footer={<button onClick={addCase} disabled={!newCase.patient.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">Agregar Usuario</button>}>
+      <Modal open={showCaseModal} onClose={() => setShowCaseModal(false)} title="Agregar Paciente" subtitle={activeColumnId ? columns.find((c) => c.id === activeColumnId)?.label : undefined} footer={<button onClick={addCase} disabled={!newCase.patient.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">Agregar Paciente</button>}>
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario *</label>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Paciente *</label>
             <select
               autoFocus
               value={newCase.patient}
@@ -418,7 +418,7 @@ export default function PipelinePage() {
               }}
               className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
             >
-              <option value="">Seleccionar usuario...</option>
+              <option value="">Seleccionar paciente...</option>
               {pipelinePatients.map((p) => (<option key={p.id} value={p.name}>{p.name}</option>))}
               <option value="__manual__" disabled>── o escribe manualmente ──</option>
             </select>
