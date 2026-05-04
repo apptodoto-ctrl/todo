@@ -7,7 +7,11 @@ export async function PUT(req: Request, { params }: { params: Params }) {
   try {
     const { id } = await params;
     const body = await req.json();
-    const task = await prisma.task.update({ where: { id: Number(id) }, data: body });
+    const { patient, patientId, ...rest } = body;
+    const task = await prisma.task.update({
+      where: { id: Number(id) },
+      data: { ...rest, ...(patientId ? { patientId: Number(patientId) } : {}) },
+    });
     return NextResponse.json(task);
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });
