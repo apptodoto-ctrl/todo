@@ -18,6 +18,7 @@ interface Patient {
   color: string;
   phone: string;
   email: string;
+  rut: string;
 }
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
@@ -41,7 +42,7 @@ export default function UsuariosPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
   const [showNewPatient, setShowNewPatient] = useState(false);
-  const [newPatient, setNewPatient] = useState({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "" });
+  const [newPatient, setNewPatient] = useState({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "", rut: "" });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
@@ -73,7 +74,7 @@ export default function UsuariosPage() {
     if (res.ok) {
       const patient = await res.json();
       setPatients((prev) => [...prev, patient]);
-      setNewPatient({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "" });
+      setNewPatient({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "", rut: "" });
       setShowNewPatient(false);
       setFilter("todos");
     }
@@ -86,7 +87,7 @@ export default function UsuariosPage() {
   };
 
   const openEdit = (p: Patient) => {
-    setEditForm({ name: p.name, age: p.age, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, phone: p.phone, email: p.email });
+    setEditForm({ name: p.name, age: p.age, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, phone: p.phone, email: p.email, rut: p.rut });
     setEditPatient(p);
     setMenuOpenId(null);
   };
@@ -273,6 +274,9 @@ export default function UsuariosPage() {
             </div>
           </div>
           <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT</label>
+            <input type="text" value={editForm.rut || ""} onChange={(e) => setEditForm({ ...editForm, rut: e.target.value })} placeholder="12.345.678-9" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico</label>
             <input type="text" value={editForm.diagnosis || ""} onChange={(e) => setEditForm({ ...editForm, diagnosis: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
@@ -398,6 +402,9 @@ export default function UsuariosPage() {
               <input type="number" min={0} max={120} value={newPatient.age || ""} onChange={(e) => setNewPatient({ ...newPatient, age: parseInt(e.target.value) || 0 })} placeholder="Años" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
           </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT</label>
+            <input type="text" value={newPatient.rut} onChange={(e) => setNewPatient({ ...newPatient, rut: e.target.value })} placeholder="12.345.678-9" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico *</label>
             <input type="text" value={newPatient.diagnosis} onChange={(e) => setNewPatient({ ...newPatient, diagnosis: e.target.value })} placeholder="Diagnóstico principal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />

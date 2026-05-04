@@ -27,6 +27,7 @@ model Patient {
   color       String   @default("from-violet-500 to-purple-600")
   phone       String   @default("")
   email       String   @default("")
+  rut         String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
