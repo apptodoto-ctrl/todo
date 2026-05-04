@@ -207,26 +207,9 @@ export default function UsuariosPage() {
                     <p className="text-xs text-slate-400">{p.age} años</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg ${statusConfig[p.status]?.cls}`}>
+                <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg ${statusConfig[p.status]?.cls}`}>
                     {statusConfig[p.status]?.label}
                   </span>
-                  <div className="relative">
-                    <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === p.id ? null : p.id); }} className="p-1 text-slate-300 hover:text-slate-600 transition-colors">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                    {menuOpenId === p.id && (
-                      <div className="absolute right-0 top-7 z-20 bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/60 py-1 w-36" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => openEdit(p)} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors">
-                          <Pencil className="w-3.5 h-3.5" /> Editar
-                        </button>
-                        <button onClick={() => { setMenuOpenId(null); deletePatient(p.id); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
-                          <Trash2 className="w-3.5 h-3.5" /> Eliminar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
 
               <div className="space-y-2 mb-4">
@@ -253,6 +236,12 @@ export default function UsuariosPage() {
                   </button>
                   <button onClick={() => setSelectedPatient(p)} className="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-white hover:bg-gradient-to-r hover:from-violet-500 hover:to-purple-600 border border-violet-200 hover:border-transparent rounded-lg transition-all">
                     Ver perfil
+                  </button>
+                  <button onClick={() => openEdit(p)} className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all" title="Editar">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => deletePatient(p.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Eliminar">
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
