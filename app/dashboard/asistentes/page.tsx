@@ -156,14 +156,26 @@ export default function AsistentesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: fullPrompt,
-          systemPrompt: current ? systemPrompts[current.id] : undefined,
+          systemPrompt: current
+            ? systemPrompts[current.id] +
+              "\n\nIMPORTANTE: Responde en texto plano, sin markdown, sin asteriscos, sin almohadillas (#), sin viñetas especiales, sin emojis ni caracteres especiales de formato. Usa solo texto limpio con saltos de línea normales."
+            : "Responde en texto plano, sin markdown, sin asteriscos, sin almohadillas (#), sin viñetas especiales, sin emojis ni caracteres especiales de formato.",
         }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setOutput(data.text);
+      // Strip any remaining markdown/special chars just in case
+      const clean = (data.text as string)
+        .replace(/#{1,6}\s*/g, "")
+        .replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1")
+        .replace(/_{1,2}([^_]+)_{1,2}/g, "$1")
+        .replace(/`{1,3}[^`]*`{1,3}/g, "")
+        .replace(/^\s*[-•·▪▸►]\s+/gm, "- ")
+        .replace(/[^\S\n]+$/gm, "")
+        .trim();
+      setOutput(clean);
     } catch (err) {
-      setOutput("❌ Error al conectar con la IA. Por favor intenta de nuevo.");
+      setOutput("Error al conectar con la IA. Por favor intenta de nuevo.");
     } finally {
       setLoading(false);
     }
