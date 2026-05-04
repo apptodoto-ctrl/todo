@@ -15,8 +15,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const patient = await prisma.patient.create({ data: body });
     return NextResponse.json(patient, { status: 201 });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: "DB error", detail: msg }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "DB error" }, { status: 500 });
   }
 }
