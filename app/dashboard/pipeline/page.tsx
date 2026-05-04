@@ -115,10 +115,10 @@ function KanbanCard({
             </div>
           </div>
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <GripVertical className="w-3.5 h-3.5 text-slate-300 cursor-grab" />
+            <GripVertical className="w-3.5 h-3.5 text-slate-400 cursor-grab" />
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="p-1 text-slate-300 hover:text-red-500 rounded-lg transition-colors"
+              className="p-1 text-slate-700 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
             >
               <Trash2 className="w-3 h-3" />
             </button>
@@ -209,13 +209,13 @@ function KanbanColumn({
           <div className="flex items-center gap-0.5">
             <button
               onClick={onEditCol}
-              className="p-1.5 text-slate-300 hover:text-violet-500 hover:bg-violet-50 rounded-lg transition-colors"
+              className="p-1.5 text-slate-600 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
             >
               <Pencil className="w-3 h-3" />
             </button>
             <button
               onClick={onDeleteCol}
-              className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              className="p-1.5 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
             >
               <X className="w-3 h-3" />
             </button>
@@ -615,7 +615,7 @@ export default function PipelinePage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar paciente o diagnóstico…"
-              className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+              className="w-full pl-9 pr-4 py-2.5 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all placeholder:text-slate-400"
             />
           </div>
 
