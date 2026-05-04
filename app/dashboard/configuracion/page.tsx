@@ -16,6 +16,14 @@ export default function ConfiguracionPage() {
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [saved, setSaved] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setAvatarUrl(url);
+  };
   const [profile, setProfile] = useState({
     nombre: "Josefina",
     apellido: "Pizarro",
@@ -82,17 +90,23 @@ export default function ConfiguracionPage() {
             </p>
             <div className="flex items-center gap-6">
               <div className="relative">
-                <div className="w-20 h-20 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-violet-500/30">
-                  JP
+                <div className="w-20 h-20 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-violet-500/30 overflow-hidden">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Perfil" className="w-full h-full object-cover" />
+                  ) : (
+                    "JP"
+                  )}
                 </div>
-                <button className="absolute -bottom-1 -right-1 w-7 h-7 bg-violet-500 hover:bg-violet-600 text-white rounded-lg flex items-center justify-center transition-colors shadow-md">
+                <label className="absolute -bottom-1 -right-1 w-7 h-7 bg-violet-500 hover:bg-violet-600 text-white rounded-lg flex items-center justify-center transition-colors shadow-md cursor-pointer">
                   <Camera className="w-3.5 h-3.5" />
-                </button>
+                  <input type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleImageChange} />
+                </label>
               </div>
               <div>
-                <button className="flex items-center gap-2 text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 px-4 py-2.5 rounded-xl transition-colors">
+                <label className="flex items-center gap-2 text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 px-4 py-2.5 rounded-xl transition-colors cursor-pointer">
                   <Upload className="w-4 h-4" /> Seleccionar imagen
-                </button>
+                  <input type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleImageChange} />
+                </label>
                 <p className="text-xs text-slate-400 mt-2">JPG, PNG hasta 5MB</p>
               </div>
             </div>
