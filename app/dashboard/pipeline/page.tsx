@@ -291,8 +291,36 @@ export default function PipelinePage() {
   useEffect(() => {
     fetch("/api/pipelines")
       .then((r) => r.json())
-      .then((data: Pipeline[]) => {
-        const list = Array.isArray(data) ? data : [];
+      .then(async (data: Pipeline[]) => {
+        let list = Array.isArray(data) ? data : [];
+        // Auto-create default pipeline if none exist
+        if (list.length === 0) {
+          const res = await fetch("/api/pipelines", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "Pipeline Principal" }),
+          });
+          if (res.ok) {
+            const pip: Pipeline = await res.json();
+            // Create default columns
+            const defaultCols = [
+              { label: "Evaluación Inicial", color: "bg-violet-50 border-violet-200", accent: "bg-violet-500" },
+              { label: "En Tratamiento", color: "bg-blue-50 border-blue-200", accent: "bg-blue-500" },
+              { label: "Seguimiento", color: "bg-amber-50 border-amber-200", accent: "bg-amber-500" },
+              { label: "Alta Definitiva", color: "bg-emerald-50 border-emerald-200", accent: "bg-emerald-500" },
+            ];
+            const cols: Column[] = [];
+            for (const col of defaultCols) {
+              const cr = await fetch("/api/pipeline/columns", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...col, pipelineId: pip.id }),
+              });
+              if (cr.ok) cols.push({ ...(await cr.json()), cases: [] });
+            }
+            list = [{ ...pip, columns: cols }];
+          }
+        }
         setPipelines(list);
         if (list.length > 0) setActivePipelineId(list[0].id);
         setLoading(false);
