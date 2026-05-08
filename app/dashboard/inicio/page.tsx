@@ -10,10 +10,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 const statsData = [
-  { label: "Usuarios activos", value: "24", change: "+3 este mes", icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600" },
-  { label: "Citas esta semana", value: "12", change: "3 hoy", icon: Calendar, color: "from-blue-500 to-indigo-600", bg: "bg-blue-50", text: "text-blue-600" },
-  { label: "Tareas pendientes", value: "8", change: "2 vencidas", icon: CheckSquare, color: "from-amber-500 to-orange-500", bg: "bg-amber-50", text: "text-amber-600" },
-  { label: "Recordatorios", value: "5", change: "1 próximo", icon: Bell, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", text: "text-emerald-600" },
+  { label: "Usuarios activos", value: "24", change: "+3 este mes", icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600", href: "/dashboard/usuarios" },
+  { label: "Citas esta semana", value: "12", change: "3 hoy", icon: Calendar, color: "from-blue-500 to-indigo-600", bg: "bg-blue-50", text: "text-blue-600", href: "/dashboard/calendario" },
+  { label: "Tareas pendientes", value: "8", change: "2 vencidas", icon: CheckSquare, color: "from-amber-500 to-orange-500", bg: "bg-amber-50", text: "text-amber-600", href: "/dashboard/tareas" },
+  { label: "Recordatorios", value: "5", change: "1 próximo", icon: Bell, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", text: "text-emerald-600", href: "/dashboard/recordatorios" },
 ];
 
 const chartData = [
@@ -85,9 +85,10 @@ export default function InicioPage() {
       {/* Stats grid */}
       <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statsData.map((stat) => (
-          <div
+          <button
             key={stat.label}
-            className="bg-white rounded-2xl p-5 border border-slate-200/60 hover:border-violet-200 hover:shadow-lg hover:shadow-violet-500/5 transition-all duration-300 group"
+            onClick={() => router.push(stat.href)}
+            className="bg-white rounded-2xl p-5 border border-slate-200/60 hover:border-violet-200 hover:shadow-lg hover:shadow-violet-500/5 transition-all duration-300 group text-left cursor-pointer w-full"
           >
             <div className="flex items-center justify-between mb-4">
               <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center`}>
@@ -100,7 +101,7 @@ export default function InicioPage() {
             </p>
             <p className="text-sm font-medium text-slate-600 mt-0.5">{stat.label}</p>
             <p className="text-xs text-slate-400 mt-1">{stat.change}</p>
-          </div>
+          </button>
         ))}
       </motion.div>
 

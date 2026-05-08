@@ -95,11 +95,11 @@ export default function AuthPage() {
       {/* Left panel — branding */}
       <div className="hidden lg:flex flex-col justify-between w-[55%] p-16 relative z-10">
         {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-violet-400 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/30">
-            <Brain className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-violet-400 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/30">
+            <Brain className="w-9 h-9 text-white" />
           </div>
-          <span className="text-white font-bold text-xl tracking-tight">TOdo</span>
+          <span className="text-white font-bold text-2xl tracking-tight">TOdo</span>
         </div>
 
         {/* Hero text */}
@@ -166,10 +166,10 @@ export default function AuthPage() {
           <div className="bg-white/[0.08] backdrop-blur-2xl border border-white/[0.12] rounded-3xl p-8 shadow-2xl shadow-black/30">
             {/* Mobile logo */}
             <div className="flex items-center gap-3 mb-8 lg:hidden">
-              <div className="w-9 h-9 bg-gradient-to-br from-violet-400 to-purple-600 rounded-xl flex items-center justify-center">
-                <Brain className="w-4 h-4 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-br from-violet-400 to-purple-600 rounded-xl flex items-center justify-center">
+                <Brain className="w-7 h-7 text-white" />
               </div>
-              <span className="text-white font-bold text-lg">TOdo</span>
+              <span className="text-white font-bold text-xl">TOdo</span>
             </div>
 
             {/* Tab switcher */}

@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, CheckSquare, Bell } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, CheckSquare, Bell, Pencil, Trash2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -55,10 +55,14 @@ export default function CalendarioPage() {
   const [selected, setSelected] = useState<Date | null>(new Date());
   const [localEvents, setLocalEvents] = useState<CalEvent[]>([]);
   const [showNewEvent, setShowNewEvent] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "Sala 1" });
+  const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "" });
   const [patients, setPatients] = useState<{ id: number; name: string }[]>([]);
   const [tasks, setTasks] = useState<CalTask[]>([]);
   const [reminders, setReminders] = useState<CalReminder[]>([]);
+  const [editEvent, setEditEvent] = useState<CalEvent | null>(null);
+  const [editEventForm, setEditEventForm] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "" });
+  const [editReminder, setEditReminder] = useState<CalReminder | null>(null);
+  const [editReminderForm, setEditReminderForm] = useState({ title: "", date: "", time: "09:00", type: "general" });
 
   useEffect(() => {
     const load = () => {
@@ -105,7 +109,7 @@ export default function CalendarioPage() {
     const defaultDate = selected
       ? format(selected, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    setNewEvent({ title: "", date: defaultDate, time: "10:00", type, location: "Sala 1" });
+    setNewEvent({ title: "", date: defaultDate, time: "10:00", type, location: "" });
     setShowNewEvent(true);
   };
 
@@ -123,9 +127,76 @@ export default function CalendarioPage() {
       setLocalEvents((prev: CalEvent[]) => [...prev, { id: saved.id, date: eventDate, title: newEvent.title, time: newEvent.time, type: newEvent.type, location: newEvent.location }]);
       setSelected(eventDate);
       setCurrent(new Date(y, m - 1, 1));
-      setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "Sala 1" });
+      setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "" });
       setShowNewEvent(false);
     }
+  };
+
+  const openEditEvent = (ev: CalEvent) => {
+    setEditEventForm({
+      title: ev.title,
+      date: format(ev.date, "yyyy-MM-dd"),
+      time: ev.time,
+      type: ev.type,
+      location: ev.location,
+    });
+    setEditEvent(ev);
+  };
+
+  const saveEditEvent = async () => {
+    if (!editEvent?.id || !editEventForm.title.trim() || !editEventForm.date) return;
+    const res = await fetch(`/api/appointments/${editEvent.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editEventForm),
+    });
+    if (res.ok) {
+      const [y, m, d] = editEventForm.date.split("-").map(Number);
+      const newDate = new Date(y, m - 1, d);
+      setLocalEvents((prev) =>
+        prev.map((e) =>
+          e.id === editEvent.id
+            ? { ...e, ...editEventForm, date: newDate }
+            : e
+        )
+      );
+      setEditEvent(null);
+    }
+  };
+
+  const deleteEvent = async (ev: CalEvent) => {
+    if (!ev.id) return;
+    if (!confirm("¿Eliminar esta cita?")) return;
+    const res = await fetch(`/api/appointments/${ev.id}`, { method: "DELETE" });
+    if (res.ok) setLocalEvents((prev) => prev.filter((e) => e.id !== ev.id));
+  };
+
+  const openEditReminder = (r: CalReminder) => {
+    setEditReminderForm({ title: r.title, date: r.date, time: r.time, type: r.type });
+    setEditReminder(r);
+  };
+
+  const saveEditReminder = () => {
+    if (!editReminder || !editReminderForm.title.trim()) return;
+    const updated = reminders.map((r) =>
+      r.id === editReminder.id ? { ...r, ...editReminderForm } : r
+    );
+    setReminders(updated);
+    localStorage.setItem("reminders", JSON.stringify(updated));
+    setEditReminder(null);
+  };
+
+  const deleteReminder = (id: number) => {
+    if (!confirm("¿Eliminar este recordatorio?")) return;
+    const updated = reminders.filter((r) => r.id !== id);
+    setReminders(updated);
+    localStorage.setItem("reminders", JSON.stringify(updated));
+  };
+
+  const deleteTask = async (id: number) => {
+    if (!confirm("¿Eliminar esta tarea?")) return;
+    const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+    if (res.ok) setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
   const monthStart = startOfMonth(current);
@@ -300,13 +371,21 @@ export default function CalendarioPage() {
               {selectedEvents.map((ev, i) => (
                 <div
                   key={i}
-                  className="p-3.5 rounded-xl border border-slate-100 hover:border-violet-200 hover:bg-violet-50/40 transition-all cursor-pointer"
+                  className="p-3.5 rounded-xl border border-slate-100 hover:border-violet-200 hover:bg-violet-50/40 transition-all"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${typeColors[ev.type]} capitalize`}>
                       {ev.type}
                     </span>
-                    <span className="text-xs text-slate-500 font-medium">{ev.time}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-slate-500 font-medium">{ev.time}</span>
+                      <button onClick={() => openEditEvent(ev)} className="p-1 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all" title="Editar">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => deleteEvent(ev)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Eliminar">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                   <p className="text-sm font-semibold text-slate-700">{ev.title}</p>
                   <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
@@ -334,7 +413,12 @@ export default function CalendarioPage() {
                             t.priority === "media" ? "bg-amber-50 text-amber-600 border-amber-200" :
                             "bg-emerald-50 text-emerald-600 border-emerald-200"
                           } capitalize`}>{done ? "completada" : t.priority}</span>
-                          <CheckSquare className={`w-3.5 h-3.5 ${done ? "text-emerald-500" : "text-slate-300"}`} />
+                          <div className="flex items-center gap-1">
+                            <CheckSquare className={`w-3.5 h-3.5 ${done ? "text-emerald-500" : "text-slate-300"}`} />
+                            <button onClick={() => deleteTask(t.id)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Eliminar">
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                         <p className={`text-sm font-semibold ${
                           done ? "line-through text-slate-400" : "text-slate-700"
@@ -352,9 +436,17 @@ export default function CalendarioPage() {
                     <div key={r.id} className="p-3.5 rounded-xl border border-orange-100 bg-orange-50/60 hover:bg-orange-50 transition-all">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-lg border bg-orange-100 text-orange-700 border-orange-200 capitalize">{r.type}</span>
-                        <span className="flex items-center gap-1 text-xs text-orange-500 font-medium">
-                          <Bell className="w-3 h-3" /> {r.time}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="flex items-center gap-1 text-xs text-orange-500 font-medium">
+                            <Bell className="w-3 h-3" /> {r.time}
+                          </span>
+                          <button onClick={() => openEditReminder(r)} className="p-1 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all" title="Editar">
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button onClick={() => deleteReminder(r.id)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Eliminar">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-sm font-semibold text-slate-700">{r.title}</p>
                     </div>
@@ -369,6 +461,94 @@ export default function CalendarioPage() {
           </button>
         </motion.div>
       </div>
+
+      {/* Edit Event Modal */}
+      <Modal
+        open={!!editEvent}
+        onClose={() => setEditEvent(null)}
+        title="Editar Cita"
+        footer={
+          <button onClick={saveEditEvent} disabled={!editEventForm.title.trim() || !editEventForm.date} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
+            Guardar cambios
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha *</label>
+            <input type="date" value={editEventForm.date} onChange={(e) => setEditEventForm({ ...editEventForm, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario *</label>
+            {patients.length > 0 ? (
+              <select value={editEventForm.title} onChange={(e) => setEditEventForm({ ...editEventForm, title: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                <option value="">Seleccionar usuario...</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.name}>{p.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input type="text" value={editEventForm.title} onChange={(e) => setEditEventForm({ ...editEventForm, title: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
+              <input type="time" value={editEventForm.time} onChange={(e) => setEditEventForm({ ...editEventForm, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
+              <select value={editEventForm.type} onChange={(e) => setEditEventForm({ ...editEventForm, type: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                <option value="sesion">Sesión</option>
+                <option value="evaluacion">Evaluación</option>
+                <option value="reunion">Reunión</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Comentario</label>
+            <textarea value={editEventForm.location} onChange={(e) => setEditEventForm({ ...editEventForm, location: e.target.value })} rows={3} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all resize-none" />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Reminder Modal */}
+      <Modal
+        open={!!editReminder}
+        onClose={() => setEditReminder(null)}
+        title="Editar Recordatorio"
+        footer={
+          <button onClick={saveEditReminder} disabled={!editReminderForm.title.trim()} className="w-full bg-gradient-to-r from-orange-400 to-amber-500 text-white font-semibold py-3 rounded-xl hover:from-orange-300 hover:to-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-orange-500/30">
+            Guardar cambios
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Título *</label>
+            <input autoFocus type="text" value={editReminderForm.title} onChange={(e) => setEditReminderForm({ ...editReminderForm, title: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha</label>
+              <input type="date" value={editReminderForm.date} onChange={(e) => setEditReminderForm({ ...editReminderForm, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
+              <input type="time" value={editReminderForm.time} onChange={(e) => setEditReminderForm({ ...editReminderForm, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all" />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
+            <select value={editReminderForm.type} onChange={(e) => setEditReminderForm({ ...editReminderForm, type: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all bg-white">
+              <option value="general">General</option>
+              <option value="sesion">Sesión</option>
+              <option value="medicacion">Medicación</option>
+              <option value="evaluacion">Evaluación</option>
+            </select>
+          </div>
+        </div>
+      </Modal>
 
       {/* New Event Modal */}
       <Modal
@@ -414,8 +594,8 @@ export default function CalendarioPage() {
             </div>
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Sala / Ubicación</label>
-            <input type="text" value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })} placeholder="Ej. Sala 1" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Comentario</label>
+            <textarea value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })} rows={3} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all resize-none" />
           </div>
         </div>
       </Modal>

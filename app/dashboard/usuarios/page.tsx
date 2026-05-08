@@ -238,12 +238,22 @@ export default function UsuariosPage() {
                   <span className="font-semibold text-slate-600">{p.sessions}</span> sesiones
                 </div>
                 <div className="flex gap-1.5">
-                  <button className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all">
+                  <a
+                    href={p.email ? `mailto:${p.email}` : undefined}
+                    onClick={!p.email ? (e) => e.preventDefault() : undefined}
+                    title={p.email || "Sin email"}
+                    className={`p-1.5 rounded-lg transition-all ${p.email ? "text-slate-400 hover:text-violet-600 hover:bg-violet-50 cursor-pointer" : "text-slate-200 cursor-not-allowed"}`}
+                  >
                     <Mail className="w-3.5 h-3.5" />
-                  </button>
-                  <button className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all">
+                  </a>
+                  <a
+                    href={p.phone ? `tel:${p.phone}` : undefined}
+                    onClick={!p.phone ? (e) => e.preventDefault() : undefined}
+                    title={p.phone || "Sin teléfono"}
+                    className={`p-1.5 rounded-lg transition-all ${p.phone ? "text-slate-400 hover:text-violet-600 hover:bg-violet-50 cursor-pointer" : "text-slate-200 cursor-not-allowed"}`}
+                  >
                     <Phone className="w-3.5 h-3.5" />
-                  </button>
+                  </a>
                   <button onClick={() => setSelectedPatient(p)} className="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-white hover:bg-gradient-to-r hover:from-violet-500 hover:to-purple-600 border border-violet-200 hover:border-transparent rounded-lg transition-all">
                     Ver perfil
                   </button>
