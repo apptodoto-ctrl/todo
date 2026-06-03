@@ -87,3 +87,14 @@ model PipelineCase {
   patientRef Patient?      @relation(fields: [patientId], references: [id])
   createdAt DateTime       @default(now())
 }
+
+model Document {
+  id        Int      @id @default(autoincrement())
+  name      String
+  category  String   @default("Sin categoría")
+  size      String
+  type      String
+  key       String   @unique
+  url       String
+  createdAt DateTime @default(now())
+}

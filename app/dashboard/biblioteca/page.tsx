@@ -1,8 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useRef } from "react";
-import { Upload, Search, FileText, File, Image, Archive, Download, Trash2, Eye, FolderOpen } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Upload, Search, FileText, File, Image, Archive, Download, Trash2, Eye, FolderOpen, Loader2 } from "lucide-react";
 
 const categories = ["Todas", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios"];
 
@@ -11,61 +11,54 @@ interface Doc {
   name: string;
   category: string;
   size: string;
-  date: string;
+  createdAt: string;
   type: string;
-  url?: string;
+  url: string;
 }
-
-const mockDocuments: Doc[] = [
-  { id: 1, name: "Protocolo Evaluación TEA.pdf", category: "Protocolos", size: "2.4 MB", date: "15 Mar 2026", type: "pdf" },
-  { id: 2, name: "Guía Actividades Motoras Finas.pdf", category: "Guías", size: "1.8 MB", date: "10 Mar 2026", type: "pdf" },
-  { id: 3, name: "Formulario Anamnesis.docx", category: "Formularios", size: "450 KB", date: "05 Mar 2026", type: "doc" },
-  { id: 4, name: "Escala COPM Evaluación.xlsx", category: "Evaluaciones", size: "320 KB", date: "01 Mar 2026", type: "excel" },
-  { id: 5, name: "Manual Terapia Sensorial.pdf", category: "Protocolos", size: "5.2 MB", date: "20 Feb 2026", type: "pdf" },
-  { id: 6, name: "Actividades Niños 6-8 años.pdf", category: "Actividades", size: "3.1 MB", date: "18 Feb 2026", type: "pdf" },
-];
 
 const fileIcons: Record<string, { icon: typeof FileText; color: string; bg: string }> = {
   pdf: { icon: FileText, color: "text-red-500", bg: "bg-red-50" },
   doc: { icon: File, color: "text-blue-500", bg: "bg-blue-50" },
   excel: { icon: Archive, color: "text-emerald-500", bg: "bg-emerald-50" },
   img: { icon: Image, color: "text-amber-500", bg: "bg-amber-50" },
+  file: { icon: File, color: "text-slate-500", bg: "bg-slate-100" },
 };
-
-function getFileType(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  if (["pdf"].includes(ext)) return "pdf";
-  if (["doc", "docx"].includes(ext)) return "doc";
-  if (["xls", "xlsx", "csv"].includes(ext)) return "excel";
-  if (["jpg", "jpeg", "png", "gif", "svg"].includes(ext)) return "img";
-  return "pdf";
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
 
 export default function BibliotecaPage() {
   const [category, setCategory] = useState("Todas");
   const [search, setSearch] = useState("");
   const [dragging, setDragging] = useState(false);
-  const [documents, setDocuments] = useState<Doc[]>(mockDocuments);
+  const [documents, setDocuments] = useState<Doc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadCategory, setUploadCategory] = useState("Sin categoría");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFiles = (files: FileList | null) => {
-    if (!files) return;
-    const newDocs: Doc[] = Array.from(files).map((f) => ({
-      id: Date.now() + Math.random(),
-      name: f.name,
-      category: "Todas",
-      size: formatFileSize(f.size),
-      date: new Date().toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" }),
-      type: getFileType(f.name),
-      url: URL.createObjectURL(f),
-    }));
-    setDocuments((prev) => [...newDocs, ...prev]);
+  const fetchDocuments = useCallback(async () => {
+    try {
+      const res = await fetch("/api/documents");
+      if (res.ok) setDocuments(await res.json());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("category", uploadCategory);
+        await fetch("/api/documents", { method: "POST", body: fd });
+      }
+      await fetchDocuments();
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -81,25 +74,18 @@ export default function BibliotecaPage() {
     setDragging(true);
   };
 
-  const deleteDoc = (id: number) => setDocuments((prev) => prev.filter((d) => d.id !== id));
-
-  const viewDoc = (doc: Doc) => {
-    if (doc.url) {
-      window.open(doc.url, "_blank");
-    } else {
-      alert(`Vista previa de "${doc.name}" (archivo de demo)`);
-    }
+  const deleteDoc = async (id: number) => {
+    await fetch(`/api/documents/${id}`, { method: "DELETE" });
+    setDocuments((prev) => prev.filter((d) => d.id !== id));
   };
 
+  const viewDoc = (doc: Doc) => window.open(doc.url, "_blank");
+
   const downloadDoc = (doc: Doc) => {
-    if (doc.url) {
-      const a = document.createElement("a");
-      a.href = doc.url;
-      a.download = doc.name;
-      a.click();
-    } else {
-      alert(`Descargando "${doc.name}" (archivo de demo)`);
-    }
+    const a = document.createElement("a");
+    a.href = doc.url;
+    a.download = doc.name;
+    a.click();
   };
 
   const filtered = documents.filter((d) => {
@@ -119,6 +105,20 @@ export default function BibliotecaPage() {
         onChange={(e) => handleFiles(e.target.files)}
       />
 
+      {/* Upload category selector */}
+      <div className="flex items-center gap-2 text-sm text-slate-500">
+        <span className="shrink-0">Categoría al subir:</span>
+        <select
+          value={uploadCategory}
+          onChange={(e) => setUploadCategory(e.target.value)}
+          className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+        >
+          {["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios"].map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>
+      </div>
+
       {/* Header toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative flex-1 max-w-sm">
@@ -133,9 +133,11 @@ export default function BibliotecaPage() {
         </div>
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 shrink-0"
+          disabled={uploading}
+          className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 shrink-0 disabled:opacity-60"
         >
-          <Upload className="w-4 h-4" /> Subir Documento
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {uploading ? "Subiendo..." : "Subir Documento"}
         </button>
       </div>
 
@@ -179,7 +181,11 @@ export default function BibliotecaPage() {
       </div>
 
       {/* Documents grid */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-violet-400" />
+        </div>
+      ) : filtered.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -211,7 +217,7 @@ export default function BibliotecaPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-700 truncate">{doc.name}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{doc.size} · {doc.date}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{doc.size} · {new Date(doc.createdAt).toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" })}</p>
                     <span className="inline-block mt-1.5 text-[11px] font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg">
                       {doc.category}
                     </span>

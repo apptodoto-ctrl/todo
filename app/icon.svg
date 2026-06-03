@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none">
+  <rect width="36" height="36" rx="9" fill="url(#g)"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+  <!-- Brain icon (lucide brain simplified) -->
+  <path d="M18 9C15.5 9 13.5 10.5 13 12.5C11.5 12.8 10 14.2 10 16C10 17.1 10.5 18 11.3 18.7C11.1 19.1 11 19.5 11 20C11 21.7 12.3 23 14 23C14 24.1 14.9 25 16 25H20C21.1 25 22 24.1 22 23C23.7 23 25 21.7 25 20C25 19.5 24.9 19.1 24.7 18.7C25.5 18 26 17.1 26 16C26 14.2 24.5 12.8 23 12.5C22.5 10.5 20.5 9 18 9Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M13 16H14M22 16H23M18 13V14M18 20V21M15 18.5C15 18.5 16 19.5 18 19.5C20 19.5 21 18.5 21 18.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
