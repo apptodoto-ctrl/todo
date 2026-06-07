@@ -52,11 +52,42 @@ export default function RecordatoriosPage() {
   const deleteReminder = (id: number) =>
     setReminders((r) => r.filter((rem) => rem.id !== id));
 
-  const addReminder = () => {
+  const addReminder = async () => {
     if (!form.title.trim()) return;
-    setReminders((r) => [...r, { ...form, id: Date.now(), done: false }]);
+    const newReminder = { ...form, id: Date.now(), done: false };
+    setReminders((r) => [...r, newReminder]);
     setForm({ title: "", description: "", date: "", time: "", type: "general" });
     setShowNew(false);
+
+    // Send email notification
+    try {
+      await fetch("/api/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: "info@todo-to.com",
+          subject: `Recordatorio: ${newReminder.title}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+              <div style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);padding:24px;border-radius:12px 12px 0 0;">
+                <h1 style="color:white;margin:0;font-size:20px;">🔔 Nuevo Recordatorio</h1>
+              </div>
+              <div style="background:#f8fafc;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;">
+                <h2 style="color:#1e293b;margin:0 0 8px;">${newReminder.title}</h2>
+                ${newReminder.description ? `<p style="color:#64748b;margin:0 0 16px;">${newReminder.description}</p>` : ""}
+                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                  ${newReminder.date ? `<span style="background:#ede9fe;color:#7c3aed;padding:4px 12px;border-radius:8px;font-size:14px;">📅 ${newReminder.date}</span>` : ""}
+                  ${newReminder.time ? `<span style="background:#ede9fe;color:#7c3aed;padding:4px 12px;border-radius:8px;font-size:14px;">⏰ ${newReminder.time}</span>` : ""}
+                  <span style="background:#ede9fe;color:#7c3aed;padding:4px 12px;border-radius:8px;font-size:14px;">${typeConfig[newReminder.type]?.label ?? newReminder.type}</span>
+                </div>
+              </div>
+            </div>
+          `,
+        }),
+      });
+    } catch {
+      // Email failure is silent — reminder is still saved
+    }
   };
 
   const saveEdit = () => {

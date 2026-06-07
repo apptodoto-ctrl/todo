@@ -23,6 +23,7 @@ import {
 import {
   SortableContext,
   verticalListSortingStrategy,
+  horizontalListSortingStrategy,
   useSortable,
   arrayMove,
 } from "@dnd-kit/sortable";
@@ -172,10 +173,11 @@ function SortableCard({ c, colAccent, onDelete }: { c: Case; colAccent: string; 
 
 // ─── Column ────────────────────────────────────────────────────────────────────
 function KanbanColumn({
-  col, isOver, onAddCase, onEditCol, onDeleteCol, onDeleteCase,
+  col, isOver, dragHandleProps, onAddCase, onEditCol, onDeleteCol, onDeleteCase,
 }: {
   col: Column;
   isOver: boolean;
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   onAddCase: () => void;
   onEditCol: () => void;
   onDeleteCol: () => void;
@@ -204,6 +206,11 @@ function KanbanColumn({
         <div className={`h-1 w-full rounded-full bg-gradient-to-r ${pal.gradient} mb-3 opacity-80`} />
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            {dragHandleProps && (
+              <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors p-0.5" title="Arrastrar columna">
+                <GripVertical className="w-4 h-4" />
+              </div>
+            )}
             <h3 className="text-sm font-bold text-slate-800 leading-tight">{col.label}</h3>
             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${pal.light} ${pal.text}`}>
               {col.cases.length}
@@ -264,6 +271,37 @@ function KanbanColumn({
   );
 }
 
+// ─── SortableColumn ────────────────────────────────────────────────────────────
+function SortableColumn({ col, isOver, onAddCase, onEditCol, onDeleteCol, onDeleteCase }: {
+  col: Column;
+  isOver: boolean;
+  onAddCase: () => void;
+  onEditCol: () => void;
+  onDeleteCol: () => void;
+  onDeleteCase: (id: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `col-${col.id}` });
+  const style = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <KanbanColumn
+        col={col}
+        isOver={isOver}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        onAddCase={onAddCase}
+        onEditCol={onEditCol}
+        onDeleteCol={onDeleteCol}
+        onDeleteCase={onDeleteCase}
+      />
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function PipelinePage() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -283,7 +321,7 @@ export default function PipelinePage() {
   const [showPipelineDropdown, setShowPipelineDropdown] = useState(false);
   const [pipelinePatients, setPipelinePatients] = useState<{ id: number; name: string; age: number; diagnosis: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeId, setActiveId] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<number | string | null>(null);
   const [overColId, setOverColId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -364,19 +402,20 @@ export default function PipelinePage() {
   const allCases = columns.flatMap((c) => c.cases);
   const totalOverdue = allCases.filter((c) => c.overdue).length;
   const altaCol = columns.find((c) => c.label.toLowerCase().includes("alta"));
-  const activeCase = activeId ? allCases.find((c) => c.id === activeId) : null;
+  const activeCase = typeof activeId === "number" ? allCases.find((c) => c.id === activeId) : null;
   const activeCaseCol = activeCase ? columns.find((col) => col.cases.some((c) => c.id === activeId)) : null;
 
   // ─── DnD handlers ────────────────────────────────────────────────────────────
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as number);
+    setActiveId(event.active.id as number | string);
   };
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     const { over } = event;
     if (!over) { setOverColId(null); return; }
-    // over could be a column id (string) or a case id (number)
     const overId = over.id;
+    // Skip column drag
+    if (typeof overId === "string" && String(overId).startsWith("col-")) { setOverColId(null); return; }
     const overColumn = columns.find((c) => c.id === overId || c.cases.some((ca) => ca.id === overId));
     setOverColId(overColumn?.id ?? null);
   }, [columns]);
@@ -387,7 +426,40 @@ export default function PipelinePage() {
     setOverColId(null);
     if (!over) return;
 
-    const activeCase = allCases.find((c) => c.id === active.id);
+    const activeIdVal = active.id;
+    const overIdVal = over.id;
+
+    // ── Column reorder ──────────────────────────────────────────────────────
+    if (typeof activeIdVal === "string" && String(activeIdVal).startsWith("col-")) {
+      const activeColId = String(activeIdVal).replace("col-", "");
+      const overColIdStr = String(overIdVal).replace("col-", "");
+      if (activeColId === overColIdStr) return;
+
+      const oldIndex = columns.findIndex((c) => c.id === activeColId);
+      const newIndex = columns.findIndex((c) => c.id === overColIdStr);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = arrayMove(columns, oldIndex, newIndex).map((c, i) => ({ ...c, order: i }));
+      setPipelines((prev) =>
+        prev.map((pip) =>
+          pip.id === activePipelineId ? { ...pip, columns: reordered } : pip
+        )
+      );
+      // Persist order for each column
+      await Promise.all(
+        reordered.map((c) =>
+          fetch(`/api/pipeline/columns/${c.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order: c.order }),
+          })
+        )
+      );
+      return;
+    }
+
+    // ── Case move ──────────────────────────────────────────────────────────
+    const activeCase = allCases.find((c) => c.id === activeIdVal);
     if (!activeCase) return;
 
     // Determine target column
@@ -706,19 +778,21 @@ export default function PipelinePage() {
             className="overflow-x-auto pb-6"
           >
             <div className="flex gap-4 min-w-max items-start pt-1">
-              <AnimatePresence mode="popLayout">
-                {filteredColumns.map((col) => (
-                  <KanbanColumn
-                    key={col.id}
-                    col={col}
-                    isOver={overColId === col.id}
-                    onAddCase={() => openAddCase(col.id)}
-                    onEditCol={() => openEditCol(col)}
-                    onDeleteCol={() => setConfirmDeleteColId(col.id)}
-                    onDeleteCase={(caseId) => deleteCase(col.id, caseId)}
-                  />
-                ))}
-              </AnimatePresence>
+              <SortableContext items={filteredColumns.map((c) => `col-${c.id}`)} strategy={horizontalListSortingStrategy}>
+                <AnimatePresence mode="popLayout">
+                  {filteredColumns.map((col) => (
+                    <SortableColumn
+                      key={col.id}
+                      col={col}
+                      isOver={overColId === col.id}
+                      onAddCase={() => openAddCase(col.id)}
+                      onEditCol={() => openEditCol(col)}
+                      onDeleteCol={() => setConfirmDeleteColId(col.id)}
+                      onDeleteCase={(caseId) => deleteCase(col.id, caseId)}
+                    />
+                  ))}
+                </AnimatePresence>
+              </SortableContext>
 
               {/* Add column ghost */}
               <motion.button

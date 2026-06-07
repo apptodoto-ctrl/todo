@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, MessageCircle, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 
 interface Patient {
@@ -247,12 +247,14 @@ export default function UsuariosPage() {
                     <Mail className="w-3.5 h-3.5" />
                   </a>
                   <a
-                    href={p.phone ? `tel:${p.phone}` : undefined}
+                    href={p.phone ? `https://wa.me/${p.phone.replace(/[^0-9]/g, "")}` : undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     onClick={!p.phone ? (e) => e.preventDefault() : undefined}
-                    title={p.phone || "Sin teléfono"}
-                    className={`p-1.5 rounded-lg transition-all ${p.phone ? "text-slate-400 hover:text-violet-600 hover:bg-violet-50 cursor-pointer" : "text-slate-200 cursor-not-allowed"}`}
+                    title={p.phone ? `WhatsApp: ${p.phone}` : "Sin teléfono"}
+                    className={`p-1.5 rounded-lg transition-all ${p.phone ? "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 cursor-pointer" : "text-slate-200 cursor-not-allowed"}`}
                   >
-                    <Phone className="w-3.5 h-3.5" />
+                    <MessageCircle className="w-3.5 h-3.5" />
                   </a>
                   <button onClick={() => setSelectedPatient(p)} className="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-white hover:bg-gradient-to-r hover:from-violet-500 hover:to-purple-600 border border-violet-200 hover:border-transparent rounded-lg transition-all">
                     Ver perfil
@@ -393,7 +395,7 @@ export default function UsuariosPage() {
                     : 'border-slate-200 text-slate-400 cursor-not-allowed opacity-50 pointer-events-none'
                 }`}
               >
-                <Phone className="w-4 h-4" /> WhatsApp
+                <MessageCircle className="w-4 h-4" /> WhatsApp
               </a>
             </div>
           </div>
