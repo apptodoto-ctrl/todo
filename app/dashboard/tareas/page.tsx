@@ -38,7 +38,15 @@ export default function TareasPage() {
   const [newTask, setNewTask] = useState({ title: "", description: "", priority: "media" as Priority, due: "", patient: "", category: "Clínico" });
 
   useEffect(() => {
-    Promise.all([fetch("/api/tasks"), fetch("/api/patients")])
+    let email = "";
+    try {
+      const stored = localStorage.getItem("currentUser");
+      if (stored) email = JSON.parse(stored).email || "";
+    } catch { /* ignore */ }
+    Promise.all([
+      fetch(`/api/tasks?createdBy=${encodeURIComponent(email)}`),
+      fetch(`/api/patients?createdBy=${encodeURIComponent(email)}`),
+    ])
       .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
       .then(([tasksData, patientsData]) => {
         setTasks(Array.isArray(tasksData) ? tasksData : []);
@@ -50,10 +58,15 @@ export default function TareasPage() {
 
   const addTask = async () => {
     if (!newTask.title.trim()) return;
+    let createdBy = "";
+    try {
+      const stored = localStorage.getItem("currentUser");
+      if (stored) createdBy = JSON.parse(stored).email || "";
+    } catch { /* ignore */ }
     const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newTask, status: "pendiente" as Status, patientName: newTask.patient }),
+      body: JSON.stringify({ ...newTask, status: "pendiente" as Status, patientName: newTask.patient, createdBy }),
     });
     if (res.ok) {
       const task = await res.json();

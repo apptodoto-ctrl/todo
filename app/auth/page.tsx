@@ -3,12 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, Brain, Loader2, ArrowRight, CheckCircle2, Zap, ShieldCheck, ArrowLeft, Mail } from "lucide-react";
-
-const DEMO_USERS = [
-  { role: "Admin", email: "admin@todo.com", password: "admin123", color: "from-violet-500 to-purple-600", badge: "bg-violet-100 text-violet-700" },
-  { role: "Terapeuta", email: "japieaters@gmail.com", password: "todo123", color: "from-blue-500 to-indigo-600", badge: "bg-blue-100 text-blue-700" },
-];
+import { Eye, EyeOff, Brain, Loader2, ArrowRight, CheckCircle2, ShieldCheck, ArrowLeft, Mail } from "lucide-react";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -51,15 +46,20 @@ export default function AuthPage() {
       return;
     }
 
-    const valid = DEMO_USERS.find(
-      (u) => u.email === form.email && u.password === form.password
-    );
-    if (!valid) {
-      setError("Credenciales incorrectas. Usa uno de los accesos de prueba.");
+    const VALID_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!VALID_EMAIL_RE.test(form.email)) {
+      setError("Ingresa un correo electrónico válido.");
       setLoading(false);
       return;
     }
-    localStorage.setItem("currentUser", JSON.stringify({ name: valid.role === "Admin" ? "Administrador" : "Josefina Pizarro", email: valid.email, role: valid.role }));
+    if (form.password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      setLoading(false);
+      return;
+    }
+    // Accept any credentials — real auth would validate against DB
+    const name = form.email.split("@")[0];
+    localStorage.setItem("currentUser", JSON.stringify({ name, email: form.email, role: "Terapeuta" }));
     router.push("/dashboard/inicio");
   };
 
@@ -95,11 +95,6 @@ export default function AuthPage() {
     } catch { /* show success regardless */ }
     setForgotLoading(false);
     setForgotSent(true);
-  };
-
-  const fillDemo = (user: typeof DEMO_USERS[0]) => {
-    setForm((f) => ({ ...f, email: user.email, password: user.password }));
-    setError("");
   };
 
   return (
@@ -395,37 +390,6 @@ export default function AuthPage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-
-                {/* Demo access buttons */}
-                {tab === "login" && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 text-white/25">
-                      <div className="flex-1 h-px bg-white/10" />
-                      <span className="text-[11px] font-medium uppercase tracking-wider flex items-center gap-1.5">
-                        <Zap className="w-3 h-3" /> Acceso rápido
-                      </span>
-                      <div className="flex-1 h-px bg-white/10" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {DEMO_USERS.map((user) => (
-                        <button
-                          key={user.email}
-                          type="button"
-                          onClick={() => fillDemo(user)}
-                          className="flex items-center gap-2.5 bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] hover:border-white/[0.2] rounded-xl px-3 py-2.5 transition-all text-left group"
-                        >
-                          <div className={`w-7 h-7 bg-gradient-to-br ${user.color} rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-md`}>
-                            {user.role[0]}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-white/80 group-hover:text-white transition-colors">{user.role}</p>
-                            <p className="text-[10px] text-white/30 truncate">{user.email}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Submit */}
                 <motion.button

@@ -1,9 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const tasks = await prisma.task.findMany({ orderBy: { createdAt: "asc" } });
+    const createdBy = req.nextUrl.searchParams.get("createdBy") || "";
+    const tasks = await prisma.task.findMany({
+      where: createdBy ? { createdBy } : undefined,
+      orderBy: { createdAt: "asc" },
+    });
     return NextResponse.json(tasks.map((t) => ({ ...t, patient: t.patientName })));
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });

@@ -48,6 +48,7 @@ model Task {
   patientName String   @default("")
   patientId   Int?
   patient     Patient? @relation(fields: [patientId], references: [id])
+  createdBy   String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -58,7 +59,8 @@ model Appointment {
   date      String
   time      String
   type      String   @default("sesion")
-  location  String   @default("Sala 1")
+  location  String   @default("")
+  createdBy String   @default("")
   createdAt DateTime @default(now())
 }
 

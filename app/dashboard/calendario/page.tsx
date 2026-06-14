@@ -63,6 +63,14 @@ export default function CalendarioPage() {
   const [editEventForm, setEditEventForm] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "" });
   const [editReminder, setEditReminder] = useState<CalReminder | null>(null);
   const [editReminderForm, setEditReminderForm] = useState({ title: "", date: "", time: "09:00", type: "general" });
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("currentUser");
+      if (stored) setCurrentUserEmail(JSON.parse(stored).email || "");
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     const load = () => {
@@ -77,21 +85,24 @@ export default function CalendarioPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/patients")
+    if (!currentUserEmail) return;
+    fetch(`/api/patients?createdBy=${encodeURIComponent(currentUserEmail)}`)
       .then((r) => r.json())
       .then((data) => setPatients(Array.isArray(data) ? data.map((p: { id: number; name: string }) => ({ id: p.id, name: p.name })) : []))
       .catch(() => {});
-  }, []);
+  }, [currentUserEmail]);
 
   useEffect(() => {
-    fetch("/api/tasks")
+    if (!currentUserEmail) return;
+    fetch(`/api/tasks?createdBy=${encodeURIComponent(currentUserEmail)}`)
       .then((r) => r.json())
       .then((data) => setTasks(Array.isArray(data) ? data : []))
       .catch(() => {});
-  }, []);
+  }, [currentUserEmail]);
 
   useEffect(() => {
-    fetch("/api/appointments")
+    if (!currentUserEmail) return;
+    fetch(`/api/appointments?createdBy=${encodeURIComponent(currentUserEmail)}`)
       .then((r) => r.json())
       .then((data: { id: number; date: string; title: string; time: string; type: string; location: string }[]) => {
         const list = Array.isArray(data) ? data : [];
@@ -120,7 +131,7 @@ export default function CalendarioPage() {
     const res = await fetch("/api/appointments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location }),
+      body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location, createdBy: currentUserEmail }),
     });
     if (res.ok) {
       const saved = await res.json();
