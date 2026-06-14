@@ -110,5 +110,6 @@ model Document {
   type      String
   key       String   @unique
   url       String
+  createdBy String   @default("")
   createdAt DateTime @default(now())
 }
