@@ -2,42 +2,13 @@
 
 import { motion } from "framer-motion";
 import {
-  Users, Calendar, CheckSquare, Bell, TrendingUp, Clock, ArrowUpRight,
-  Activity, Star, Zap, AlertCircle
+  Users, Calendar, CheckSquare, Bell, Clock, ArrowUpRight,
+  Activity,
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-
-const statsData = [
-  { label: "Usuarios activos", value: "24", change: "+3 este mes", icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600", href: "/dashboard/usuarios" },
-  { label: "Citas esta semana", value: "12", change: "3 hoy", icon: Calendar, color: "from-blue-500 to-indigo-600", bg: "bg-blue-50", text: "text-blue-600", href: "/dashboard/calendario" },
-  { label: "Tareas pendientes", value: "8", change: "2 vencidas", icon: CheckSquare, color: "from-amber-500 to-orange-500", bg: "bg-amber-50", text: "text-amber-600", href: "/dashboard/tareas" },
-  { label: "Recordatorios", value: "5", change: "1 próximo", icon: Bell, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", text: "text-emerald-600", href: "/dashboard/recordatorios" },
-];
-
-const chartData = [
-  { mes: "Oct", sesiones: 32, pacientes: 18 },
-  { mes: "Nov", sesiones: 38, pacientes: 20 },
-  { mes: "Dic", sesiones: 28, pacientes: 19 },
-  { mes: "Ene", sesiones: 45, pacientes: 22 },
-  { mes: "Feb", sesiones: 52, pacientes: 24 },
-  { mes: "Mar", sesiones: 48, pacientes: 24 },
-];
-
-const recentPatients = [
-  { name: "María González", age: 8, diagnosis: "TEA", session: "Hoy 10:00", status: "active" },
-  { name: "Carlos Morales", age: 45, diagnosis: "ACV", session: "Hoy 14:30", status: "active" },
-  { name: "Sofía Reyes", age: 6, diagnosis: "Desarrollo Motor", session: "Mañana 09:00", status: "pending" },
-  { name: "Pedro Vargas", age: 67, diagnosis: "Artritis", session: "Mañana 11:00", status: "pending" },
-];
-
-const upcomingTasks = [
-  { title: "Informe inicial - María G.", priority: "alta", due: "Hoy" },
-  { title: "Revisión plan de Carlos M.", priority: "media", due: "Mañana" },
-  { title: "Actualizar tabla de factores", priority: "baja", due: "Vie 28" },
-];
 
 const container = {
   hidden: {},
@@ -48,14 +19,85 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
+interface Patient {
+  id: number;
+  name: string;
+  age: number;
+  diagnosis: string;
+}
+
+interface Task {
+  id: number;
+  title: string;
+  priority: string;
+  dueDate?: string;
+  status: string;
+}
+
+interface Appointment {
+  id: number;
+  date: string;
+}
+
 export default function InicioPage() {
   const router = useRouter();
-  const { name } = useCurrentUser();
-  const [greeting, setGreeting] = useState("Usuario");
+  const { name, email } = useCurrentUser();
+
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   useEffect(() => {
-    if (name && name !== "Usuario") setGreeting(name.split(" ")[0]);
-  }, [name]);
+    if (!email) return;
+    const enc = encodeURIComponent(email);
+    Promise.all([
+      fetch(`/api/patients?createdBy=${enc}`).then((r) => r.json()),
+      fetch(`/api/tasks?createdBy=${enc}`).then((r) => r.json()),
+      fetch(`/api/appointments?createdBy=${enc}`).then((r) => r.json()),
+    ]).then(([p, t, a]) => {
+      setPatients(Array.isArray(p) ? p : []);
+      setTasks(Array.isArray(t) ? t : []);
+      setAppointments(Array.isArray(a) ? a : []);
+    }).catch(() => {});
+  }, [email]);
+
+  const firstName = name && name !== "Usuario" ? name.split(" ")[0] : "";
+
+  const now = new Date();
+  const weekEnd = new Date(now); weekEnd.setDate(now.getDate() + 7);
+  const aptsThisWeek = appointments.filter((a) => {
+    const d = new Date(a.date); return d >= now && d <= weekEnd;
+  }).length;
+  const aptsToday = appointments.filter((a) => {
+    const d = new Date(a.date);
+    return d.toDateString() === now.toDateString();
+  }).length;
+  const pendingTasks = tasks.filter((t) => t.status !== "completada").length;
+  const overdueTasks = tasks.filter((t) => {
+    if (!t.dueDate || t.status === "completada") return false;
+    return new Date(t.dueDate) < now;
+  }).length;
+
+  const statsData = [
+    { label: "Usuarios activos", value: String(patients.length), change: `${patients.length} registrados`, icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600", href: "/dashboard/usuarios" },
+    { label: "Citas esta semana", value: String(aptsThisWeek), change: `${aptsToday} hoy`, icon: Calendar, color: "from-blue-500 to-indigo-600", bg: "bg-blue-50", text: "text-blue-600", href: "/dashboard/calendario" },
+    { label: "Tareas pendientes", value: String(pendingTasks), change: `${overdueTasks} vencidas`, icon: CheckSquare, color: "from-amber-500 to-orange-500", bg: "bg-amber-50", text: "text-amber-600", href: "/dashboard/tareas" },
+    { label: "Citas totales", value: String(appointments.length), change: `${aptsThisWeek} esta semana`, icon: Bell, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", text: "text-emerald-600", href: "/dashboard/calendario" },
+  ];
+
+  // Chart: last 6 months of appointments grouped by month
+  const chartData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+    const mes = d.toLocaleString("es-CL", { month: "short" });
+    const sesiones = appointments.filter((a) => {
+      const ad = new Date(a.date);
+      return ad.getFullYear() === d.getFullYear() && ad.getMonth() === d.getMonth();
+    }).length;
+    return { mes: mes.charAt(0).toUpperCase() + mes.slice(1), sesiones, pacientes: patients.length };
+  });
+
+  const recentPatients = patients.slice(-4).reverse();
+  const upcomingTasks = tasks.filter((t) => t.status !== "completada").slice(0, 3);
 
   return (
     <motion.div
@@ -68,7 +110,7 @@ export default function InicioPage() {
       <motion.div variants={item} className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">
-            Buenos días, <span className="text-violet-600">{greeting}</span> 👋
+            Buenos días{firstName ? <>, <span className="text-violet-600">{firstName}</span></> : ""} 👋
           </h2>
           <p className="text-slate-500 mt-0.5">Aquí tienes el resumen de tu práctica clínica</p>
         </div>
@@ -153,8 +195,11 @@ export default function InicioPage() {
             </span>
           </div>
           <div className="space-y-3">
-            {upcomingTasks.map((task, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group cursor-pointer">
+            {upcomingTasks.length === 0 && (
+              <p className="text-sm text-slate-400 text-center py-4">Sin tareas pendientes</p>
+            )}
+            {upcomingTasks.map((task) => (
+              <div key={task.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group cursor-pointer">
                 <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
                   task.priority === "alta" ? "bg-red-400" :
                   task.priority === "media" ? "bg-amber-400" : "bg-emerald-400"
@@ -162,7 +207,8 @@ export default function InicioPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-slate-700 truncate">{task.title}</p>
                   <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {task.due}
+                    <Clock className="w-3 h-3" />
+                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString("es-CL", { day: "2-digit", month: "short" }) : "Sin fecha"}
                   </p>
                 </div>
               </div>
@@ -183,33 +229,26 @@ export default function InicioPage() {
           </button>
         </div>
         <div className="divide-y divide-slate-100">
-          {recentPatients.map((p, i) => (
+          {recentPatients.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-8">Aún no hay usuarios registrados</p>
+          )}
+          {recentPatients.map((p) => (
             <div
-              key={i}
+              key={p.id}
               className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/80 transition-colors cursor-pointer group"
             >
               <div className="flex items-center gap-4">
                 <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0">
-                  {p.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  {p.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-700">{p.name}</p>
                   <p className="text-xs text-slate-400">{p.age} años · {p.diagnosis}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="hidden sm:block text-right">
-                  <p className="text-xs font-medium text-slate-600">{p.session}</p>
-                  <p className="text-xs text-slate-400">Próxima sesión</p>
-                </div>
-                <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg ${
-                  p.status === "active"
-                    ? "bg-emerald-100 text-emerald-600"
-                    : "bg-amber-100 text-amber-600"
-                }`}>
-                  {p.status === "active" ? "Activo" : "Pendiente"}
-                </span>
-              </div>
+              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-600">
+                Activo
+              </span>
             </div>
           ))}
         </div>

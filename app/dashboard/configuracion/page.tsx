@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Camera, Save, Eye, EyeOff, Shield, AlertTriangle, User, Lock, Trash2, Upload } from "lucide-react";
+import { Camera, Save, Eye, EyeOff, Shield, AlertTriangle, User, Lock, Upload } from "lucide-react";
+import { useSession } from "next-auth/react";
 
 const tabs = [
   { id: "perfil", label: "Perfil", icon: User },
@@ -11,6 +12,7 @@ const tabs = [
 ];
 
 export default function ConfiguracionPage() {
+  const { data: session } = useSession();
   const [tab, setTab] = useState("perfil");
   const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
@@ -18,52 +20,49 @@ export default function ConfiguracionPage() {
   const [saved, setSaved] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
+  const [profile, setProfile] = useState({
+    nombre: "",
+    apellido: "",
+    telefono: "",
+    especialidad: "Terapeuta Ocupacional",
+    email: "",
+  });
+
   useEffect(() => {
-    try {
-      const storedAvatar = localStorage.getItem("profileAvatar");
-      if (storedAvatar) setAvatarUrl(storedAvatar);
-      const storedUser = localStorage.getItem("currentUser");
-      if (storedUser) {
-        const u = JSON.parse(storedUser);
-        const parts = (u.name ?? "").split(" ");
-        setProfile({
-          nombre: parts[0] ?? "Josefina",
-          apellido: parts.slice(1).join(" ") || "Pizarro",
-          telefono: u.phone ?? "",
-          especialidad: u.role === "Admin" ? "Administrador" : "Terapeuta Ocupacional",
-          email: u.email ?? "japieaters@gmail.com",
-        });
-      }
-    } catch { /* ignore */ }
-  }, []);
+    if (!session?.user) return;
+    const parts = (session.user.name ?? "").split(" ");
+    const role = (session.user as { role?: string })?.role;
+    setProfile((prev) => ({
+      ...prev,
+      nombre: parts[0] ?? "",
+      apellido: parts.slice(1).join(" ") ?? "",
+      especialidad: role === "admin" ? "Administrador" : "Terapeuta Ocupacional",
+      email: session.user?.email ?? "",
+    }));
+  }, [session]);
+
+  // Avatar persisted locally per user
+  useEffect(() => {
+    if (!session?.user?.email) return;
+    const key = `profileAvatar_${session.user.email}`;
+    const stored = localStorage.getItem(key);
+    if (stored) setAvatarUrl(stored);
+  }, [session?.user?.email]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !session?.user?.email) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const base64 = ev.target?.result as string;
       setAvatarUrl(base64);
-      localStorage.setItem("profileAvatar", base64);
+      localStorage.setItem(`profileAvatar_${session.user!.email}`, base64);
     };
     reader.readAsDataURL(file);
   };
-  const [profile, setProfile] = useState({
-    nombre: "Josefina",
-    apellido: "Pizarro",
-    telefono: "",
-    especialidad: "Terapeuta Ocupacional",
-    email: "japieaters@gmail.com",
-  });
 
   const showSaved = (msg: string) => {
     setSaved(msg);
-    // Also persist profile name to currentUser
-    try {
-      const stored = localStorage.getItem("currentUser");
-      const u = stored ? JSON.parse(stored) : {};
-      localStorage.setItem("currentUser", JSON.stringify({ ...u, name: `${profile.nombre} ${profile.apellido}`.trim(), phone: profile.telefono }));
-    } catch { /* ignore */ }
     setTimeout(() => setSaved(""), 2500);
   };
 
@@ -124,7 +123,7 @@ export default function ConfiguracionPage() {
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="Perfil" className="w-full h-full object-cover" />
                   ) : (
-                    "JP"
+                    [profile.nombre[0], profile.apellido[0]].filter(Boolean).join("").toUpperCase() || "U"
                   )}
                 </div>
                 <label className="absolute -bottom-1 -right-1 w-7 h-7 bg-violet-500 hover:bg-violet-600 text-white rounded-lg flex items-center justify-center transition-colors shadow-md cursor-pointer">

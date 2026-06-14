@@ -398,7 +398,7 @@ export default function PipelinePage() {
       .then((r) => r.json())
       .then((data) => setPipelinePatients(Array.isArray(data) ? data : []))
       .catch(() => {});
-  }, []);
+  }, [currentUserEmail]);
 
   // Close dropdown on outside click
   useEffect(() => {
