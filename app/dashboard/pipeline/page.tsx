@@ -307,6 +307,7 @@ export default function PipelinePage() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
   const [newCase, setNewCase] = useState({ patient: "", age: 0, diagnosis: "", days: 0 });
@@ -330,7 +331,18 @@ export default function PipelinePage() {
   );
 
   useEffect(() => {
-    fetch("/api/pipelines")
+    try {
+      const stored = localStorage.getItem("currentUser");
+      if (stored) {
+        const u = JSON.parse(stored);
+        setCurrentUserEmail(u.email || "");
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (!currentUserEmail) return;
+    fetch(`/api/pipelines?createdBy=${encodeURIComponent(currentUserEmail)}`)
       .then((r) => r.json())
       .then(async (data: Pipeline[]) => {
         let list = Array.isArray(data) ? data : [];
@@ -339,7 +351,7 @@ export default function PipelinePage() {
           const res = await fetch("/api/pipelines", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: "Pipeline Principal" }),
+            body: JSON.stringify({ name: "Pipeline Principal", createdBy: currentUserEmail }),
           });
           if (res.ok) {
             const pip: Pipeline = await res.json();
@@ -621,7 +633,7 @@ export default function PipelinePage() {
     const res = await fetch("/api/pipelines", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newPipelineName }),
+      body: JSON.stringify({ name: newPipelineName, createdBy: currentUserEmail }),
     });
     if (res.ok) {
       const pip: Pipeline = await res.json();

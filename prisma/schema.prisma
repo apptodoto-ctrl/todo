@@ -10,6 +10,7 @@ datasource db {
 model Pipeline {
   id        String           @id @default(cuid())
   name      String
+  createdBy String           @default("")
   createdAt DateTime         @default(now())
   columns   PipelineColumn[]
 }
@@ -28,6 +29,7 @@ model Patient {
   phone       String   @default("")
   email       String   @default("")
   rut         String   @default("")
+  createdBy   String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

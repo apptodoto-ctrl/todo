@@ -3,6 +3,7 @@
 import { Bell, Search, ChevronDown } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 
 const pageLabels: Record<string, { title: string; subtitle: string }> = {
   "/dashboard/inicio": { title: "Inicio", subtitle: "Resumen de tu práctica clínica" },
@@ -20,6 +21,19 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const page = pageLabels[pathname] || { title: "TOdo", subtitle: "" };
+  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("currentUser");
+      if (stored) setCurrentUser(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, []);
+
+  const displayName = currentUser?.name ?? "Usuario";
+  const displayRole = currentUser?.role ?? "Terapeuta";
+  const displayInitials = displayName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+  const shortName = displayName.split(" ").slice(0, 2).join(" ");
 
   return (
     <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200/60 sticky top-0 z-20">
@@ -63,11 +77,11 @@ export default function Header() {
           className="flex items-center gap-2 pl-1 pr-2 py-1 hover:bg-slate-100 rounded-xl transition-colors group"
         >
           <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-xs font-bold">
-            JP
+            {displayInitials}
           </div>
           <div className="hidden md:block text-left">
-            <p className="text-sm font-semibold text-slate-700 leading-tight">Josefina P.</p>
-            <p className="text-[11px] text-slate-400 leading-tight">Terapeuta</p>
+            <p className="text-sm font-semibold text-slate-700 leading-tight">{shortName}</p>
+            <p className="text-[11px] text-slate-400 leading-tight">{displayRole}</p>
           </div>
           <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors" />
         </button>

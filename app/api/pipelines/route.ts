@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const createdBy = req.nextUrl.searchParams.get("createdBy") || "";
     const pipelines = await prisma.pipeline.findMany({
+      where: createdBy ? { createdBy } : undefined,
       orderBy: { createdAt: "asc" },
       include: {
         columns: {
@@ -20,9 +22,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { name } = await req.json();
+    const { name, createdBy } = await req.json();
     const pipeline = await prisma.pipeline.create({
-      data: { name },
+      data: { name, createdBy: createdBy || "" },
       include: { columns: true },
     });
     return NextResponse.json(pipeline);

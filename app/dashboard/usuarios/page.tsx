@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, MessageCircle, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 
 interface Patient {
@@ -64,10 +64,19 @@ export default function UsuariosPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/patients")
-      .then((r) => r.json())
-      .then((data) => { setPatients(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
+    try {
+      const stored = localStorage.getItem("currentUser");
+      if (stored) {
+        const u = JSON.parse(stored);
+        const email = u.email || "";
+        fetch(`/api/patients?createdBy=${encodeURIComponent(email)}`)
+          .then((r) => r.json())
+          .then((data) => { setPatients(Array.isArray(data) ? data : []); setLoading(false); })
+          .catch(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
+    } catch { setLoading(false); }
   }, []);
 
   const addPatient = async () => {
@@ -75,10 +84,15 @@ export default function UsuariosPage() {
     const initials = newPatient.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
     const colors = ["from-violet-500 to-purple-600", "from-blue-500 to-indigo-600", "from-emerald-500 to-teal-600", "from-amber-500 to-orange-500", "from-pink-500 to-rose-500"];
     const color = colors[patients.length % colors.length];
+    let createdBy = "";
+    try {
+      const stored = localStorage.getItem("currentUser");
+      if (stored) createdBy = JSON.parse(stored).email || "";
+    } catch { /* ignore */ }
     const res = await fetch("/api/patients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newPatient, therapist: "Josefina P.", sessions: 0, initials, color }),
+      body: JSON.stringify({ ...newPatient, therapist: "Josefina P.", sessions: 0, initials, color, createdBy }),
     });
     if (res.ok) {
       const patient = await res.json();
@@ -247,14 +261,12 @@ export default function UsuariosPage() {
                     <Mail className="w-3.5 h-3.5" />
                   </a>
                   <a
-                    href={p.phone ? `https://wa.me/${p.phone.replace(/[^0-9]/g, "")}` : undefined}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={p.phone ? `tel:${p.phone}` : undefined}
                     onClick={!p.phone ? (e) => e.preventDefault() : undefined}
-                    title={p.phone ? `WhatsApp: ${p.phone}` : "Sin teléfono"}
-                    className={`p-1.5 rounded-lg transition-all ${p.phone ? "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 cursor-pointer" : "text-slate-200 cursor-not-allowed"}`}
+                    title={p.phone || "Sin teléfono"}
+                    className={`p-1.5 rounded-lg transition-all ${p.phone ? "text-slate-400 hover:text-violet-600 hover:bg-violet-50 cursor-pointer" : "text-slate-200 cursor-not-allowed"}`}
                   >
-                    <MessageCircle className="w-3.5 h-3.5" />
+                    <Phone className="w-3.5 h-3.5" />
                   </a>
                   <button onClick={() => setSelectedPatient(p)} className="px-3 py-1.5 text-xs font-medium text-violet-600 hover:text-white hover:bg-gradient-to-r hover:from-violet-500 hover:to-purple-600 border border-violet-200 hover:border-transparent rounded-lg transition-all">
                     Ver perfil
@@ -395,7 +407,7 @@ export default function UsuariosPage() {
                     : 'border-slate-200 text-slate-400 cursor-not-allowed opacity-50 pointer-events-none'
                 }`}
               >
-                <MessageCircle className="w-4 h-4" /> WhatsApp
+                <Phone className="w-4 h-4" /> WhatsApp
               </a>
             </div>
           </div>
