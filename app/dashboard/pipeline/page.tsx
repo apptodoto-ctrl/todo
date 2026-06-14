@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Plus, Clock, AlertTriangle, Trash2, Pencil, X, Settings2,
-  ChevronDown, FolderKanban, Users, Layers, TrendingUp, Award,
+  ChevronDown, ChevronLeft, ChevronRight, FolderKanban, Users, Layers, TrendingUp, Award,
   GripVertical, Search, Filter, MoreHorizontal, Zap,
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
@@ -174,7 +174,7 @@ function SortableCard({ c, colAccent, onDelete }: { c: Case; colAccent: string; 
 
 // ─── Column ────────────────────────────────────────────────────────────────────
 function KanbanColumn({
-  col, isOver, dragHandleProps, onAddCase, onEditCol, onDeleteCol, onDeleteCase,
+  col, isOver, dragHandleProps, onAddCase, onEditCol, onDeleteCol, onDeleteCase, onMoveLeft, onMoveRight,
 }: {
   col: Column;
   isOver: boolean;
@@ -183,6 +183,8 @@ function KanbanColumn({
   onEditCol: () => void;
   onDeleteCol: () => void;
   onDeleteCase: (caseId: number) => void;
+  onMoveLeft?: () => void;
+  onMoveRight?: () => void;
 }) {
   const pal = getPaletteByAccent(col.accent);
   const caseIds = col.cases.map((c) => c.id);
@@ -218,6 +220,24 @@ function KanbanColumn({
             </span>
           </div>
           <div className="flex items-center gap-0.5">
+            {onMoveLeft && (
+              <button
+                onClick={onMoveLeft}
+                className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                title="Mover izquierda"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {onMoveRight && (
+              <button
+                onClick={onMoveRight}
+                className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                title="Mover derecha"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button
               onClick={onEditCol}
               className="p-1.5 text-slate-600 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
@@ -273,13 +293,15 @@ function KanbanColumn({
 }
 
 // ─── SortableColumn ────────────────────────────────────────────────────────────
-function SortableColumn({ col, isOver, onAddCase, onEditCol, onDeleteCol, onDeleteCase }: {
+function SortableColumn({ col, isOver, onAddCase, onEditCol, onDeleteCol, onDeleteCase, onMoveLeft, onMoveRight }: {
   col: Column;
   isOver: boolean;
   onAddCase: () => void;
   onEditCol: () => void;
   onDeleteCol: () => void;
   onDeleteCase: (id: number) => void;
+  onMoveLeft?: () => void;
+  onMoveRight?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `col-${col.id}` });
   const style = {
@@ -298,6 +320,8 @@ function SortableColumn({ col, isOver, onAddCase, onEditCol, onDeleteCol, onDele
         onEditCol={onEditCol}
         onDeleteCol={onDeleteCol}
         onDeleteCase={onDeleteCase}
+        onMoveLeft={onMoveLeft}
+        onMoveRight={onMoveRight}
       />
     </div>
   );
@@ -557,6 +581,28 @@ export default function PipelinePage() {
     await fetch(`/api/pipeline/cases/${caseId}`, { method: "DELETE" });
   };
 
+  // ─── Column reorder ───────────────────────────────────────────────────────────
+  const moveColumn = useCallback(async (colId: string, direction: -1 | 1) => {
+    const idx = columns.findIndex((c) => c.id === colId);
+    const newIdx = idx + direction;
+    if (idx === -1 || newIdx < 0 || newIdx >= columns.length) return;
+    const reordered = arrayMove(columns, idx, newIdx).map((c, i) => ({ ...c, order: i }));
+    setPipelines((prev) =>
+      prev.map((pip) =>
+        pip.id === activePipelineId ? { ...pip, columns: reordered } : pip
+      )
+    );
+    await Promise.all(
+      reordered.map((c) =>
+        fetch(`/api/pipeline/columns/${c.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order: c.order }),
+        })
+      )
+    );
+  }, [columns, activePipelineId]);
+
   // ─── Column CRUD ─────────────────────────────────────────────────────────────
   const openAddCol = () => {
     setEditingCol(null);
@@ -783,7 +829,7 @@ export default function PipelinePage() {
             <div className="flex gap-4 min-w-max items-start pt-1">
               <SortableContext items={filteredColumns.map((c) => `col-${c.id}`)} strategy={horizontalListSortingStrategy}>
                 <AnimatePresence mode="popLayout">
-                  {filteredColumns.map((col) => (
+                  {filteredColumns.map((col, idx) => (
                     <SortableColumn
                       key={col.id}
                       col={col}
@@ -792,6 +838,8 @@ export default function PipelinePage() {
                       onEditCol={() => openEditCol(col)}
                       onDeleteCol={() => setConfirmDeleteColId(col.id)}
                       onDeleteCase={(caseId) => deleteCase(col.id, caseId)}
+                      onMoveLeft={idx > 0 ? () => moveColumn(col.id, -1) : undefined}
+                      onMoveRight={idx < filteredColumns.length - 1 ? () => moveColumn(col.id, 1) : undefined}
                     />
                   ))}
                 </AnimatePresence>
