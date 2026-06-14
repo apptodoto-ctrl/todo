@@ -3,13 +3,22 @@ import { prisma } from "@/lib/db";
 import { uploadToR2 } from "@/lib/r2";
 import { randomUUID } from "crypto";
 import path from "path";
+import { auth } from "@/auth";
 
 export async function GET() {
-  const docs = await prisma.document.findMany({ orderBy: { createdAt: "desc" } });
+  const session = await auth();
+  const createdBy = session?.user?.email ?? "";
+  const docs = await prisma.document.findMany({
+    where: { createdBy },
+    orderBy: { createdAt: "desc" },
+  });
   return NextResponse.json(docs);
 }
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  const createdBy = session?.user?.email ?? "";
+
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const category = (formData.get("category") as string) || "Sin categoría";
@@ -32,6 +41,7 @@ export async function POST(req: NextRequest) {
       type: getFileType(file.name),
       key,
       url,
+      createdBy,
     },
   });
 
