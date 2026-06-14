@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, Brain, Loader2, ArrowRight, CheckCircle2, Zap, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Brain, Loader2, ArrowRight, CheckCircle2, Zap, ShieldCheck, ArrowLeft, Mail } from "lucide-react";
 
 const DEMO_USERS = [
   { role: "Admin", email: "admin@todo.com", password: "admin123", color: "from-violet-500 to-purple-600", badge: "bg-violet-100 text-violet-700" },
@@ -13,6 +13,10 @@ const DEMO_USERS = [
 export default function AuthPage() {
   const router = useRouter();
   const [tab, setTab] = useState<"login" | "register">("login");
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -57,6 +61,40 @@ export default function AuthPage() {
     }
     localStorage.setItem("currentUser", JSON.stringify({ name: valid.role === "Admin" ? "Administrador" : "Josefina Pizarro", email: valid.email, role: valid.role }));
     router.push("/dashboard/inicio");
+  };
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) return;
+    setForgotLoading(true);
+    try {
+      await fetch("/api/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: forgotEmail.trim(),
+          subject: "Recupera tu contraseña — TOdo Therapy",
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#f9f5ff;border-radius:16px;">
+              <div style="text-align:center;margin-bottom:24px;">
+                <div style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#7c3aed);border-radius:12px;padding:12px 20px;">
+                  <span style="color:white;font-size:20px;font-weight:bold;">TOdo Therapy</span>
+                </div>
+              </div>
+              <h2 style="color:#1e1b4b;margin-bottom:8px;">Recuperación de contraseña</h2>
+              <p style="color:#4c4469;">Recibimos una solicitud para recuperar el acceso a tu cuenta asociada a <strong>${forgotEmail.trim()}</strong>.</p>
+              <p style="color:#4c4469;">Para restablecer tu contraseña o recuperar tu acceso, por favor contáctanos respondiendo este correo o escríbenos directamente a:</p>
+              <div style="background:white;border-radius:10px;padding:16px;margin:20px 0;text-align:center;">
+                <a href="mailto:info@todo-to.com" style="color:#7c3aed;font-weight:bold;font-size:16px;">info@todo-to.com</a>
+              </div>
+              <p style="color:#9ca3af;font-size:12px;text-align:center;margin-top:24px;">Si no solicitaste esto, puedes ignorar este correo.<br/>© 2026 TOdo Therapy</p>
+            </div>
+          `,
+        }),
+      });
+    } catch { /* show success regardless */ }
+    setForgotLoading(false);
+    setForgotSent(true);
   };
 
   const fillDemo = (user: typeof DEMO_USERS[0]) => {
@@ -335,6 +373,7 @@ export default function AuthPage() {
                     </label>
                     <button
                       type="button"
+                      onClick={() => { setShowForgot(true); setForgotSent(false); setForgotEmail(""); }}
                       className="text-sm text-violet-300/80 hover:text-violet-300 transition-colors font-medium"
                     >
                       ¿Olvidaste tu contraseña?
@@ -357,7 +396,36 @@ export default function AuthPage() {
                   )}
                 </AnimatePresence>
 
-
+                {/* Demo access buttons */}
+                {tab === "login" && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 text-white/25">
+                      <div className="flex-1 h-px bg-white/10" />
+                      <span className="text-[11px] font-medium uppercase tracking-wider flex items-center gap-1.5">
+                        <Zap className="w-3 h-3" /> Acceso rápido
+                      </span>
+                      <div className="flex-1 h-px bg-white/10" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {DEMO_USERS.map((user) => (
+                        <button
+                          key={user.email}
+                          type="button"
+                          onClick={() => fillDemo(user)}
+                          className="flex items-center gap-2.5 bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] hover:border-white/[0.2] rounded-xl px-3 py-2.5 transition-all text-left group"
+                        >
+                          <div className={`w-7 h-7 bg-gradient-to-br ${user.color} rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-md`}>
+                            {user.role[0]}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-white/80 group-hover:text-white transition-colors">{user.role}</p>
+                            <p className="text-[10px] text-white/30 truncate">{user.email}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Submit */}
                 <motion.button
@@ -389,6 +457,82 @@ export default function AuthPage() {
           </p>
         </motion.div>
       </div>
+
+      {/* Forgot password overlay */}
+      <AnimatePresence>
+        {showForgot && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              transition={{ duration: 0.25 }}
+              className="bg-white/[0.10] backdrop-blur-2xl border border-white/[0.15] rounded-3xl p-8 shadow-2xl shadow-black/40 w-full max-w-sm"
+            >
+              {!forgotSent ? (
+                <>
+                  <button
+                    onClick={() => setShowForgot(false)}
+                    className="flex items-center gap-1.5 text-white/50 hover:text-white/80 text-sm mb-6 transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Volver
+                  </button>
+                  <div className="mb-6">
+                    <h3 className="text-xl font-bold text-white">Recuperar contraseña</h3>
+                    <p className="text-white/50 text-sm mt-1">Ingresa tu correo y te enviaremos instrucciones</p>
+                  </div>
+                  <form onSubmit={handleForgot} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-white/70 mb-2">Correo electrónico</label>
+                      <input
+                        type="email"
+                        autoFocus
+                        placeholder="correo@ejemplo.com"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        required
+                        className="w-full bg-white/[0.07] border border-white/[0.12] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all text-sm"
+                      />
+                    </div>
+                    <motion.button
+                      type="submit"
+                      disabled={forgotLoading || !forgotEmail.trim()}
+                      whileHover={{ scale: forgotLoading ? 1 : 1.01 }}
+                      whileTap={{ scale: forgotLoading ? 1 : 0.99 }}
+                      className="w-full bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-violet-500/30"
+                    >
+                      {forgotLoading ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /><span>Enviando...</span></>
+                      ) : (
+                        <><Mail className="w-4 h-4" /><span>Enviar instrucciones</span></>
+                      )}
+                    </motion.button>
+                  </form>
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Correo enviado</h3>
+                  <p className="text-white/50 text-sm mb-6">Si <span className="text-violet-300 font-medium">{forgotEmail}</span> está registrado, recibirás las instrucciones en tu correo.</p>
+                  <button
+                    onClick={() => setShowForgot(false)}
+                    className="w-full bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.12] text-white font-medium py-3 rounded-xl transition-all text-sm"
+                  >
+                    Volver al inicio de sesión
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
