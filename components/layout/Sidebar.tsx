@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  ShieldAlert,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ export default function Sidebar() {
 
   const displayName = session?.user?.name ?? "Usuario";
   const displayRole = (session?.user as { role?: string })?.role ?? "Terapeuta";
+  const isAdmin = displayRole === "admin";
   const displayInitials = displayName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
   const avatarUrl = null;
 
@@ -115,6 +117,50 @@ export default function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Admin link — only for admins */}
+        {isAdmin && (() => {
+          const active = pathname === "/dashboard/admin" || pathname.startsWith("/dashboard/admin/");
+          return (
+            <Link href="/dashboard/admin">
+              <motion.div
+                whileHover={{ x: collapsed ? 0 : 2 }}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative",
+                  active
+                    ? "bg-gradient-to-r from-violet-500/20 to-purple-500/10 text-violet-300"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                )}
+              >
+                {active && (
+                  <motion.div
+                    layoutId="activeIndicator"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-gradient-to-b from-violet-400 to-purple-500 rounded-full"
+                  />
+                )}
+                <ShieldAlert
+                  className={cn(
+                    "w-5 h-5 shrink-0 transition-colors",
+                    active ? "text-violet-400" : "text-slate-500 group-hover:text-slate-300"
+                  )}
+                />
+                <AnimatePresence>
+                  {!collapsed && (
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="text-sm font-medium whitespace-nowrap overflow-hidden"
+                    >
+                      Admin
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            </Link>
+          );
+        })()}
       </nav>
 
       {/* User profile */}
