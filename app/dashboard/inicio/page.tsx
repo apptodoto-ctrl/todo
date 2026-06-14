@@ -8,6 +8,7 @@ import {
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 const statsData = [
   { label: "Usuarios activos", value: "24", change: "+3 este mes", icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600", href: "/dashboard/usuarios" },
@@ -49,17 +50,12 @@ const item = {
 
 export default function InicioPage() {
   const router = useRouter();
-  const [greeting, setGreeting] = useState("Josefina");
+  const { name } = useCurrentUser();
+  const [greeting, setGreeting] = useState("Usuario");
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("currentUser");
-      if (stored) {
-        const u = JSON.parse(stored);
-        setGreeting(u.name?.split(" ")[0] ?? "Josefina");
-      }
-    } catch { /* ignore */ }
-  }, []);
+    if (name && name !== "Usuario") setGreeting(name.split(" ")[0]);
+  }, [name]);
 
   return (
     <motion.div

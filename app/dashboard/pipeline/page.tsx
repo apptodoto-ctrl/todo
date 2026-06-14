@@ -8,6 +8,7 @@ import {
   GripVertical, Search, Filter, MoreHorizontal, Zap,
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 import {
   DndContext,
   DragOverlay,
@@ -307,7 +308,6 @@ export default function PipelinePage() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
   const [newCase, setNewCase] = useState({ patient: "", age: 0, diagnosis: "", days: 0 });
@@ -325,20 +325,11 @@ export default function PipelinePage() {
   const [activeId, setActiveId] = useState<number | string | null>(null);
   const [overColId, setOverColId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { email: currentUserEmail } = useCurrentUser();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("currentUser");
-      if (stored) {
-        const u = JSON.parse(stored);
-        setCurrentUserEmail(u.email || "");
-      }
-    } catch { /* ignore */ }
-  }, []);
 
   useEffect(() => {
     if (!currentUserEmail) return;

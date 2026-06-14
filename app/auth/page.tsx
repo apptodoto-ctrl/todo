@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, Brain, Loader2, ArrowRight, CheckCircle2, ShieldCheck, ArrowLeft, Mail } from "lucide-react";
 
@@ -23,43 +24,33 @@ export default function AuthPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
 
     if (tab === "register") {
-      if (!form.name.trim()) {
-        setError("Por favor ingresa tu nombre completo.");
-        setLoading(false);
-        return;
-      }
-      if (form.password.length < 6) {
-        setError("La contraseña debe tener al menos 6 caracteres.");
-        setLoading(false);
-        return;
-      }
-      if (form.password !== form.confirmPassword) {
-        setError("Las contraseñas no coinciden.");
-        setLoading(false);
-        return;
-      }
-      localStorage.setItem("currentUser", JSON.stringify({ name: form.name, email: form.email, role: "Terapeuta" }));
+      if (!form.name.trim()) { setError("Por favor ingresa tu nombre completo."); setLoading(false); return; }
+      if (form.password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); setLoading(false); return; }
+      if (form.password !== form.confirmPassword) { setError("Las contraseñas no coinciden."); setLoading(false); return; }
+
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Error al crear la cuenta."); setLoading(false); return; }
+
+      // Auto-login after register
+      const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
+      if (result?.error) { setError("Cuenta creada. Inicia sesión."); setLoading(false); setTab("login"); return; }
       router.push("/dashboard/inicio");
       return;
     }
 
-    const VALID_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!VALID_EMAIL_RE.test(form.email)) {
-      setError("Ingresa un correo electrónico válido.");
+    const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
+    if (result?.error) {
+      setError("Credenciales incorrectas. Verifica tu correo y contraseña.");
       setLoading(false);
       return;
     }
-    if (form.password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres.");
-      setLoading(false);
-      return;
-    }
-    // Accept any credentials — real auth would validate against DB
-    const name = form.email.split("@")[0];
-    localStorage.setItem("currentUser", JSON.stringify({ name, email: form.email, role: "Terapeuta" }));
     router.push("/dashboard/inicio");
   };
 

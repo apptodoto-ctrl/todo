@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { Plus, Check, Clock, AlertCircle, Trash2, ArrowUpDown, Pencil } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 type Priority = "alta" | "media" | "baja";
 type Status = "pendiente" | "en_progreso" | "completada";
@@ -36,16 +37,13 @@ export default function TareasPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTask, setNewTask] = useState({ title: "", description: "", priority: "media" as Priority, due: "", patient: "", category: "Clínico" });
+  const { email: currentUserEmail } = useCurrentUser();
 
   useEffect(() => {
-    let email = "";
-    try {
-      const stored = localStorage.getItem("currentUser");
-      if (stored) email = JSON.parse(stored).email || "";
-    } catch { /* ignore */ }
+    if (!currentUserEmail) return;
     Promise.all([
-      fetch(`/api/tasks?createdBy=${encodeURIComponent(email)}`),
-      fetch(`/api/patients?createdBy=${encodeURIComponent(email)}`),
+      fetch(`/api/tasks?createdBy=${encodeURIComponent(currentUserEmail)}`),
+      fetch(`/api/patients?createdBy=${encodeURIComponent(currentUserEmail)}`),
     ])
       .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
       .then(([tasksData, patientsData]) => {
@@ -54,19 +52,14 @@ export default function TareasPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [currentUserEmail]);
 
   const addTask = async () => {
     if (!newTask.title.trim()) return;
-    let createdBy = "";
-    try {
-      const stored = localStorage.getItem("currentUser");
-      if (stored) createdBy = JSON.parse(stored).email || "";
-    } catch { /* ignore */ }
     const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newTask, status: "pendiente" as Status, patientName: newTask.patient, createdBy }),
+      body: JSON.stringify({ ...newTask, status: "pendiente" as Status, patientName: newTask.patient, createdBy: currentUserEmail }),
     });
     if (res.ok) {
       const task = await res.json();

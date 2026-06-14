@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 interface Patient {
   id: number;
@@ -56,6 +57,7 @@ export default function UsuariosPage() {
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
   const [editForm, setEditForm] = useState<Partial<Patient>>({});
+  const { email: currentUserEmail } = useCurrentUser();
 
   useEffect(() => {
     const close = () => setMenuOpenId(null);
@@ -64,35 +66,22 @@ export default function UsuariosPage() {
   }, []);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("currentUser");
-      if (stored) {
-        const u = JSON.parse(stored);
-        const email = u.email || "";
-        fetch(`/api/patients?createdBy=${encodeURIComponent(email)}`)
-          .then((r) => r.json())
-          .then((data) => { setPatients(Array.isArray(data) ? data : []); setLoading(false); })
-          .catch(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    } catch { setLoading(false); }
-  }, []);
+    if (!currentUserEmail) return;
+    fetch(`/api/patients?createdBy=${encodeURIComponent(currentUserEmail)}`)
+      .then((r) => r.json())
+      .then((data) => { setPatients(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [currentUserEmail]);
 
   const addPatient = async () => {
     if (!newPatient.name.trim() || !newPatient.diagnosis.trim()) return;
     const initials = newPatient.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
     const colors = ["from-violet-500 to-purple-600", "from-blue-500 to-indigo-600", "from-emerald-500 to-teal-600", "from-amber-500 to-orange-500", "from-pink-500 to-rose-500"];
     const color = colors[patients.length % colors.length];
-    let createdBy = "";
-    try {
-      const stored = localStorage.getItem("currentUser");
-      if (stored) createdBy = JSON.parse(stored).email || "";
-    } catch { /* ignore */ }
     const res = await fetch("/api/patients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newPatient, therapist: "Josefina P.", sessions: 0, initials, color, createdBy }),
+      body: JSON.stringify({ ...newPatient, therapist: "Josefina P.", sessions: 0, initials, color, createdBy: currentUserEmail }),
     });
     if (res.ok) {
       const patient = await res.json();

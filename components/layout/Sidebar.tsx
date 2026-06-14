@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useSession, signOut } from "next-auth/react";
 
 const navItems = [
   { href: "/dashboard/inicio", icon: LayoutDashboard, label: "Inicio" },
@@ -37,20 +38,12 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; role: string } | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const { data: session } = useSession();
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("currentUser");
-      if (stored) setCurrentUser(JSON.parse(stored));
-      const avatar = localStorage.getItem("profileAvatar");
-      if (avatar) setAvatarUrl(avatar);
-    } catch { /* ignore */ }
-  }, []);
-
-  const displayName = currentUser?.name ?? "Josefina Pizarro";
+  const displayName = session?.user?.name ?? "Usuario";
+  const displayRole = (session?.user as { role?: string })?.role ?? "Terapeuta";
   const displayInitials = displayName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+  const avatarUrl = null;
 
   return (
     <motion.aside
@@ -143,7 +136,7 @@ export default function Sidebar() {
                 className="flex-1 min-w-0 overflow-hidden"
               >
                 <p className="text-sm font-medium text-slate-200 truncate">{displayName}</p>
-                <p className="text-xs text-slate-500 truncate">{currentUser?.role === "Admin" ? "Administrador" : "Terapeuta Ocupacional"}</p>
+                <p className="text-xs text-slate-500 truncate">{displayRole === "Admin" ? "Administrador" : "Terapeuta Ocupacional"}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -153,7 +146,7 @@ export default function Sidebar() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => router.push("/auth")}
+                onClick={() => signOut({ callbackUrl: "/auth" })}
                 className="text-slate-600 hover:text-slate-400 transition-colors"
               >
                 <LogOut className="w-4 h-4" />

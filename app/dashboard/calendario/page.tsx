@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, CheckSquare, Bell, Penc
 import Modal from "@/components/ui/Modal";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -63,14 +64,7 @@ export default function CalendarioPage() {
   const [editEventForm, setEditEventForm] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "" });
   const [editReminder, setEditReminder] = useState<CalReminder | null>(null);
   const [editReminderForm, setEditReminderForm] = useState({ title: "", date: "", time: "09:00", type: "general" });
-  const [currentUserEmail, setCurrentUserEmail] = useState("");
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("currentUser");
-      if (stored) setCurrentUserEmail(JSON.parse(stored).email || "");
-    } catch { /* ignore */ }
-  }, []);
+  const { email: currentUserEmail } = useCurrentUser();
 
   useEffect(() => {
     const load = () => {

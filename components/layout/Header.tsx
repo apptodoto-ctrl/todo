@@ -3,7 +3,7 @@
 import { Bell, Search, ChevronDown } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 
 const pageLabels: Record<string, { title: string; subtitle: string }> = {
   "/dashboard/inicio": { title: "Inicio", subtitle: "Resumen de tu práctica clínica" },
@@ -21,17 +21,10 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const page = pageLabels[pathname] || { title: "TOdo", subtitle: "" };
-  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>(null);
+  const { data: session } = useSession();
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("currentUser");
-      if (stored) setCurrentUser(JSON.parse(stored));
-    } catch { /* ignore */ }
-  }, []);
-
-  const displayName = currentUser?.name ?? "Usuario";
-  const displayRole = currentUser?.role ?? "Terapeuta";
+  const displayName = session?.user?.name ?? "Usuario";
+  const displayRole = (session?.user as { role?: string })?.role ?? "Terapeuta";
   const displayInitials = displayName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
   const shortName = displayName.split(" ").slice(0, 2).join(" ");
 
