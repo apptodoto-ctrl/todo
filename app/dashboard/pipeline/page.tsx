@@ -349,6 +349,8 @@ export default function PipelinePage() {
   const [activeId, setActiveId] = useState<number | string | null>(null);
   const [overColId, setOverColId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const autoCreateDoneRef = useRef(false);
+  const isCreatingPipelineRef = useRef(false);
   const { email: currentUserEmail } = useCurrentUser();
 
   const sensors = useSensors(
@@ -363,6 +365,8 @@ export default function PipelinePage() {
         let list = Array.isArray(data) ? data : [];
         // Auto-create default pipeline if none exist
         if (list.length === 0) {
+          if (autoCreateDoneRef.current) return;
+          autoCreateDoneRef.current = true;
           const res = await fetch("/api/pipelines", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -667,17 +671,23 @@ export default function PipelinePage() {
   // ─── Pipeline CRUD ───────────────────────────────────────────────────────────
   const createPipeline = async () => {
     if (!newPipelineName.trim()) return;
-    const res = await fetch("/api/pipelines", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newPipelineName, createdBy: currentUserEmail }),
-    });
-    if (res.ok) {
-      const pip: Pipeline = await res.json();
-      setPipelines((prev) => [...prev, { ...pip, columns: [] }]);
-      setActivePipelineId(pip.id);
-      setNewPipelineName("");
-      setShowPipelineModal(false);
+    if (isCreatingPipelineRef.current) return;
+    isCreatingPipelineRef.current = true;
+    try {
+      const res = await fetch("/api/pipelines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newPipelineName, createdBy: currentUserEmail }),
+      });
+      if (res.ok) {
+        const pip: Pipeline = await res.json();
+        setPipelines((prev) => [...prev, { ...pip, columns: [] }]);
+        setActivePipelineId(pip.id);
+        setNewPipelineName("");
+        setShowPipelineModal(false);
+      }
+    } finally {
+      isCreatingPipelineRef.current = false;
     }
   };
 

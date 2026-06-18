@@ -1,21 +1,18 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import { randomBytes } from "crypto";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const password = process.argv[2] ?? randomBytes(10).toString("base64url");
-  const hashed = await bcrypt.hash(password, 12);
-
-  const user = await prisma.user.upsert({
-    where: { email: "japieaters@gmail.com" },
-    update: { password: hashed, role: "admin", name: "Josefina" },
-    create: { email: "japieaters@gmail.com", password: hashed, name: "Josefina", role: "admin" },
+  const rows = await prisma.pipeline.findMany({
+    select: { id: true, name: true, createdBy: true },
   });
+  console.table(rows);
 
-  console.log("✅ Cuenta creada:", user.email, "| rol:", user.role);
-  console.log("🔑 Contraseña:", password);
+  const users = await prisma.user.findMany({
+    select: { id: true, name: true, email: true },
+  });
+  console.table(users);
+
   await prisma.$disconnect();
 }
 
