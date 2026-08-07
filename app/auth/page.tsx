@@ -61,29 +61,10 @@ export default function AuthPage() {
     setForgotError("");
     setForgotLoading(true);
     try {
-      const res = await fetch("/api/email", {
+      const res = await fetch("/api/auth/forgot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: forgotEmail.trim(),
-          subject: "Recupera tu contraseña — TOdo Therapy",
-          html: `
-            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#f9f5ff;border-radius:16px;">
-              <div style="text-align:center;margin-bottom:24px;">
-                <div style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#7c3aed);border-radius:12px;padding:12px 20px;">
-                  <span style="color:white;font-size:20px;font-weight:bold;">TOdo Therapy</span>
-                </div>
-              </div>
-              <h2 style="color:#1e1b4b;margin-bottom:8px;">Recuperación de contraseña</h2>
-              <p style="color:#4c4469;">Recibimos una solicitud para recuperar el acceso a tu cuenta asociada a <strong>${forgotEmail.trim()}</strong>.</p>
-              <p style="color:#4c4469;">Para restablecer tu contraseña o recuperar tu acceso, por favor contáctanos respondiendo este correo o escríbenos directamente a:</p>
-              <div style="background:white;border-radius:10px;padding:16px;margin:20px 0;text-align:center;">
-                <a href="mailto:info@todo-to.com" style="color:#7c3aed;font-weight:bold;font-size:16px;">info@todo-to.com</a>
-              </div>
-              <p style="color:#9ca3af;font-size:12px;text-align:center;margin-top:24px;">Si no solicitaste esto, puedes ignorar este correo.<br/>© 2026 TOdo Therapy</p>
-            </div>
-          `,
-        }),
+        body: JSON.stringify({ email: forgotEmail.trim() }),
       });
       if (!res.ok) throw new Error("send failed");
       setForgotSent(true);
