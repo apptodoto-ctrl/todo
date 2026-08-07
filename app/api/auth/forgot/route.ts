@@ -12,9 +12,8 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
 
-    // Siempre responder success para no revelar qué correos están registrados
     if (!user) {
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ error: "No tienes una cuenta registrada con este correo" }, { status: 404 });
     }
 
     const token = crypto.randomBytes(32).toString("hex");

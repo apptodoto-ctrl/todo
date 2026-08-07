@@ -66,8 +66,12 @@ export default function AuthPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: forgotEmail.trim() }),
       });
-      if (!res.ok) throw new Error("send failed");
-      setForgotSent(true);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setForgotError(data?.error || "No pudimos enviar el correo. Intenta de nuevo o escríbenos a info@todo-to.com");
+      } else {
+        setForgotSent(true);
+      }
     } catch {
       setForgotError("No pudimos enviar el correo. Intenta de nuevo o escríbenos a info@todo-to.com");
     }
