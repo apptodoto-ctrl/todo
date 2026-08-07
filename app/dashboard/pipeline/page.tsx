@@ -351,7 +351,7 @@ export default function PipelinePage() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const autoCreateDoneRef = useRef(false);
   const isCreatingPipelineRef = useRef(false);
-  const { email: currentUserEmail } = useCurrentUser();
+  const { email: currentUserEmail, name: currentUserName } = useCurrentUser();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -557,7 +557,7 @@ export default function PipelinePage() {
     const res = await fetch("/api/pipeline/cases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newCase, therapist: "JP", overdue: false, initials, columnId: activeColumnId }),
+      body: JSON.stringify({ ...newCase, therapist: currentUserName, overdue: false, initials, columnId: activeColumnId }),
     });
     if (res.ok) {
       const c: Case = await res.json();

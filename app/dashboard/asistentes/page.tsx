@@ -7,6 +7,7 @@ import {
   Loader2, ChevronRight, User, Download
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 interface Patient {
   id: number;
@@ -122,6 +123,7 @@ export default function AsistentesPage() {
   const [output, setOutput] = useState<string | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<number | "">("");
   const [patients, setPatients] = useState<Patient[]>([]);
+  const { name: currentUserName } = useCurrentUser();
 
   useEffect(() => {
     fetch("/api/patients")
@@ -145,7 +147,7 @@ export default function AsistentesPage() {
 
     const patient = patients.find((p) => p.id === selectedPatientId);
     const patientContext = patient
-      ? `DATOS DEL PACIENTE SELECCIONADO:\n- Nombre: ${patient.name}\n- Edad: ${patient.age} años\n- Diagnóstico: ${patient.diagnosis}\n- Terapeuta: ${patient.therapist}\n- Sesiones realizadas: ${patient.sessions}\n- Próxima sesión: ${patient.nextSession}\n- Estado: ${patient.status}\n\n`
+      ? `DATOS DEL PACIENTE SELECCIONADO:\n- Nombre: ${patient.name}\n- Edad: ${patient.age} años\n- Diagnóstico: ${patient.diagnosis}\n- Terapeuta: ${currentUserName}\n- Sesiones realizadas: ${patient.sessions}\n- Próxima sesión: ${patient.nextSession}\n- Estado: ${patient.status}\n\n`
       : "";
 
     const fullPrompt = patientContext + input;

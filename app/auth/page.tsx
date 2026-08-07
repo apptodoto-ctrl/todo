@@ -13,6 +13,7 @@ export default function AuthPage() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -57,9 +58,10 @@ export default function AuthPage() {
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!forgotEmail.trim()) return;
+    setForgotError("");
     setForgotLoading(true);
     try {
-      await fetch("/api/email", {
+      const res = await fetch("/api/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -83,9 +85,12 @@ export default function AuthPage() {
           `,
         }),
       });
-    } catch { /* show success regardless */ }
+      if (!res.ok) throw new Error("send failed");
+      setForgotSent(true);
+    } catch {
+      setForgotError("No pudimos enviar el correo. Intenta de nuevo o escríbenos a info@todo-to.com");
+    }
     setForgotLoading(false);
-    setForgotSent(true);
   };
 
   return (
@@ -359,7 +364,7 @@ export default function AuthPage() {
                     </label>
                     <button
                       type="button"
-                      onClick={() => { setShowForgot(true); setForgotSent(false); setForgotEmail(""); }}
+                      onClick={() => { setShowForgot(true); setForgotSent(false); setForgotEmail(""); setForgotError(""); }}
                       className="text-sm text-violet-300/80 hover:text-violet-300 transition-colors font-medium"
                     >
                       ¿Olvidaste tu contraseña?
@@ -454,6 +459,9 @@ export default function AuthPage() {
                         className="w-full bg-white/[0.07] border border-white/[0.12] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all text-sm"
                       />
                     </div>
+                    {forgotError && (
+                      <p className="text-rose-300 text-sm bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3">{forgotError}</p>
+                    )}
                     <motion.button
                       type="submit"
                       disabled={forgotLoading || !forgotEmail.trim()}

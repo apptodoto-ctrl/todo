@@ -57,7 +57,7 @@ export default function UsuariosPage() {
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
   const [editForm, setEditForm] = useState<Partial<Patient>>({});
-  const { email: currentUserEmail } = useCurrentUser();
+  const { email: currentUserEmail, name: currentUserName } = useCurrentUser();
 
   useEffect(() => {
     const close = () => setMenuOpenId(null);
@@ -81,7 +81,7 @@ export default function UsuariosPage() {
     const res = await fetch("/api/patients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newPatient, therapist: "Josefina P.", sessions: 0, initials, color, createdBy: currentUserEmail }),
+      body: JSON.stringify({ ...newPatient, therapist: currentUserName, sessions: 0, initials, color, createdBy: currentUserEmail }),
     });
     if (res.ok) {
       const patient = await res.json();
