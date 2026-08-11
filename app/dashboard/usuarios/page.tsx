@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
@@ -20,6 +20,14 @@ interface Patient {
   phone: string;
   email: string;
   rut: string;
+}
+
+interface SessionRecord {
+  id: number;
+  patientId: number;
+  date: string;
+  notes: string;
+  therapist: string;
 }
 
 function formatRut(value: string): string {
@@ -61,6 +69,11 @@ export default function UsuariosPage() {
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
   const [editForm, setEditForm] = useState<Partial<Patient>>({});
+  const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [showAddSession, setShowAddSession] = useState(false);
+  const [newSession, setNewSession] = useState({ date: "", notes: "" });
+  const [savingSession, setSavingSession] = useState(false);
   const { email: currentUserEmail, name: currentUserName } = useCurrentUser();
 
   useEffect(() => {
@@ -76,6 +89,45 @@ export default function UsuariosPage() {
       .then((data) => { setPatients(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, [currentUserEmail]);
+
+  useEffect(() => {
+    if (!selectedPatient) { setSessionRecords([]); setShowAddSession(false); return; }
+    setSessionsLoading(true);
+    fetch(`/api/patients/${selectedPatient.id}/sessions`)
+      .then((r) => r.json())
+      .then((data) => { setSessionRecords(Array.isArray(data) ? data : []); setSessionsLoading(false); })
+      .catch(() => setSessionsLoading(false));
+  }, [selectedPatient]);
+
+  const addSession = async () => {
+    if (!selectedPatient || !newSession.date) return;
+    setSavingSession(true);
+    const res = await fetch(`/api/patients/${selectedPatient.id}/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...newSession, therapist: currentUserName, createdBy: currentUserEmail }),
+    });
+    if (res.ok) {
+      const record = await res.json();
+      setSessionRecords((prev) => [record, ...prev].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id));
+      setPatients((prev) => prev.map((p) => (p.id === selectedPatient.id ? { ...p, sessions: record.sessions } : p)));
+      setSelectedPatient((prev) => (prev ? { ...prev, sessions: record.sessions } : prev));
+      setNewSession({ date: "", notes: "" });
+      setShowAddSession(false);
+    }
+    setSavingSession(false);
+  };
+
+  const deleteSession = async (sessionId: number) => {
+    if (!selectedPatient || !confirm("¿Eliminar esta sesión del historial?")) return;
+    const res = await fetch(`/api/patients/${selectedPatient.id}/sessions/${sessionId}`, { method: "DELETE" });
+    if (res.ok) {
+      const { sessions } = await res.json();
+      setSessionRecords((prev) => prev.filter((s) => s.id !== sessionId));
+      setPatients((prev) => prev.map((p) => (p.id === selectedPatient.id ? { ...p, sessions } : p)));
+      setSelectedPatient((prev) => (prev ? { ...prev, sessions } : prev));
+    }
+  };
 
   const addPatient = async () => {
     if (!newPatient.name.trim() || !newPatient.diagnosis.trim()) return;
@@ -374,6 +426,65 @@ export default function UsuariosPage() {
                   <p className="text-sm font-semibold text-slate-700">{value}</p>
                 </div>
               ))}
+            </div>
+
+            {/* Historial de sesiones */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <NotebookPen className="w-4 h-4 text-violet-500" />
+                  <h4 className="text-sm font-bold text-slate-700">Historial de sesiones</h4>
+                </div>
+                <button
+                  onClick={() => { setShowAddSession(!showAddSession); setNewSession({ date: new Date().toISOString().slice(0, 10), notes: "" }); }}
+                  className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1.5 rounded-lg transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Registrar sesión
+                </button>
+              </div>
+
+              {showAddSession && (
+                <div className="bg-violet-50/60 border border-violet-100 rounded-xl p-3 mb-3 space-y-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Fecha de la sesión (puede ser pasada)</label>
+                    <input type="date" value={newSession.date} onChange={(e) => setNewSession({ ...newSession, date: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Notas de evolución</label>
+                    <textarea value={newSession.notes} onChange={(e) => setNewSession({ ...newSession, notes: e.target.value })} rows={3} placeholder="Qué se trabajó, avances, observaciones..." className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all resize-none" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={addSession} disabled={savingSession || !newSession.date} className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold py-2 rounded-lg hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 transition-all">
+                      {savingSession ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Guardar
+                    </button>
+                    <button onClick={() => setShowAddSession(false)} className="px-4 text-sm font-medium text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-lg transition-all">Cancelar</button>
+                  </div>
+                </div>
+              )}
+
+              {sessionsLoading ? (
+                <div className="flex items-center justify-center py-4 text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /></div>
+              ) : sessionRecords.length === 0 ? (
+                <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-3 py-3 text-center">Sin sesiones registradas aún. Registra sesiones pasadas o nuevas para construir el historial clínico.</p>
+              ) : (
+                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                  {sessionRecords.map((s) => (
+                    <div key={s.id} className="bg-slate-50 rounded-xl p-3 group">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-violet-500" />
+                          <span className="text-xs font-bold text-slate-600">{s.date.split("-").reverse().join("-")}</span>
+                          {s.therapist && <span className="text-[11px] text-slate-400">· {s.therapist}</span>}
+                        </div>
+                        <button onClick={() => deleteSession(s.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      {s.notes && <p className="text-xs text-slate-600 whitespace-pre-wrap">{s.notes}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Actions */}

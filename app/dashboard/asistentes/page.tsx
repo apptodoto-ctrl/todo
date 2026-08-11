@@ -146,9 +146,23 @@ export default function AsistentesPage() {
     setOutput(null);
 
     const patient = patients.find((p) => p.id === selectedPatientId);
-    const patientContext = patient
+    let patientContext = patient
       ? `DATOS DEL PACIENTE SELECCIONADO:\n- Nombre: ${patient.name}\n- Edad: ${patient.age} años\n- Diagnóstico: ${patient.diagnosis}\n- Terapeuta: ${currentUserName}\n- Sesiones realizadas: ${patient.sessions}\n- Próxima sesión: ${patient.nextSession}\n- Estado: ${patient.status}\n\n`
       : "";
+
+    if (patient) {
+      try {
+        const recRes = await fetch(`/api/patients/${patient.id}/sessions`);
+        const records: { date: string; notes: string; therapist: string }[] = await recRes.json();
+        if (Array.isArray(records) && records.length > 0) {
+          const history = records
+            .slice(0, 15)
+            .map((r) => `- ${r.date}${r.therapist ? ` (${r.therapist})` : ""}: ${r.notes || "Sin notas"}`)
+            .join("\n");
+          patientContext += `HISTORIAL DE SESIONES (más reciente primero):\n${history}\n\n`;
+        }
+      } catch { /* historial opcional */ }
+    }
 
     const fullPrompt = patientContext + input;
 

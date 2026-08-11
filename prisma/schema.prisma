@@ -46,8 +46,23 @@ model Patient {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tasks         Task[]
-  pipelineCases PipelineCase[]
+  tasks          Task[]
+  pipelineCases  PipelineCase[]
+  sessionRecords SessionRecord[]
+}
+
+model SessionRecord {
+  id        Int      @id @default(autoincrement())
+  patientId Int
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  date      String
+  notes     String   @default("")
+  therapist String   @default("")
+  createdBy String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId, date])
 }
 
 model Task {
