@@ -4,10 +4,20 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import {
   FileText, BookOpen, Lightbulb, Sparkles,
-  Loader2, ChevronRight, User, Download
+  Loader2, ChevronRight, User, Download, Trash2
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+
+interface SavedReport {
+  id: number;
+  patientId: number | null;
+  patient?: { name: string } | null;
+  type: string;
+  title: string;
+  content: string;
+  createdAt: string;
+}
 
 interface Patient {
   id: number;
@@ -123,12 +133,25 @@ export default function AsistentesPage() {
   const [output, setOutput] = useState<string | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<number | "">("");
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [savedReportId, setSavedReportId] = useState<number | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [reports, setReports] = useState<SavedReport[]>([]);
+  const [viewingReport, setViewingReport] = useState<SavedReport | null>(null);
+  const [specialty, setSpecialty] = useState("Terapeuta Ocupacional");
   const { name: currentUserName } = useCurrentUser();
 
   useEffect(() => {
     fetch("/api/patients")
       .then((r) => r.json())
       .then((data) => setPatients(Array.isArray(data) ? data : []))
+      .catch(() => {});
+    fetch("/api/reports")
+      .then((r) => r.json())
+      .then((data) => setReports(Array.isArray(data) ? data : []))
+      .catch(() => {});
+    fetch("/api/users/me")
+      .then((r) => r.json())
+      .then((u) => { if (u?.specialty) setSpecialty(u.specialty); })
       .catch(() => {});
   }, []);
 
@@ -144,6 +167,8 @@ export default function AsistentesPage() {
     if (!input.trim()) return;
     setLoading(true);
     setOutput(null);
+    setSavedReportId(null);
+    setSaveState("idle");
 
     const patient = patients.find((p) => p.id === selectedPatientId);
     let patientContext = patient
@@ -190,11 +215,109 @@ export default function AsistentesPage() {
         .replace(/[^\S\n]+$/gm, "")
         .trim();
       setOutput(clean);
+      // Guardar automáticamente en el historial de informes
+      try {
+        setSaveState("saving");
+        const saveRes = await fetch("/api/reports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            patientId: patient?.id ?? null,
+            type: current?.id ?? "informe",
+            title: `${current?.title ?? "Documento"}${patient ? ` — ${patient.name}` : ""} · ${new Date().toLocaleDateString("es-CL")}`,
+            content: clean,
+          }),
+        });
+        if (saveRes.ok) {
+          const saved: SavedReport = await saveRes.json();
+          setSavedReportId(saved.id);
+          setReports((prev) => [saved, ...prev]);
+          setSaveState("saved");
+        } else {
+          setSaveState("idle");
+        }
+      } catch { setSaveState("idle"); }
     } catch (err) {
       setOutput("Error al conectar con la IA. Por favor intenta de nuevo.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const saveOutputEdits = async () => {
+    if (!savedReportId || !output) return;
+    setSaveState("saving");
+    const res = await fetch(`/api/reports/${savedReportId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: output }),
+    });
+    if (res.ok) {
+      setReports((prev) => prev.map((r) => (r.id === savedReportId ? { ...r, content: output } : r)));
+      setSaveState("saved");
+    } else {
+      setSaveState("idle");
+    }
+  };
+
+  const deleteReport = async (id: number) => {
+    if (!confirm("¿Eliminar este informe del historial?")) return;
+    const res = await fetch(`/api/reports/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setReports((prev) => prev.filter((r) => r.id !== id));
+      if (viewingReport?.id === id) setViewingReport(null);
+    }
+  };
+
+  // Impresión con membrete vía iframe oculto (evita bloqueadores de pop-ups)
+  const printDocument = (docTitle: string, content: string, patientLine: string) => {
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>${docTitle}</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 780px; margin: 40px auto; padding: 0 24px; color: #1e293b; line-height: 1.7; }
+    .letterhead { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #7c3aed; padding-bottom: 14px; margin-bottom: 6px; }
+    .brand { font-size: 22px; font-weight: bold; color: #7c3aed; }
+    .therapist { text-align: right; font-size: 12px; color: #475569; line-height: 1.5; }
+    .therapist strong { font-size: 13px; color: #1e293b; }
+    h1 { font-size: 17px; color: #1e293b; margin: 18px 0 4px; }
+    .meta { font-size: 12px; color: #64748b; margin-bottom: 24px; }
+    pre { white-space: pre-wrap; font-family: Arial, sans-serif; font-size: 13px; }
+    .signature { margin-top: 60px; padding-top: 8px; border-top: 1px solid #94a3b8; width: 260px; font-size: 12px; color: #475569; text-align: center; }
+    @media print { body { margin: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="letterhead">
+    <div class="brand">TOdo Therapy</div>
+    <div class="therapist"><strong>${currentUserName}</strong><br/>${specialty}</div>
+  </div>
+  <h1>${docTitle}</h1>
+  <div class="meta">${patientLine}${patientLine ? " &nbsp;·&nbsp; " : ""}Generado el ${new Date().toLocaleDateString("es-CL")}</div>
+  <pre>${content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+  <div class="signature">${currentUserName}<br/>${specialty}</div>
+</body>
+</html>`;
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 2000);
+    }, 300);
   };
 
   const downloadPDF = () => {
@@ -203,31 +326,7 @@ export default function AsistentesPage() {
     const patientLine = patient
       ? `Paciente: ${patient.name} &nbsp;·&nbsp; Diagnóstico: ${patient.diagnosis} &nbsp;·&nbsp; ${patient.age} años`
       : "";
-    const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>${current.title}</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 780px; margin: 40px auto; padding: 0 24px; color: #1e293b; line-height: 1.7; }
-    h1 { font-size: 20px; color: #4f46e5; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; margin-bottom: 4px; }
-    .meta { font-size: 12px; color: #64748b; margin-bottom: 28px; }
-    pre { white-space: pre-wrap; font-family: Arial, sans-serif; font-size: 13px; }
-    @media print { body { margin: 20px; } }
-  </style>
-</head>
-<body>
-  <h1>${current.title}</h1>
-  <div class="meta">${patientLine}${patientLine ? " &nbsp;·&nbsp; " : ""}Generado el ${new Date().toLocaleDateString("es-CL")}</div>
-  <pre>${output.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
-</body>
-</html>`;
-    const win = window.open("", "_blank");
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      setTimeout(() => win.print(), 300);
-    }
+    printDocument(current.title, output, patientLine);
   };
 
   return (
@@ -268,6 +367,8 @@ export default function AsistentesPage() {
               setOutput(null);
               setInput("");
               setSelectedPatientId("");
+              setSavedReportId(null);
+              setSaveState("idle");
             }}
           >
             <div className={`h-32 bg-gradient-to-br ${ast.gradient} relative overflow-hidden`}>
@@ -294,6 +395,73 @@ export default function AsistentesPage() {
           </motion.div>
         ))}
       </div>
+
+      {/* Informes guardados */}
+      {reports.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-white rounded-2xl border border-slate-200/60 p-6"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="w-4 h-4 text-violet-500" />
+            <h3 className="font-semibold text-slate-800">Informes guardados</h3>
+            <span className="text-xs text-slate-400">({reports.length})</span>
+          </div>
+          <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+            {reports.map((r) => (
+              <div key={r.id} className="flex items-center justify-between gap-3 bg-slate-50 hover:bg-violet-50/60 rounded-xl px-4 py-3 transition-colors group">
+                <button onClick={() => setViewingReport(r)} className="flex-1 text-left min-w-0">
+                  <p className="text-sm font-semibold text-slate-700 truncate group-hover:text-violet-700 transition-colors">{r.title}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {r.patient?.name ? `${r.patient.name} · ` : ""}{new Date(r.createdAt).toLocaleDateString("es-CL")}
+                  </p>
+                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => printDocument(r.title, r.content, r.patient?.name ? `Paciente: ${r.patient.name}` : "")}
+                    className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-100 rounded-lg transition-colors"
+                    title="Imprimir / PDF"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => deleteReport(r.id)}
+                    className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Ver informe guardado */}
+      <Modal
+        open={!!viewingReport}
+        onClose={() => setViewingReport(null)}
+        title={viewingReport?.title ?? ""}
+        maxWidth="max-w-2xl"
+        footer={
+          viewingReport ? (
+            <button
+              onClick={() => printDocument(viewingReport.title, viewingReport.content, viewingReport.patient?.name ? `Paciente: ${viewingReport.patient.name}` : "")}
+              className="w-full bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-violet-500/30"
+            >
+              <Download className="w-4 h-4" /> Imprimir / PDF
+            </button>
+          ) : undefined
+        }
+      >
+        {viewingReport && (
+          <div className="max-h-96 overflow-y-auto">
+            <pre className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-sans">{viewingReport.content}</pre>
+          </div>
+        )}
+      </Modal>
 
       {/* How it works */}
       <motion.div
@@ -402,17 +570,33 @@ export default function AsistentesPage() {
                 className="bg-white border border-slate-200 rounded-xl overflow-hidden"
               >
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Resultado</span>
-                  <button
-                    onClick={downloadPDF}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Descargar PDF
-                  </button>
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Resultado {saveState === "saved" ? "· guardado ✓" : saveState === "saving" ? "· guardando..." : "· editado (sin guardar)"}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {savedReportId && saveState === "idle" && (
+                      <button
+                        onClick={saveOutputEdits}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Guardar cambios
+                      </button>
+                    )}
+                    <button
+                      onClick={downloadPDF}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Imprimir / PDF
+                    </button>
+                  </div>
                 </div>
-                <div className="p-4 max-h-72 overflow-y-auto">
-                  <pre className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-sans">{output}</pre>
-                </div>
+                <textarea
+                  value={output}
+                  onChange={(e) => { setOutput(e.target.value); setSaveState("idle"); }}
+                  rows={12}
+                  className="w-full p-4 text-sm text-slate-700 leading-relaxed font-sans resize-y focus:outline-none"
+                />
+                <p className="px-4 pb-3 text-[11px] text-slate-400">Puedes editar el texto antes de imprimir. Los cambios se guardan en el historial con &quot;Guardar cambios&quot;.</p>
               </motion.div>
             )}
           </div>

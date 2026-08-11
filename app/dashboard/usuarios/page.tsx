@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2 } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
@@ -10,6 +10,13 @@ interface Patient {
   id: number;
   name: string;
   age: number;
+  birthDate: string;
+  guardian: string;
+  guardianPhone: string;
+  prevision: string;
+  school: string;
+  consultReason: string;
+  sessionValue: number;
   diagnosis: string;
   therapist: string;
   sessions: number;
@@ -28,6 +35,32 @@ interface SessionRecord {
   date: string;
   notes: string;
   therapist: string;
+  duration: number;
+  attended: boolean;
+  paid: boolean;
+}
+
+interface Objective {
+  id: number;
+  patientId: number;
+  title: string;
+  status: string;
+  progress: number;
+}
+
+// Edad calculada desde la fecha de nacimiento; si no hay, usa el campo age
+function displayAge(p: { birthDate?: string; age: number }): number {
+  if (p.birthDate) {
+    const b = new Date(p.birthDate + "T00:00:00");
+    if (!isNaN(b.getTime())) {
+      const today = new Date();
+      let age = today.getFullYear() - b.getFullYear();
+      const m = today.getMonth() - b.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+      return Math.max(0, age);
+    }
+  }
+  return p.age;
 }
 
 function formatRut(value: string): string {
@@ -64,7 +97,7 @@ export default function UsuariosPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
   const [showNewPatient, setShowNewPatient] = useState(false);
-  const [newPatient, setNewPatient] = useState({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "", rut: "" });
+  const [newPatient, setNewPatient] = useState({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "", rut: "" });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
@@ -72,8 +105,12 @@ export default function UsuariosPage() {
   const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [showAddSession, setShowAddSession] = useState(false);
-  const [newSession, setNewSession] = useState({ date: "", notes: "" });
+  const [newSession, setNewSession] = useState({ date: "", notes: "", duration: 45, attended: true, paid: false });
   const [savingSession, setSavingSession] = useState(false);
+  const [editingSession, setEditingSession] = useState<SessionRecord | null>(null);
+  const [objectives, setObjectives] = useState<Objective[]>([]);
+  const [newObjective, setNewObjective] = useState("");
+  const [savingObjective, setSavingObjective] = useState(false);
   const { email: currentUserEmail, name: currentUserName } = useCurrentUser();
 
   useEffect(() => {
@@ -91,13 +128,17 @@ export default function UsuariosPage() {
   }, [currentUserEmail]);
 
   useEffect(() => {
-    if (!selectedPatient) { setSessionRecords([]); setShowAddSession(false); return; }
+    if (!selectedPatient) { setSessionRecords([]); setObjectives([]); setShowAddSession(false); setEditingSession(null); return; }
     setSessionsLoading(true);
     fetch(`/api/patients/${selectedPatient.id}/sessions`)
       .then((r) => r.json())
       .then((data) => { setSessionRecords(Array.isArray(data) ? data : []); setSessionsLoading(false); })
       .catch(() => setSessionsLoading(false));
-  }, [selectedPatient]);
+    fetch(`/api/patients/${selectedPatient.id}/objectives`)
+      .then((r) => r.json())
+      .then((data) => setObjectives(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [selectedPatient?.id]);
 
   const addSession = async () => {
     if (!selectedPatient || !newSession.date) return;
@@ -112,10 +153,92 @@ export default function UsuariosPage() {
       setSessionRecords((prev) => [record, ...prev].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id));
       setPatients((prev) => prev.map((p) => (p.id === selectedPatient.id ? { ...p, sessions: record.sessions } : p)));
       setSelectedPatient((prev) => (prev ? { ...prev, sessions: record.sessions } : prev));
-      setNewSession({ date: "", notes: "" });
+      setNewSession({ date: "", notes: "", duration: 45, attended: true, paid: false });
       setShowAddSession(false);
     }
     setSavingSession(false);
+  };
+
+  const saveEditSession = async () => {
+    if (!selectedPatient || !editingSession) return;
+    const res = await fetch(`/api/patients/${selectedPatient.id}/sessions/${editingSession.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: editingSession.date,
+        notes: editingSession.notes,
+        duration: editingSession.duration,
+        attended: editingSession.attended,
+        paid: editingSession.paid,
+      }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setSessionRecords((prev) => prev.map((s) => (s.id === updated.id ? updated : s)).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id));
+      setEditingSession(null);
+    }
+  };
+
+  const toggleSessionPaid = async (s: SessionRecord) => {
+    if (!selectedPatient) return;
+    setSessionRecords((prev) => prev.map((x) => (x.id === s.id ? { ...x, paid: !s.paid } : x)));
+    const res = await fetch(`/api/patients/${selectedPatient.id}/sessions/${s.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paid: !s.paid }),
+    });
+    if (!res.ok) setSessionRecords((prev) => prev.map((x) => (x.id === s.id ? { ...x, paid: s.paid } : x)));
+  };
+
+  const addObjective = async () => {
+    if (!selectedPatient || !newObjective.trim()) return;
+    setSavingObjective(true);
+    const res = await fetch(`/api/patients/${selectedPatient.id}/objectives`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newObjective }),
+    });
+    if (res.ok) {
+      const obj = await res.json();
+      setObjectives((prev) => [...prev, obj]);
+      setNewObjective("");
+    }
+    setSavingObjective(false);
+  };
+
+  const updateObjective = async (obj: Objective, changes: Partial<Objective>) => {
+    if (!selectedPatient) return;
+    setObjectives((prev) => prev.map((o) => (o.id === obj.id ? { ...o, ...changes } : o)));
+    const res = await fetch(`/api/patients/${selectedPatient.id}/objectives/${obj.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(changes),
+    });
+    if (!res.ok) setObjectives((prev) => prev.map((o) => (o.id === obj.id ? obj : o)));
+  };
+
+  const deleteObjective = async (id: number) => {
+    if (!selectedPatient || !confirm("¿Eliminar este objetivo?")) return;
+    const res = await fetch(`/api/patients/${selectedPatient.id}/objectives/${id}`, { method: "DELETE" });
+    if (res.ok) setObjectives((prev) => prev.filter((o) => o.id !== id));
+  };
+
+  const exportCSV = () => {
+    const headers = ["Nombre", "Edad", "Fecha nacimiento", "Documento", "Diagnóstico", "Estado", "Tutor", "Teléfono tutor", "Previsión", "Teléfono", "Email", "Sesiones", "Próxima sesión"];
+    const rows = patients.map((p) => [
+      p.name, displayAge(p), p.birthDate, p.rut, p.diagnosis, statusConfig[p.status]?.label ?? p.status,
+      p.guardian, p.guardianPhone, p.prevision, p.phone, p.email, p.sessions, p.nextSession,
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"))
+      .join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pacientes-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const deleteSession = async (sessionId: number) => {
@@ -137,12 +260,12 @@ export default function UsuariosPage() {
     const res = await fetch("/api/patients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newPatient, therapist: currentUserName, sessions: 0, initials, color, createdBy: currentUserEmail }),
+      body: JSON.stringify({ ...newPatient, age: newPatient.birthDate ? displayAge(newPatient) : newPatient.age, sessionValue: Number(newPatient.sessionValue) || 0, therapist: currentUserName, sessions: 0, initials, color, createdBy: currentUserEmail }),
     });
     if (res.ok) {
       const patient = await res.json();
       setPatients((prev) => [...prev, patient]);
-      setNewPatient({ name: "", age: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "", rut: "" });
+      setNewPatient({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "", rut: "" });
       setShowNewPatient(false);
       setFilter("todos");
     }
@@ -155,7 +278,7 @@ export default function UsuariosPage() {
   };
 
   const openEdit = (p: Patient) => {
-    setEditForm({ name: p.name, age: p.age, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, phone: p.phone, email: p.email, rut: p.rut });
+    setEditForm({ name: p.name, age: p.age, birthDate: p.birthDate, guardian: p.guardian, guardianPhone: p.guardianPhone, prevision: p.prevision, consultReason: p.consultReason, sessionValue: p.sessionValue, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, phone: p.phone, email: p.email, rut: p.rut });
     setEditPatient(p);
     setMenuOpenId(null);
   };
@@ -165,11 +288,12 @@ export default function UsuariosPage() {
     const res = await fetch(`/api/patients/${editPatient.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editForm),
+      body: JSON.stringify({ ...editForm, age: editForm.birthDate ? displayAge(editForm as Patient) : editForm.age, sessionValue: Number(editForm.sessionValue) || 0 }),
     });
     if (res.ok) {
       const updated = await res.json();
       setPatients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      setSelectedPatient((prev) => (prev && prev.id === updated.id ? updated : prev));
       setEditPatient(null);
     }
   };
@@ -189,9 +313,14 @@ export default function UsuariosPage() {
         <div>
           <p className="text-slate-500 text-sm">{patients.length} usuarios registrados</p>
         </div>
-        <button onClick={() => setShowNewPatient(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30 self-start sm:self-auto">
-          <Plus className="w-4 h-4" /> Nuevo Usuario
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button onClick={exportCSV} disabled={patients.length === 0} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl font-medium text-sm hover:border-violet-300 hover:text-violet-700 disabled:opacity-50 transition-all">
+            <Download className="w-4 h-4" /> Exportar
+          </button>
+          <button onClick={() => setShowNewPatient(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
+            <Plus className="w-4 h-4" /> Nuevo Usuario
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -273,7 +402,7 @@ export default function UsuariosPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-slate-800">{p.name}</h3>
-                    <p className="text-xs text-slate-400">{p.age} años</p>
+                    <p className="text-xs text-slate-400">{displayAge(p)} años</p>
                   </div>
                 </div>
                 <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg ${statusConfig[p.status]?.cls}`}>
@@ -347,17 +476,54 @@ export default function UsuariosPage() {
               <input type="text" value={editForm.name || ""} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha de nacimiento</label>
+              <input type="date" value={editForm.birthDate || ""} onChange={(e) => setEditForm({ ...editForm, birthDate: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <p className="text-[11px] text-slate-400 mt-1">{editForm.birthDate ? `Edad: ${displayAge(editForm as Patient)} años` : "Si no la sabes, deja vacío"}</p>
+            </div>
+          </div>
+          {!editForm.birthDate && (
+            <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Edad</label>
               <input type="number" min={0} max={120} value={editForm.age || ""} onChange={(e) => setEditForm({ ...editForm, age: parseInt(e.target.value) || 0 })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
-          </div>
+          )}
           <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT</label>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT / Documento</label>
             <input type="text" value={editForm.rut || ""} onChange={(e) => setEditForm({ ...editForm, rut: formatRut(e.target.value) })} placeholder="12.345.678-9 o pasaporte/DNI" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico</label>
             <input type="text" value={editForm.diagnosis || ""} onChange={(e) => setEditForm({ ...editForm, diagnosis: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Motivo de consulta</label>
+            <textarea rows={2} value={editForm.consultReason || ""} onChange={(e) => setEditForm({ ...editForm, consultReason: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all resize-none" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tutor / Apoderado</label>
+              <input type="text" value={editForm.guardian || ""} onChange={(e) => setEditForm({ ...editForm, guardian: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Teléfono tutor</label>
+              <input type="tel" value={editForm.guardianPhone || ""} onChange={(e) => setEditForm({ ...editForm, guardianPhone: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Previsión</label>
+              <select value={editForm.prevision || ""} onChange={(e) => setEditForm({ ...editForm, prevision: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                <option value="">Sin especificar</option>
+                <option value="Fonasa">Fonasa</option>
+                <option value="Isapre">Isapre</option>
+                <option value="Particular">Particular</option>
+                <option value="Otra">Otra</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Valor sesión (CLP)</label>
+              <input type="number" min={0} value={editForm.sessionValue || ""} onChange={(e) => setEditForm({ ...editForm, sessionValue: parseInt(e.target.value) || 0 })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Estado</label>
@@ -412,11 +578,13 @@ export default function UsuariosPage() {
             {/* Info grid */}
             <div className="grid grid-cols-2 gap-3">
               {[
-                { icon: User, label: "Edad", value: `${selectedPatient.age} años` },
+                { icon: User, label: "Edad", value: `${displayAge(selectedPatient)} años${selectedPatient.birthDate ? ` (${selectedPatient.birthDate.split("-").reverse().join("-")})` : ""}` },
                 { icon: Activity, label: "Terapeuta", value: selectedPatient.therapist },
                 { icon: ClipboardList, label: "Diagnóstico", value: selectedPatient.diagnosis },
                 { icon: Hash, label: "Sesiones", value: `${selectedPatient.sessions} realizadas` },
                 { icon: Calendar, label: "Próxima sesión", value: selectedPatient.nextSession || "—" },
+                ...(selectedPatient.guardian ? [{ icon: User, label: "Tutor / Apoderado", value: `${selectedPatient.guardian}${selectedPatient.guardianPhone ? ` · ${selectedPatient.guardianPhone}` : ""}` }] : []),
+                ...(selectedPatient.prevision ? [{ icon: ClipboardList, label: "Previsión", value: selectedPatient.prevision }] : []),
               ].map(({ icon: Icon, label, value }) => (
                 <div key={label} className="bg-slate-50 rounded-xl p-3">
                   <div className="flex items-center gap-2 mb-1">
@@ -428,6 +596,93 @@ export default function UsuariosPage() {
               ))}
             </div>
 
+            {selectedPatient.consultReason && (
+              <div className="bg-slate-50 rounded-xl p-3">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Motivo de consulta</span>
+                <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{selectedPatient.consultReason}</p>
+              </div>
+            )}
+
+            {/* Adherencia y pagos */}
+            {sessionRecords.length > 0 && (() => {
+              const asistidas = sessionRecords.filter((s) => s.attended).length;
+              const adherencia = Math.round((asistidas / sessionRecords.length) * 100);
+              const pendientesPago = sessionRecords.filter((s) => s.attended && !s.paid).length;
+              const valor = selectedPatient.sessionValue || 0;
+              return (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className={`rounded-xl p-3 ${adherencia >= 80 ? "bg-emerald-50" : adherencia >= 50 ? "bg-amber-50" : "bg-rose-50"}`}>
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Adherencia</span>
+                    <p className={`text-lg font-bold ${adherencia >= 80 ? "text-emerald-600" : adherencia >= 50 ? "text-amber-600" : "text-rose-600"}`}>{adherencia}%</p>
+                    <p className="text-[11px] text-slate-400">{asistidas} de {sessionRecords.length} sesiones</p>
+                  </div>
+                  <div className={`rounded-xl p-3 ${pendientesPago === 0 ? "bg-emerald-50" : "bg-amber-50"}`}>
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Pagos</span>
+                    <p className={`text-lg font-bold ${pendientesPago === 0 ? "text-emerald-600" : "text-amber-600"}`}>
+                      {pendientesPago === 0 ? "Al día" : `${pendientesPago} pendiente${pendientesPago > 1 ? "s" : ""}`}
+                    </p>
+                    {valor > 0 && pendientesPago > 0 && <p className="text-[11px] text-slate-400">${(pendientesPago * valor).toLocaleString("es-CL")} por cobrar</p>}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Objetivos terapéuticos */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="w-4 h-4 text-violet-500" />
+                <h4 className="text-sm font-bold text-slate-700">Objetivos terapéuticos</h4>
+              </div>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={newObjective}
+                  onChange={(e) => setNewObjective(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") addObjective(); }}
+                  placeholder="Nuevo objetivo (ej. Tolerar 3 texturas nuevas)..."
+                  className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                />
+                <button onClick={addObjective} disabled={savingObjective || !newObjective.trim()} className="px-3 bg-violet-50 hover:bg-violet-100 text-violet-600 rounded-lg disabled:opacity-50 transition-all">
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              {objectives.length === 0 ? (
+                <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-3 py-2.5 text-center">Sin objetivos definidos aún</p>
+              ) : (
+                <div className="space-y-2">
+                  {objectives.map((obj) => (
+                    <div key={obj.id} className="bg-slate-50 rounded-xl p-3 group">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <p className={`text-xs font-semibold ${obj.status === "logrado" ? "text-emerald-600 line-through" : "text-slate-700"}`}>{obj.title}</p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {obj.status !== "logrado" ? (
+                            <button onClick={() => updateObjective(obj, { status: "logrado", progress: 100 })} className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors">✓ Logrado</button>
+                          ) : (
+                            <button onClick={() => updateObjective(obj, { status: "activo", progress: obj.progress === 100 ? 75 : obj.progress })} className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">Reabrir</button>
+                          )}
+                          <button onClick={() => deleteObjective(obj.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={obj.progress}
+                          onChange={(e) => updateObjective(obj, { progress: Number(e.target.value), ...(Number(e.target.value) === 100 ? { status: "logrado" } : { status: "activo" }) })}
+                          className="flex-1 accent-violet-500 h-1.5"
+                        />
+                        <span className="text-[11px] font-bold text-slate-500 w-9 text-right">{obj.progress}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Historial de sesiones */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -436,7 +691,7 @@ export default function UsuariosPage() {
                   <h4 className="text-sm font-bold text-slate-700">Historial de sesiones</h4>
                 </div>
                 <button
-                  onClick={() => { setShowAddSession(!showAddSession); setNewSession({ date: new Date().toISOString().slice(0, 10), notes: "" }); }}
+                  onClick={() => { setShowAddSession(!showAddSession); setNewSession({ date: new Date().toISOString().slice(0, 10), notes: "", duration: 45, attended: true, paid: false }); }}
                   className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1.5 rounded-lg transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" /> Registrar sesión
@@ -445,13 +700,32 @@ export default function UsuariosPage() {
 
               {showAddSession && (
                 <div className="bg-violet-50/60 border border-violet-100 rounded-xl p-3 mb-3 space-y-2">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Fecha de la sesión (puede ser pasada)</label>
-                    <input type="date" value={newSession.date} onChange={(e) => setNewSession({ ...newSession, date: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Fecha (puede ser pasada)</label>
+                      <input type="date" value={newSession.date} onChange={(e) => setNewSession({ ...newSession, date: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Duración</label>
+                      <select value={newSession.duration} onChange={(e) => setNewSession({ ...newSession, duration: Number(e.target.value) })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all">
+                        <option value={30}>30 min</option>
+                        <option value={45}>45 min</option>
+                        <option value={60}>60 min</option>
+                        <option value={90}>90 min</option>
+                      </select>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Notas de evolución</label>
                     <textarea value={newSession.notes} onChange={(e) => setNewSession({ ...newSession, notes: e.target.value })} rows={3} placeholder="Qué se trabajó, avances, observaciones..." className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all resize-none" />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                      <input type="checkbox" checked={newSession.attended} onChange={(e) => setNewSession({ ...newSession, attended: e.target.checked })} className="accent-violet-500" /> Asistió
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                      <input type="checkbox" checked={newSession.paid} onChange={(e) => setNewSession({ ...newSession, paid: e.target.checked })} className="accent-emerald-500" /> Pagada
+                    </label>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={addSession} disabled={savingSession || !newSession.date} className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold py-2 rounded-lg hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 transition-all">
@@ -467,21 +741,58 @@ export default function UsuariosPage() {
               ) : sessionRecords.length === 0 ? (
                 <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-3 py-3 text-center">Sin sesiones registradas aún. Registra sesiones pasadas o nuevas para construir el historial clínico.</p>
               ) : (
-                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                   {sessionRecords.map((s) => (
+                    editingSession?.id === s.id ? (
+                      <div key={s.id} className="bg-violet-50/60 border border-violet-100 rounded-xl p-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <input type="date" value={editingSession.date} onChange={(e) => setEditingSession({ ...editingSession, date: e.target.value })} className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30" />
+                          <select value={editingSession.duration} onChange={(e) => setEditingSession({ ...editingSession, duration: Number(e.target.value) })} className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30">
+                            <option value={30}>30 min</option>
+                            <option value={45}>45 min</option>
+                            <option value={60}>60 min</option>
+                            <option value={90}>90 min</option>
+                          </select>
+                        </div>
+                        <textarea value={editingSession.notes} onChange={(e) => setEditingSession({ ...editingSession, notes: e.target.value })} rows={3} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 resize-none" />
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
+                            <input type="checkbox" checked={editingSession.attended} onChange={(e) => setEditingSession({ ...editingSession, attended: e.target.checked })} className="accent-violet-500" /> Asistió
+                          </label>
+                          <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
+                            <input type="checkbox" checked={editingSession.paid} onChange={(e) => setEditingSession({ ...editingSession, paid: e.target.checked })} className="accent-emerald-500" /> Pagada
+                          </label>
+                          <div className="flex-1" />
+                          <button onClick={saveEditSession} className="text-[11px] font-semibold px-2 py-1 rounded-md bg-violet-500 text-white hover:bg-violet-600 transition-colors">Guardar</button>
+                          <button onClick={() => setEditingSession(null)} className="text-[11px] font-medium px-2 py-1 rounded-md text-slate-500 bg-white border border-slate-200 hover:text-slate-700 transition-colors">Cancelar</button>
+                        </div>
+                      </div>
+                    ) : (
                     <div key={s.id} className="bg-slate-50 rounded-xl p-3 group">
                       <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-3.5 h-3.5 text-violet-500" />
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Calendar className="w-3.5 h-3.5 text-violet-500 shrink-0" />
                           <span className="text-xs font-bold text-slate-600">{s.date.split("-").reverse().join("-")}</span>
-                          {s.therapist && <span className="text-[11px] text-slate-400">· {s.therapist}</span>}
+                          <span className="text-[11px] text-slate-400">· {s.duration} min</span>
+                          {!s.attended && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-600">No asistió</span>}
                         </div>
-                        <button onClick={() => deleteSession(s.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {s.attended && (
+                            <button onClick={() => toggleSessionPaid(s)} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md transition-colors flex items-center gap-0.5 ${s.paid ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600 hover:bg-amber-200"}`} title={s.paid ? "Marcar como no pagada" : "Marcar como pagada"}>
+                              <DollarSign className="w-2.5 h-2.5" /> {s.paid ? "Pagada" : "Pendiente"}
+                            </button>
+                          )}
+                          <button onClick={() => setEditingSession(s)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-violet-500 transition-all" title="Editar sesión">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => deleteSession(s.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                       {s.notes && <p className="text-xs text-slate-600 whitespace-pre-wrap">{s.notes}</p>}
                     </div>
+                    )
                   ))}
                 </div>
               )}
@@ -536,17 +847,48 @@ export default function UsuariosPage() {
               <input autoFocus type="text" value={newPatient.name} onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })} placeholder="Nombre completo" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Edad</label>
-              <input type="number" min={0} max={120} value={newPatient.age || ""} onChange={(e) => setNewPatient({ ...newPatient, age: parseInt(e.target.value) || 0 })} placeholder="Años" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha de nacimiento</label>
+              <input type="date" value={newPatient.birthDate} onChange={(e) => setNewPatient({ ...newPatient, birthDate: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <p className="text-[11px] text-slate-400 mt-1">La edad se calcula sola{newPatient.birthDate ? `: ${displayAge(newPatient)} años` : ""}</p>
             </div>
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT</label>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT / Documento</label>
             <input type="text" value={newPatient.rut} onChange={(e) => setNewPatient({ ...newPatient, rut: formatRut(e.target.value) })} placeholder="12.345.678-9 o pasaporte/DNI" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico *</label>
             <input type="text" value={newPatient.diagnosis} onChange={(e) => setNewPatient({ ...newPatient, diagnosis: e.target.value })} placeholder="Diagnóstico principal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Motivo de consulta</label>
+            <textarea rows={2} value={newPatient.consultReason} onChange={(e) => setNewPatient({ ...newPatient, consultReason: e.target.value })} placeholder="Por qué consulta, quién deriva..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all resize-none" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tutor / Apoderado</label>
+              <input type="text" value={newPatient.guardian} onChange={(e) => setNewPatient({ ...newPatient, guardian: e.target.value })} placeholder="Nombre (si aplica)" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Teléfono tutor</label>
+              <input type="tel" value={newPatient.guardianPhone} onChange={(e) => setNewPatient({ ...newPatient, guardianPhone: e.target.value })} placeholder="+56912345678" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Previsión</label>
+              <select value={newPatient.prevision} onChange={(e) => setNewPatient({ ...newPatient, prevision: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                <option value="">Sin especificar</option>
+                <option value="Fonasa">Fonasa</option>
+                <option value="Isapre">Isapre</option>
+                <option value="Particular">Particular</option>
+                <option value="Otra">Otra</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Valor sesión (CLP)</label>
+              <input type="number" min={0} value={newPatient.sessionValue || ""} onChange={(e) => setNewPatient({ ...newPatient, sessionValue: parseInt(e.target.value) || 0 })} placeholder="Ej. 35000" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Estado</label>

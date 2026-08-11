@@ -17,7 +17,18 @@ interface CalEvent {
   time: string;
   type: string;
   location: string;
+  duration: number;
+  status: string;
+  patientId: number | null;
 }
+
+const statusBadges: Record<string, { label: string; cls: string }> = {
+  agendada: { label: "Agendada", cls: "bg-slate-100 text-slate-600" },
+  confirmada: { label: "Confirmada", cls: "bg-blue-100 text-blue-700" },
+  asistio: { label: "Asistió", cls: "bg-emerald-100 text-emerald-700" },
+  no_asistio: { label: "No asistió", cls: "bg-rose-100 text-rose-700" },
+  cancelada: { label: "Cancelada", cls: "bg-slate-100 text-slate-400 line-through" },
+};
 
 interface CalTask {
   id: number;
@@ -56,12 +67,12 @@ export default function CalendarioPage() {
   const [selected, setSelected] = useState<Date | null>(new Date());
   const [localEvents, setLocalEvents] = useState<CalEvent[]>([]);
   const [showNewEvent, setShowNewEvent] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "" });
+  const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, patientId: null as number | null });
   const [patients, setPatients] = useState<{ id: number; name: string }[]>([]);
   const [tasks, setTasks] = useState<CalTask[]>([]);
   const [reminders, setReminders] = useState<CalReminder[]>([]);
   const [editEvent, setEditEvent] = useState<CalEvent | null>(null);
-  const [editEventForm, setEditEventForm] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "" });
+  const [editEventForm, setEditEventForm] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, status: "agendada" });
   const [editReminder, setEditReminder] = useState<CalReminder | null>(null);
   const [editReminderForm, setEditReminderForm] = useState({ title: "", date: "", time: "09:00", type: "general" });
   const { email: currentUserEmail } = useCurrentUser();
@@ -94,12 +105,12 @@ export default function CalendarioPage() {
     if (!currentUserEmail) return;
     fetch(`/api/appointments?createdBy=${encodeURIComponent(currentUserEmail)}`)
       .then((r) => r.json())
-      .then((data: { id: number; date: string; title: string; time: string; type: string; location: string }[]) => {
+      .then((data: { id: number; date: string; title: string; time: string; type: string; location: string; duration?: number; status?: string; patientId?: number | null }[]) => {
         const list = Array.isArray(data) ? data : [];
         setLocalEvents(
           list.map((a) => {
             const [y, m, d] = a.date.split("-").map(Number);
-            return { id: a.id, date: new Date(y, m - 1, d), title: a.title, time: a.time, type: a.type, location: a.location };
+            return { id: a.id, date: new Date(y, m - 1, d), title: a.title, time: a.time, type: a.type, location: a.location, duration: a.duration ?? 45, status: a.status ?? "agendada", patientId: a.patientId ?? null };
           })
         );
       })
@@ -110,25 +121,32 @@ export default function CalendarioPage() {
     const defaultDate = selected
       ? format(selected, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    setNewEvent({ title: "", date: defaultDate, time: "10:00", type, location: "" });
+    setNewEvent({ title: "", date: defaultDate, time: "10:00", type, location: "", duration: 45, patientId: null });
     setShowNewEvent(true);
   };
 
-  const addEvent = async () => {
+  const addEvent = async (force = false) => {
     if (!newEvent.title.trim() || !newEvent.date) return;
     const [y, m, d] = newEvent.date.split("-").map(Number);
     const eventDate = new Date(y, m - 1, d);
     const res = await fetch("/api/appointments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location, createdBy: currentUserEmail }),
+      body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location, duration: newEvent.duration, patientId: newEvent.patientId, force }),
     });
+    if (res.status === 409) {
+      const data = await res.json();
+      if (confirm(`⚠️ ${data.error}.\n\n¿Agendar de todas formas?`)) {
+        await addEvent(true);
+      }
+      return;
+    }
     if (res.ok) {
       const saved = await res.json();
-      setLocalEvents((prev: CalEvent[]) => [...prev, { id: saved.id, date: eventDate, title: newEvent.title, time: newEvent.time, type: newEvent.type, location: newEvent.location }]);
+      setLocalEvents((prev: CalEvent[]) => [...prev, { id: saved.id, date: eventDate, title: newEvent.title, time: newEvent.time, type: newEvent.type, location: newEvent.location, duration: newEvent.duration, status: "agendada", patientId: newEvent.patientId }]);
       setSelected(eventDate);
       setCurrent(new Date(y, m - 1, 1));
-      setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "" });
+      setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, patientId: null });
       setShowNewEvent(false);
     }
   };
@@ -140,8 +158,20 @@ export default function CalendarioPage() {
       time: ev.time,
       type: ev.type,
       location: ev.location,
+      duration: ev.duration,
+      status: ev.status,
     });
     setEditEvent(ev);
+  };
+
+  const setEventStatus = async (ev: CalEvent, status: string) => {
+    if (!ev.id) return;
+    const res = await fetch(`/api/appointments/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) setLocalEvents((prev) => prev.map((e) => (e.id === ev.id ? { ...e, status } : e)));
   };
 
   const saveEditEvent = async () => {
@@ -391,10 +421,24 @@ export default function CalendarioPage() {
                     </div>
                   </div>
                   <p className="text-sm font-semibold text-slate-700">{ev.title}</p>
-                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3" /> {ev.location}
-                    </span>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2 text-xs text-slate-400 min-w-0">
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0 ${(statusBadges[ev.status] ?? statusBadges.agendada).cls}`}>
+                        {(statusBadges[ev.status] ?? statusBadges.agendada).label}
+                      </span>
+                      <span className="shrink-0">{ev.duration} min</span>
+                      {ev.location && (
+                        <span className="flex items-center gap-1 truncate">
+                          <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{ev.location}</span>
+                        </span>
+                      )}
+                    </div>
+                    {ev.status !== "asistio" && ev.status !== "no_asistio" && ev.status !== "cancelada" && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => setEventStatus(ev, "asistio")} className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors" title="Marcar como asistió">✓ Asistió</button>
+                        <button onClick={() => setEventStatus(ev, "no_asistio")} className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors" title="Marcar como no asistió">✗ No</button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -505,6 +549,28 @@ export default function CalendarioPage() {
                 <option value="sesion">Sesión</option>
                 <option value="evaluacion">Evaluación</option>
                 <option value="reunion">Reunión</option>
+                <option value="grupal">Grupal</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Duración</label>
+              <select value={editEventForm.duration} onChange={(e) => setEditEventForm({ ...editEventForm, duration: Number(e.target.value) })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                <option value={30}>30 minutos</option>
+                <option value={45}>45 minutos</option>
+                <option value={60}>1 hora</option>
+                <option value={90}>1 hora 30</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Estado</label>
+              <select value={editEventForm.status} onChange={(e) => setEditEventForm({ ...editEventForm, status: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                <option value="agendada">Agendada</option>
+                <option value="confirmada">Confirmada</option>
+                <option value="asistio">Asistió</option>
+                <option value="no_asistio">No asistió</option>
+                <option value="cancelada">Cancelada</option>
               </select>
             </div>
           </div>
@@ -559,7 +625,7 @@ export default function CalendarioPage() {
         onClose={() => setShowNewEvent(false)}
         title="Nueva Cita"
         footer={
-          <button onClick={addEvent} disabled={!newEvent.title.trim() || !newEvent.date} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
+          <button onClick={() => addEvent()} disabled={!newEvent.title.trim() || !newEvent.date} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
             Crear Cita
           </button>
         }
@@ -572,7 +638,7 @@ export default function CalendarioPage() {
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario *</label>
             {patients.length > 0 ? (
-              <select value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+              <select value={newEvent.title} onChange={(e) => { const p = patients.find((x) => x.name === e.target.value); setNewEvent({ ...newEvent, title: e.target.value, patientId: p?.id ?? null }); }} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
                 <option value="">Seleccionar usuario...</option>
                 {patients.map((p) => (
                   <option key={p.id} value={p.name}>{p.name}</option>
@@ -593,8 +659,18 @@ export default function CalendarioPage() {
                 <option value="sesion">Sesión</option>
                 <option value="evaluacion">Evaluación</option>
                 <option value="reunion">Reunión</option>
+                <option value="grupal">Grupal</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Duración</label>
+            <select value={newEvent.duration} onChange={(e) => setNewEvent({ ...newEvent, duration: Number(e.target.value) })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+              <option value={30}>30 minutos</option>
+              <option value={45}>45 minutos</option>
+              <option value={60}>1 hora</option>
+              <option value={90}>1 hora 30</option>
+            </select>
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Comentario</label>

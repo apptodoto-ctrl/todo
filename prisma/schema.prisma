@@ -31,9 +31,16 @@ model Pipeline {
 }
 
 model Patient {
-  id          Int      @id @default(autoincrement())
-  name        String
-  age         Int
+  id            Int      @id @default(autoincrement())
+  name          String
+  age           Int
+  birthDate     String   @default("")
+  guardian      String   @default("")
+  guardianPhone String   @default("")
+  prevision     String   @default("")
+  school        String   @default("")
+  consultReason String   @default("")
+  sessionValue  Int      @default(0)
   diagnosis   String
   therapist   String   @default("Josefina P.")
   sessions    Int      @default(0)
@@ -51,6 +58,35 @@ model Patient {
   tasks          Task[]
   pipelineCases  PipelineCase[]
   sessionRecords SessionRecord[]
+  objectives     Objective[]
+  reports        GeneratedReport[]
+}
+
+model Objective {
+  id        Int      @id @default(autoincrement())
+  patientId Int
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  title     String
+  status    String   @default("activo")
+  progress  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+}
+
+model GeneratedReport {
+  id        Int      @id @default(autoincrement())
+  patientId Int?
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  type      String   @default("informe")
+  title     String
+  content   String
+  createdBy String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdBy])
 }
 
 model Reminder {
@@ -73,6 +109,9 @@ model SessionRecord {
   date      String
   notes     String   @default("")
   therapist String   @default("")
+  duration  Int      @default(45)
+  attended  Boolean  @default(true)
+  paid      Boolean  @default(false)
   createdBy String   @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -103,6 +142,9 @@ model Appointment {
   time      String
   type      String   @default("sesion")
   location  String   @default("")
+  patientId Int?
+  duration  Int      @default(45)
+  status    String   @default("agendada")
   createdBy String   @default("")
   createdAt DateTime @default(now())
 }

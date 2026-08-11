@@ -22,11 +22,14 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
     const updated = await prisma.appointment.update({
       where: { id: Number(id) },
       data: {
-        title: body.title,
-        date: body.date,
-        time: body.time,
-        type: body.type,
-        location: body.location,
+        ...(body.title !== undefined ? { title: body.title } : {}),
+        ...(body.date !== undefined ? { date: body.date } : {}),
+        ...(body.time !== undefined ? { time: body.time } : {}),
+        ...(body.type !== undefined ? { type: body.type } : {}),
+        ...(body.location !== undefined ? { location: body.location } : {}),
+        ...(body.duration !== undefined ? { duration: Number(body.duration) } : {}),
+        ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.patientId !== undefined ? { patientId: body.patientId ? Number(body.patientId) : null } : {}),
       },
     });
     return NextResponse.json(updated);
