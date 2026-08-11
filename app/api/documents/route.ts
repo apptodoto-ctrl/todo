@@ -7,7 +7,8 @@ import { auth } from "@/auth";
 
 export async function GET() {
   const session = await auth();
-  const createdBy = session?.user?.email ?? "";
+  const createdBy = session?.user?.email;
+  if (!createdBy) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const docs = await prisma.document.findMany({
     where: { createdBy },
     orderBy: { createdAt: "desc" },
@@ -15,15 +16,21 @@ export async function GET() {
   return NextResponse.json(docs);
 }
 
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
 export async function POST(req: NextRequest) {
   const session = await auth();
-  const createdBy = session?.user?.email ?? "";
+  const createdBy = session?.user?.email;
+  if (!createdBy) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const category = (formData.get("category") as string) || "Sin categoría";
 
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  if (file.size > MAX_FILE_SIZE) {
+    return NextResponse.json({ error: "El archivo supera el máximo de 20MB" }, { status: 413 });
+  }
 
   const ext = path.extname(file.name);
   const key = `documents/${randomUUID()}${ext}`;

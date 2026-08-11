@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
 
 type Params = Promise<{ id: string; sessionId: string }>;
+
+async function checkOwnership(patientId: number, email: string) {
+  const patient = await prisma.patient.findUnique({ where: { id: patientId } });
+  if (!patient) return notFound();
+  if (patient.createdBy !== email) return forbidden();
+  return null;
+}
 
 async function syncSessionCount(patientId: number) {
   const count = await prisma.sessionRecord.count({ where: { patientId } });
@@ -10,15 +18,18 @@ async function syncSessionCount(patientId: number) {
 }
 
 export async function PUT(req: Request, { params }: { params: Params }) {
+  const session = await getSessionInfo();
+  if (!session) return unauthorized();
   try {
-    const { sessionId } = await params;
-    const { date, notes, therapist } = await req.json();
+    const { id, sessionId } = await params;
+    const err = await checkOwnership(Number(id), session.email);
+    if (err) return err;
+    const { date, notes } = await req.json();
     const record = await prisma.sessionRecord.update({
       where: { id: Number(sessionId) },
       data: {
         ...(date !== undefined ? { date } : {}),
         ...(notes !== undefined ? { notes } : {}),
-        ...(therapist !== undefined ? { therapist } : {}),
       },
     });
     return NextResponse.json(record);
@@ -28,10 +39,15 @@ export async function PUT(req: Request, { params }: { params: Params }) {
 }
 
 export async function DELETE(_: Request, { params }: { params: Params }) {
+  const session = await getSessionInfo();
+  if (!session) return unauthorized();
   try {
     const { id, sessionId } = await params;
+    const patientId = Number(id);
+    const err = await checkOwnership(patientId, session.email);
+    if (err) return err;
     await prisma.sessionRecord.delete({ where: { id: Number(sessionId) } });
-    const sessions = await syncSessionCount(Number(id));
+    const sessions = await syncSessionCount(patientId);
     return NextResponse.json({ ok: true, sessions });
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });

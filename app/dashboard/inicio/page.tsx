@@ -24,13 +24,20 @@ interface Patient {
   name: string;
   age: number;
   diagnosis: string;
+  status?: string;
 }
+
+const patientStatusBadge: Record<string, { label: string; cls: string }> = {
+  activo: { label: "Activo", cls: "bg-emerald-100 text-emerald-600" },
+  evaluacion: { label: "Evaluación", cls: "bg-blue-100 text-blue-600" },
+  alta: { label: "Alta", cls: "bg-slate-100 text-slate-500" },
+};
 
 interface Task {
   id: number;
   title: string;
   priority: string;
-  dueDate?: string;
+  due?: string;
   status: string;
 }
 
@@ -74,8 +81,8 @@ export default function InicioPage() {
   }).length;
   const pendingTasks = tasks.filter((t) => t.status !== "completada").length;
   const overdueTasks = tasks.filter((t) => {
-    if (!t.dueDate || t.status === "completada") return false;
-    return new Date(t.dueDate) < now;
+    if (!t.due || t.status === "completada") return false;
+    return new Date(t.due + "T23:59:59") < now;
   }).length;
 
   const statsData = [
@@ -110,7 +117,7 @@ export default function InicioPage() {
       <motion.div variants={item} className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">
-            Buenos días{firstName ? <>, <span className="text-violet-600">{firstName}</span></> : ""} 👋
+            {now.getHours() < 12 ? "Buenos días" : now.getHours() < 20 ? "Buenas tardes" : "Buenas noches"}{firstName ? <>, <span className="text-violet-600">{firstName}</span></> : ""} 👋
           </h2>
           <p className="text-slate-500 mt-0.5">Aquí tienes el resumen de tu práctica clínica</p>
         </div>
@@ -208,7 +215,7 @@ export default function InicioPage() {
                   <p className="text-sm font-medium text-slate-700 truncate">{task.title}</p>
                   <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
-                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString("es-CL", { day: "2-digit", month: "short" }) : "Sin fecha"}
+                    {task.due ? new Date(task.due + "T00:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "short" }) : "Sin fecha"}
                   </p>
                 </div>
               </div>
@@ -246,8 +253,8 @@ export default function InicioPage() {
                   <p className="text-xs text-slate-400">{p.age} años · {p.diagnosis}</p>
                 </div>
               </div>
-              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-600">
-                Activo
+              <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg ${(patientStatusBadge[p.status ?? ""] ?? patientStatusBadge.activo).cls}`}>
+                {(patientStatusBadge[p.status ?? ""] ?? patientStatusBadge.activo).label}
               </span>
             </div>
           ))}

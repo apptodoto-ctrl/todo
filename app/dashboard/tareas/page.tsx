@@ -452,6 +452,18 @@ export default function TareasPage() {
                 </select>
               </div>
             </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Estado</label>
+              <select
+                value={editingTask.status}
+                onChange={(e) => setEditingTask({ ...editingTask, status: e.target.value as Status })}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+              >
+                <option value="pendiente">Pendiente</option>
+                <option value="en_progreso">En Progreso</option>
+                <option value="completada">Completada</option>
+              </select>
+            </div>
           </div>
         )}
       </Modal>

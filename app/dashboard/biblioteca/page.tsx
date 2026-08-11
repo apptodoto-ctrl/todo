@@ -79,11 +79,27 @@ export default function BibliotecaPage() {
     setDocuments((prev) => prev.filter((d) => d.id !== id));
   };
 
-  const viewDoc = (doc: Doc) => window.open(doc.url, "_blank");
+  const getSignedUrl = async (doc: Doc): Promise<string | null> => {
+    try {
+      const res = await fetch(`/api/documents/${doc.id}`);
+      if (!res.ok) return null;
+      const { url } = await res.json();
+      return url;
+    } catch {
+      return null;
+    }
+  };
 
-  const downloadDoc = (doc: Doc) => {
+  const viewDoc = async (doc: Doc) => {
+    const url = await getSignedUrl(doc);
+    if (url) window.open(url, "_blank");
+  };
+
+  const downloadDoc = async (doc: Doc) => {
+    const url = await getSignedUrl(doc);
+    if (!url) return;
     const a = document.createElement("a");
-    a.href = doc.url;
+    a.href = url;
     a.download = doc.name;
     a.click();
   };

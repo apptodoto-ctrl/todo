@@ -4,10 +4,10 @@ import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth
 
 type Params = Promise<{ id: string }>;
 
-async function checkOwnership(id: string, email: string) {
-  const pipeline = await prisma.pipeline.findUnique({ where: { id } });
-  if (!pipeline) return notFound();
-  if (pipeline.createdBy !== email) return forbidden();
+async function checkOwnership(id: number, email: string) {
+  const reminder = await prisma.reminder.findUnique({ where: { id } });
+  if (!reminder) return notFound();
+  if (reminder.createdBy !== email) return forbidden();
   return null;
 }
 
@@ -16,14 +16,13 @@ export async function PUT(req: Request, { params }: { params: Params }) {
   if (!session) return unauthorized();
   try {
     const { id } = await params;
-    const err = await checkOwnership(id, session.email);
+    const err = await checkOwnership(Number(id), session.email);
     if (err) return err;
-    const { name } = await req.json();
-    const pipeline = await prisma.pipeline.update({
-      where: { id },
-      data: { name },
-    });
-    return NextResponse.json(pipeline);
+    const body = await req.json();
+    delete body.id;
+    delete body.createdBy;
+    const reminder = await prisma.reminder.update({ where: { id: Number(id) }, data: body });
+    return NextResponse.json(reminder);
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }
@@ -34,9 +33,9 @@ export async function DELETE(_: Request, { params }: { params: Params }) {
   if (!session) return unauthorized();
   try {
     const { id } = await params;
-    const err = await checkOwnership(id, session.email);
+    const err = await checkOwnership(Number(id), session.email);
     if (err) return err;
-    await prisma.pipeline.delete({ where: { id } });
+    await prisma.reminder.delete({ where: { id: Number(id) } });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });

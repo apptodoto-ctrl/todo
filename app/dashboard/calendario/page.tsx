@@ -67,16 +67,12 @@ export default function CalendarioPage() {
   const { email: currentUserEmail } = useCurrentUser();
 
   useEffect(() => {
-    const load = () => {
-      try {
-        const stored = localStorage.getItem("reminders");
-        setReminders(stored ? JSON.parse(stored) : []);
-      } catch { setReminders([]); }
-    };
-    load();
-    window.addEventListener("storage", load);
-    return () => window.removeEventListener("storage", load);
-  }, []);
+    if (!currentUserEmail) return;
+    fetch("/api/reminders")
+      .then((r) => r.json())
+      .then((data) => setReminders(Array.isArray(data) ? data : []))
+      .catch(() => setReminders([]));
+  }, [currentUserEmail]);
 
   useEffect(() => {
     if (!currentUserEmail) return;
@@ -108,7 +104,7 @@ export default function CalendarioPage() {
         );
       })
       .catch(() => {});
-  }, []);
+  }, [currentUserEmail]);
 
   const openNewEvent = (type = "sesion") => {
     const defaultDate = selected
@@ -181,21 +177,23 @@ export default function CalendarioPage() {
     setEditReminder(r);
   };
 
-  const saveEditReminder = () => {
+  const saveEditReminder = async () => {
     if (!editReminder || !editReminderForm.title.trim()) return;
-    const updated = reminders.map((r) =>
-      r.id === editReminder.id ? { ...r, ...editReminderForm } : r
-    );
-    setReminders(updated);
-    localStorage.setItem("reminders", JSON.stringify(updated));
-    setEditReminder(null);
+    const res = await fetch(`/api/reminders/${editReminder.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editReminderForm),
+    });
+    if (res.ok) {
+      setReminders((prev) => prev.map((r) => (r.id === editReminder.id ? { ...r, ...editReminderForm } : r)));
+      setEditReminder(null);
+    }
   };
 
-  const deleteReminder = (id: number) => {
+  const deleteReminder = async (id: number) => {
     if (!confirm("¿Eliminar este recordatorio?")) return;
-    const updated = reminders.filter((r) => r.id !== id);
-    setReminders(updated);
-    localStorage.setItem("reminders", JSON.stringify(updated));
+    const res = await fetch(`/api/reminders/${id}`, { method: "DELETE" });
+    if (res.ok) setReminders((prev) => prev.filter((r) => r.id !== id));
   };
 
   const deleteTask = async (id: number) => {
@@ -283,7 +281,7 @@ export default function CalendarioPage() {
           <div className="grid grid-cols-7">
             {paddedDays.map((day, i) => {
               if (!day) return <div key={`empty-${i}`} className="h-24 border-r border-b border-slate-50" />;
-              const isToday = isSameDay(day, new Date(2026, 2, 22));
+              const isToday = isSameDay(day, new Date());
               const isSelected = selected && isSameDay(day, selected);
               const dayEvents = localEvents.filter((e) => isSameDay(e.date, day));
               const dayTasks = tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), day));
@@ -547,9 +545,9 @@ export default function CalendarioPage() {
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
             <select value={editReminderForm.type} onChange={(e) => setEditReminderForm({ ...editReminderForm, type: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all bg-white">
               <option value="general">General</option>
-              <option value="sesion">Sesión</option>
-              <option value="medicacion">Medicación</option>
-              <option value="evaluacion">Evaluación</option>
+              <option value="cita">Cita</option>
+              <option value="tarea">Tarea</option>
+              <option value="pago">Pago</option>
             </select>
           </div>
         </div>

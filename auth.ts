@@ -29,6 +29,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
+    authorized({ auth, request }) {
+      if (request.nextUrl.pathname.startsWith("/dashboard")) {
+        return !!auth?.user;
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

@@ -1,11 +1,13 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
+  const session = await getSessionInfo();
+  if (!session) return unauthorized();
   try {
-    const createdBy = req.nextUrl.searchParams.get("createdBy") || "";
     const patients = await prisma.patient.findMany({
-      where: createdBy ? { createdBy } : undefined,
+      where: { createdBy: session.email },
       orderBy: { createdAt: "asc" },
     });
     return NextResponse.json(patients);
@@ -15,9 +17,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: Request) {
+  const session = await getSessionInfo();
+  if (!session) return unauthorized();
   try {
     const body = await req.json();
-    const patient = await prisma.patient.create({ data: body });
+    const patient = await prisma.patient.create({
+      data: { ...body, createdBy: session.email },
+    });
     return NextResponse.json(patient, { status: 201 });
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });

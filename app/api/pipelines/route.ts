@@ -1,11 +1,13 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
+  const session = await getSessionInfo();
+  if (!session) return unauthorized();
   try {
-    const createdBy = req.nextUrl.searchParams.get("createdBy") || "";
     const pipelines = await prisma.pipeline.findMany({
-      where: createdBy ? { createdBy } : undefined,
+      where: { createdBy: session.email },
       orderBy: { createdAt: "asc" },
       include: {
         columns: {
@@ -21,10 +23,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: Request) {
+  const session = await getSessionInfo();
+  if (!session) return unauthorized();
   try {
-    const { name, createdBy } = await req.json();
+    const { name } = await req.json();
     const pipeline = await prisma.pipeline.create({
-      data: { name, createdBy: createdBy || "" },
+      data: { name, createdBy: session.email },
       include: { columns: true },
     });
     return NextResponse.json(pipeline);

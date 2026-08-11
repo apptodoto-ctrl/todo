@@ -6,11 +6,11 @@ export async function GET() {
   const session = await getSessionInfo();
   if (!session) return unauthorized();
   try {
-    const tasks = await prisma.task.findMany({
+    const reminders = await prisma.reminder.findMany({
       where: { createdBy: session.email },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ date: "asc" }, { time: "asc" }],
     });
-    return NextResponse.json(tasks.map((t) => ({ ...t, patient: t.patientName })));
+    return NextResponse.json(reminders);
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }
@@ -20,17 +20,21 @@ export async function POST(req: Request) {
   const session = await getSessionInfo();
   if (!session) return unauthorized();
   try {
-    const body = await req.json();
-    const { patient, patientId, ...rest } = body;
-    const task = await prisma.task.create({
+    const { title, description, date, time, type } = await req.json();
+    if (!title?.trim()) {
+      return NextResponse.json({ error: "El título es requerido" }, { status: 400 });
+    }
+    const reminder = await prisma.reminder.create({
       data: {
-        ...rest,
-        patientName: rest.patientName ?? patient ?? "",
+        title: title.trim(),
+        description: description || "",
+        date: date || "",
+        time: time || "",
+        type: type || "general",
         createdBy: session.email,
-        ...(patientId ? { patientId: Number(patientId) } : {}),
       },
     });
-    return NextResponse.json({ ...task, patient: task.patientName }, { status: 201 });
+    return NextResponse.json(reminder, { status: 201 });
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }

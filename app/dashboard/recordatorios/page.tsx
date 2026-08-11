@@ -1,9 +1,10 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Bell, Plus, RefreshCw, Calendar, Clock, Trash2, Edit2, CheckCircle2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 interface Reminder {
   id: number;
@@ -11,7 +12,7 @@ interface Reminder {
   description: string;
   date: string;
   time: string;
-  type: "cita" | "tarea" | "general" | "pago";
+  type: string;
   done: boolean;
 }
 
@@ -22,63 +23,104 @@ const typeConfig: Record<string, { label: string; color: string; bg: string; dot
   pago: { label: "Pago", color: "text-emerald-700", bg: "bg-emerald-100", dot: "bg-emerald-500" },
 };
 
-const initial: Reminder[] = [
-  { id: 1, title: "Confirmar cita de María González", description: "Llamar o enviar mensaje para confirmar la sesión del lunes", date: "24 Mar 2026", time: "09:00", type: "cita", done: false },
-  { id: 2, title: "Completar informe mensual", description: "Subir resumen de sesiones al sistema antes del cierre", date: "31 Mar 2026", time: "17:00", type: "tarea", done: false },
-  { id: 3, title: "Renovar materiales terapéuticos", description: "Comprar arcilla, pinturas y materiales de estimulación sensorial", date: "05 Abr 2026", time: "10:00", type: "general", done: false },
-];
+const getTypeConfig = (type: string) => typeConfig[type] ?? typeConfig.general;
 
 export default function RecordatoriosPage() {
-  const [reminders, setReminders] = useState<Reminder[]>(() => {
-    if (typeof window === "undefined") return initial;
-    try {
-      const stored = localStorage.getItem("reminders");
-      return stored ? JSON.parse(stored) : initial;
-    } catch {
-      return initial;
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem("reminders", JSON.stringify(reminders));
-  }, [reminders]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
-  const [form, setForm] = useState({ title: "", description: "", date: "", time: "", type: "general" as Reminder["type"] });
+  const [form, setForm] = useState({ title: "", description: "", date: "", time: "", type: "general" });
+  const { email: currentUserEmail } = useCurrentUser();
 
-  const toggleDone = (id: number) =>
-    setReminders((r) => r.map((rem) => rem.id === id ? { ...rem, done: !rem.done } : rem));
+  const loadReminders = useCallback(async () => {
+    try {
+      const res = await fetch("/api/reminders");
+      const data = await res.json();
+      if (Array.isArray(data)) setReminders(data);
+    } catch { /* keep current list */ }
+  }, []);
 
-  const deleteReminder = (id: number) =>
+  useEffect(() => {
+    if (!currentUserEmail) return;
+    // Migración única: recordatorios que quedaron en localStorage pasan a la BD
+    const migrate = async () => {
+      try {
+        const stored = localStorage.getItem("reminders");
+        if (stored) {
+          const local: Partial<Reminder>[] = JSON.parse(stored);
+          for (const r of local) {
+            if (!r.title) continue;
+            await fetch("/api/reminders", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title: r.title, description: r.description, date: r.date, time: r.time, type: r.type }),
+            });
+          }
+          localStorage.removeItem("reminders");
+        }
+      } catch { /* si falla la migración, se muestra lo que haya en BD */ }
+      await loadReminders();
+    };
+    migrate();
+  }, [currentUserEmail, loadReminders]);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await loadReminders();
+    setRefreshing(false);
+  };
+
+  const toggleDone = async (rem: Reminder) => {
+    setReminders((r) => r.map((x) => (x.id === rem.id ? { ...x, done: !x.done } : x)));
+    const res = await fetch(`/api/reminders/${rem.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ done: !rem.done }),
+    });
+    if (!res.ok) setReminders((r) => r.map((x) => (x.id === rem.id ? { ...x, done: rem.done } : x)));
+  };
+
+  const deleteReminder = async (id: number) => {
+    const prev = reminders;
     setReminders((r) => r.filter((rem) => rem.id !== id));
+    const res = await fetch(`/api/reminders/${id}`, { method: "DELETE" });
+    if (!res.ok) setReminders(prev);
+  };
 
   const addReminder = async () => {
     if (!form.title.trim()) return;
-    const newReminder = { ...form, id: Date.now(), done: false };
-    setReminders((r) => [...r, newReminder]);
+    const res = await fetch("/api/reminders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    if (!res.ok) return;
+    const created: Reminder = await res.json();
+    setReminders((r) => [...r, created]);
     setForm({ title: "", description: "", date: "", time: "", type: "general" });
     setShowNew(false);
 
-    // Send email notification
+    // Notificación por email al terapeuta
     try {
       await fetch("/api/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to: "info@todo-to.com",
-          subject: `Recordatorio: ${newReminder.title}`,
+          to: currentUserEmail,
+          subject: `Recordatorio: ${created.title}`,
           html: `
             <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
               <div style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);padding:24px;border-radius:12px 12px 0 0;">
                 <h1 style="color:white;margin:0;font-size:20px;">🔔 Nuevo Recordatorio</h1>
               </div>
               <div style="background:#f8fafc;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;">
-                <h2 style="color:#1e293b;margin:0 0 8px;">${newReminder.title}</h2>
-                ${newReminder.description ? `<p style="color:#64748b;margin:0 0 16px;">${newReminder.description}</p>` : ""}
+                <h2 style="color:#1e293b;margin:0 0 8px;">${created.title}</h2>
+                ${created.description ? `<p style="color:#64748b;margin:0 0 16px;">${created.description}</p>` : ""}
                 <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                  ${newReminder.date ? `<span style="background:#ede9fe;color:#7c3aed;padding:4px 12px;border-radius:8px;font-size:14px;">📅 ${newReminder.date}</span>` : ""}
-                  ${newReminder.time ? `<span style="background:#ede9fe;color:#7c3aed;padding:4px 12px;border-radius:8px;font-size:14px;">⏰ ${newReminder.time}</span>` : ""}
-                  <span style="background:#ede9fe;color:#7c3aed;padding:4px 12px;border-radius:8px;font-size:14px;">${typeConfig[newReminder.type]?.label ?? newReminder.type}</span>
+                  ${created.date ? `<span style="background:#ede9fe;color:#7c3aed;padding:4px 12px;border-radius:8px;font-size:14px;">📅 ${created.date}</span>` : ""}
+                  ${created.time ? `<span style="background:#ede9fe;color:#7c3aed;padding:4px 12px;border-radius:8px;font-size:14px;">⏰ ${created.time}</span>` : ""}
+                  <span style="background:#ede9fe;color:#7c3aed;padding:4px 12px;border-radius:8px;font-size:14px;">${getTypeConfig(created.type).label}</span>
                 </div>
               </div>
             </div>
@@ -90,10 +132,24 @@ export default function RecordatoriosPage() {
     }
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingReminder) return;
-    setReminders((r) => r.map((rem) => rem.id === editingReminder.id ? editingReminder : rem));
-    setEditingReminder(null);
+    const res = await fetch(`/api/reminders/${editingReminder.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: editingReminder.title,
+        description: editingReminder.description,
+        date: editingReminder.date,
+        time: editingReminder.time,
+        type: editingReminder.type,
+      }),
+    });
+    if (res.ok) {
+      const updated: Reminder = await res.json();
+      setReminders((r) => r.map((rem) => (rem.id === updated.id ? updated : rem)));
+      setEditingReminder(null);
+    }
   };
 
   const pending = reminders.filter((r) => !r.done);
@@ -104,8 +160,8 @@ export default function RecordatoriosPage() {
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button className="p-2 hover:bg-white border border-transparent hover:border-slate-200 rounded-xl transition-all text-slate-500 hover:text-slate-700">
-            <RefreshCw className="w-4 h-4" />
+          <button onClick={refresh} className="p-2 hover:bg-white border border-transparent hover:border-slate-200 rounded-xl transition-all text-slate-500 hover:text-slate-700">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
           <span className="text-sm text-slate-500">{pending.length} recordatorio{pending.length !== 1 ? "s" : ""} pendiente{pending.length !== 1 ? "s" : ""}</span>
         </div>
@@ -139,7 +195,7 @@ export default function RecordatoriosPage() {
           <div className="space-y-3">
             <AnimatePresence>
               {pending.map((rem) => {
-                const t = typeConfig[rem.type];
+                const t = getTypeConfig(rem.type);
                 return (
                   <motion.div
                     key={rem.id}
@@ -151,7 +207,7 @@ export default function RecordatoriosPage() {
                   >
                     <div className="flex items-start gap-4">
                       <button
-                        onClick={() => toggleDone(rem.id)}
+                        onClick={() => toggleDone(rem)}
                         className="mt-0.5 w-5 h-5 rounded-lg border-2 border-slate-300 hover:border-violet-400 flex items-center justify-center transition-all shrink-0"
                       />
                       <div className="flex-1 min-w-0">
@@ -177,12 +233,16 @@ export default function RecordatoriosPage() {
                             <span className={`w-1.5 h-1.5 rounded-full ${t.dot}`} />
                             {t.label}
                           </span>
-                          <span className="flex items-center gap-1 text-xs text-slate-500">
-                            <Calendar className="w-3 h-3" /> {rem.date}
-                          </span>
-                          <span className="flex items-center gap-1 text-xs text-slate-500">
-                            <Clock className="w-3 h-3" /> {rem.time}
-                          </span>
+                          {rem.date && (
+                            <span className="flex items-center gap-1 text-xs text-slate-500">
+                              <Calendar className="w-3 h-3" /> {rem.date}
+                            </span>
+                          )}
+                          {rem.time && (
+                            <span className="flex items-center gap-1 text-xs text-slate-500">
+                              <Clock className="w-3 h-3" /> {rem.time}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -204,12 +264,12 @@ export default function RecordatoriosPage() {
                 key={rem.id}
                 className="bg-white/60 rounded-2xl border border-slate-200/40 p-4 opacity-60 flex items-center gap-4"
               >
-                <button onClick={() => toggleDone(rem.id)}>
+                <button onClick={() => toggleDone(rem)}>
                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                 </button>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-slate-600 line-through">{rem.title}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{rem.date} · {rem.time}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{rem.date}{rem.time ? ` · ${rem.time}` : ""}</p>
                 </div>
                 <button
                   onClick={() => deleteReminder(rem.id)}
@@ -255,7 +315,7 @@ export default function RecordatoriosPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as Reminder["type"] })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
               <option value="general">General</option>
               <option value="cita">Cita</option>
               <option value="tarea">Tarea</option>
@@ -298,7 +358,7 @@ export default function RecordatoriosPage() {
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
-              <select value={editingReminder.type} onChange={(e) => setEditingReminder({ ...editingReminder, type: e.target.value as Reminder["type"] })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+              <select value={editingReminder.type} onChange={(e) => setEditingReminder({ ...editingReminder, type: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
                 <option value="general">General</option>
                 <option value="cita">Cita</option>
                 <option value="tarea">Tarea</option>

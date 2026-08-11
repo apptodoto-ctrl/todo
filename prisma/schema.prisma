@@ -13,6 +13,8 @@ model User {
   email     String   @unique
   password  String
   role      String   @default("Terapeuta")
+  phone     String   @default("")
+  specialty String   @default("Terapeuta Ocupacional")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -49,6 +51,19 @@ model Patient {
   tasks          Task[]
   pipelineCases  PipelineCase[]
   sessionRecords SessionRecord[]
+}
+
+model Reminder {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @default("")
+  date        String   @default("")
+  time        String   @default("")
+  type        String   @default("general")
+  done        Boolean  @default(false)
+  createdBy   String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model SessionRecord {
