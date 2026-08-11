@@ -23,6 +23,10 @@ interface Patient {
 }
 
 function formatRut(value: string): string {
+  // Solo aplicar formato de RUT chileno cuando el valor parece un RUT
+  // (dígitos, puntos, guión y dígito verificador K). Pasaportes u otros
+  // documentos con letras se dejan tal cual.
+  if (!/^[0-9.\-kK]*$/.test(value)) return value.toUpperCase();
   const clean = value.replace(/[^0-9kK]/g, "").toUpperCase();
   if (clean.length === 0) return "";
   const dv = clean.slice(-1);
@@ -297,7 +301,7 @@ export default function UsuariosPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT</label>
-            <input type="text" value={editForm.rut || ""} onChange={(e) => setEditForm({ ...editForm, rut: formatRut(e.target.value) })} placeholder="12.345.678-9" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input type="text" value={editForm.rut || ""} onChange={(e) => setEditForm({ ...editForm, rut: formatRut(e.target.value) })} placeholder="12.345.678-9 o pasaporte/DNI" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico</label>
@@ -427,7 +431,7 @@ export default function UsuariosPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT</label>
-            <input type="text" value={newPatient.rut} onChange={(e) => setNewPatient({ ...newPatient, rut: formatRut(e.target.value) })} placeholder="12.345.678-9" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input type="text" value={newPatient.rut} onChange={(e) => setNewPatient({ ...newPatient, rut: formatRut(e.target.value) })} placeholder="12.345.678-9 o pasaporte/DNI" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico *</label>
