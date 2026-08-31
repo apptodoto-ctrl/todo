@@ -89,6 +89,69 @@ model GeneratedReport {
   @@index([createdBy])
 }
 
+model PlanTier {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  plan         String
+  maxPatients  Int?
+  therapists   Int      @default(1)
+  aiCredits    Int      @default(0)
+  priceMonthly Int
+  priceYearly  Int
+  isAddon      Boolean  @default(false)
+  notes        String   @default("")
+  sortOrder    Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model AiFeature {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  creditCost  Int
+  esencial    Boolean  @default(false)
+  profesional Boolean  @default(true)
+  centro      Boolean  @default(true)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CreditPack {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  credits   Int
+  price     Int
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Coupon {
+  id              Int       @id @default(autoincrement())
+  code            String    @unique
+  type            String
+  value           Int
+  maxRedemptions  Int?
+  redemptions     Int       @default(0)
+  validUntil      DateTime?
+  planRestriction String?
+  description     String    @default("")
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model PricingSetting {
+  key       String   @id
+  value     String
+  label     String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
 model Reminder {
   id          Int      @id @default(autoincrement())
   title       String

@@ -72,10 +72,16 @@ export default function AdminPage() {
         <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/25">
           <ShieldAlert className="w-5 h-5 text-white" />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-slate-800">Panel de Administración</h1>
           <p className="text-sm text-slate-500">Métricas globales de la plataforma</p>
         </div>
+        <button
+          onClick={() => router.push("/dashboard/admin/pricing")}
+          className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30"
+        >
+          <Crown className="w-4 h-4" /> Planes y precios
+        </button>
       </motion.div>
 
       {/* Stat cards */}
