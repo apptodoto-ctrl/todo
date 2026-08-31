@@ -138,7 +138,15 @@ export default function AsistentesPage() {
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [viewingReport, setViewingReport] = useState<SavedReport | null>(null);
   const [specialty, setSpecialty] = useState("Terapeuta Ocupacional");
+  const [credits, setCredits] = useState<{ totalRemaining: number; includedTotal: number; purchased: number } | null>(null);
   const { name: currentUserName } = useCurrentUser();
+
+  const loadCredits = () => {
+    fetch("/api/billing/status")
+      .then((r) => r.json())
+      .then((d) => { if (d?.credits) setCredits(d.credits); })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     fetch("/api/patients")
@@ -153,6 +161,7 @@ export default function AsistentesPage() {
       .then((r) => r.json())
       .then((u) => { if (u?.specialty) setSpecialty(u.specialty); })
       .catch(() => {});
+    loadCredits();
   }, []);
 
   const current = assistants.find((a) => a.id === activeAssistant);
@@ -192,10 +201,16 @@ export default function AsistentesPage() {
     const fullPrompt = patientContext + input;
 
     try {
+      const featureKeys: Record<string, string> = {
+        informe: "ai_informe",
+        cuentos: "ai_cuento",
+        actividades: "ai_ideas_actividades",
+      };
       const res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          featureKey: featureKeys[current?.id ?? ""] ?? "ai_ideas_actividades",
           prompt: fullPrompt,
           systemPrompt: current
             ? systemPrompts[current.id] +
@@ -204,7 +219,13 @@ export default function AsistentesPage() {
         }),
       });
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (data.error) {
+        setOutput(data.error);
+        setLoading(false);
+        loadCredits();
+        return;
+      }
+      loadCredits();
       // Strip any remaining markdown/special chars just in case
       const clean = (data.text as string)
         .replace(/#{1,6}\s*/g, "")
@@ -350,6 +371,20 @@ export default function AsistentesPage() {
           <p className="text-white/70 max-w-xl">
             Herramientas de inteligencia artificial diseñadas para potenciar tu práctica clínica. Genera documentos, cuentos y actividades en segundos.
           </p>
+          {credits && (
+            <div className="mt-5 max-w-xs">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-white/60 uppercase tracking-wide">Créditos disponibles</span>
+                <span className="text-sm font-bold text-white">{credits.totalRemaining}</span>
+              </div>
+              <div className="h-2 bg-white/15 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-white/80 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, Math.round((credits.totalRemaining / Math.max(1, credits.includedTotal + credits.purchased)) * 100))}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </motion.div>
 

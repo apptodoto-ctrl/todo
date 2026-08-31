@@ -18,6 +18,7 @@ import {
   ChevronRight,
   LogOut,
   ShieldAlert,
+  Crown,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/dashboard/pipeline", icon: Kanban, label: "Pipeline" },
   { href: "/dashboard/biblioteca", icon: BookOpen, label: "Biblioteca" },
   { href: "/dashboard/recordatorios", icon: Bell, label: "Recordatorios" },
+  { href: "/dashboard/plan", icon: Crown, label: "Mi plan" },
   { href: "/dashboard/configuracion", icon: Settings, label: "Configuración" },
 ];
 

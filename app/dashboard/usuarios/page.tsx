@@ -268,6 +268,12 @@ export default function UsuariosPage() {
       setNewPatient({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "", rut: "" });
       setShowNewPatient(false);
       setFilter("todos");
+    } else {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || "No se pudo crear el usuario");
+      if (data?.code === "patient_limit" || data?.code === "subscription_expired") {
+        window.location.href = "/dashboard/plan";
+      }
     }
   };
 

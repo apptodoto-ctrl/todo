@@ -145,6 +145,34 @@ model Coupon {
   updatedAt       DateTime  @updatedAt
 }
 
+model Subscription {
+  id                   Int       @id @default(autoincrement())
+  userEmail            String    @unique
+  tierCode             String
+  status               String    @default("trialing")
+  billingCycle         String    @default("monthly")
+  stripeCustomerId     String    @default("")
+  stripeSubscriptionId String    @default("")
+  currentPeriodEnd     DateTime?
+  trialEndsAt          DateTime?
+  includedCreditsUsed  Int       @default(0)
+  purchasedCredits     Int       @default(0)
+  trialCredits         Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model CreditLedger {
+  id         Int      @id @default(autoincrement())
+  userEmail  String
+  featureKey String   @default("")
+  amount     Int
+  reason     String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([userEmail, createdAt])
+}
+
 model PricingSetting {
   key       String   @id
   value     String
