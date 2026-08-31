@@ -147,6 +147,10 @@ model Appointment {
   status    String   @default("agendada")
   createdBy String   @default("")
   createdAt DateTime @default(now())
+
+  reminder5dSent Boolean @default(false)
+  reminder1dSent Boolean @default(false)
+  reminder4hSent Boolean @default(false)
 }
 
 model PipelineColumn {
