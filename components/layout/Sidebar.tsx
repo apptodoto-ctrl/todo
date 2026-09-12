@@ -53,7 +53,7 @@ export default function Sidebar() {
     <motion.aside
       animate={{ width: collapsed ? 72 : 240 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="relative flex flex-col h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-r border-slate-800/60 shrink-0 overflow-hidden"
+      className="relative hidden lg:flex flex-col h-[100dvh] bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-r border-slate-800/60 shrink-0 overflow-hidden"
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-800/60">

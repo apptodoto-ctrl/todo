@@ -32,55 +32,56 @@ export default function Header() {
   const shortName = displayName.split(" ").slice(0, 2).join(" ");
 
   return (
-    <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200/60 sticky top-0 z-20">
-      {/* Page title */}
-      <motion.div
-        key={pathname}
-        initial={{ opacity: 0, y: -5 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
-      >
-        <h1 className="text-lg font-bold text-slate-800">{page.title}</h1>
-        <p className="text-xs text-slate-500">{page.subtitle}</p>
-      </motion.div>
-
-      {/* Right actions */}
-      <div className="flex items-center gap-3">
-        {/* Search */}
-        <div
-          onClick={() => router.push("/dashboard/usuarios")}
-          className="hidden md:flex items-center gap-2 bg-slate-100 hover:bg-slate-200 rounded-xl px-3 py-2 transition-colors cursor-pointer group"
+    <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-xl border-b border-slate-200/70 pt-safe">
+      <div className="flex items-center justify-between gap-3 px-4 lg:px-6 h-14 lg:h-auto lg:py-4">
+        {/* Título de la pantalla */}
+        <motion.div
+          key={pathname}
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="min-w-0"
         >
-          <Search className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
-          <span className="text-sm text-slate-400 pr-6">Buscar...</span>
-          <kbd className="text-[10px] bg-white border border-slate-200 text-slate-400 rounded px-1.5 py-0.5 font-mono">
-            ⌘K
-          </kbd>
+          <h1 className="text-[17px] lg:text-lg font-bold text-slate-800 tracking-tight truncate">{page.title}</h1>
+          <p className="hidden sm:block text-xs text-slate-500 truncate">{page.subtitle}</p>
+        </motion.div>
+
+        {/* Acciones */}
+        <div className="flex items-center gap-1.5 lg:gap-3 shrink-0">
+          {/* Buscador (solo escritorio) */}
+          <div
+            onClick={() => router.push("/dashboard/usuarios")}
+            className="hidden lg:flex items-center gap-2 bg-slate-100 hover:bg-slate-200 rounded-xl px-3 py-2 transition-colors cursor-pointer group"
+          >
+            <Search className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+            <span className="text-sm text-slate-400 pr-6">Buscar...</span>
+          </div>
+
+          {/* Notificaciones */}
+          <button
+            onClick={() => router.push("/dashboard/recordatorios")}
+            className="relative w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-xl transition-colors active:scale-90 duration-150 group"
+            aria-label="Recordatorios"
+          >
+            <Bell className="w-[22px] h-[22px] lg:w-5 lg:h-5 text-slate-500 group-hover:text-slate-700 transition-colors" />
+          </button>
+
+          {/* Perfil */}
+          <button
+            onClick={() => router.push("/dashboard/configuracion")}
+            className="flex items-center gap-2 lg:pl-1 lg:pr-2 lg:py-1 lg:hover:bg-slate-100 rounded-xl transition-all active:scale-90 lg:active:scale-100 duration-150 group"
+            aria-label="Mi perfil"
+          >
+            <div className="w-9 h-9 lg:w-8 lg:h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl lg:rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md shadow-violet-500/20">
+              {displayInitials}
+            </div>
+            <div className="hidden lg:block text-left">
+              <p className="text-sm font-semibold text-slate-700 leading-tight">{shortName}</p>
+              <p className="text-[11px] text-slate-400 leading-tight">{displayRole}</p>
+            </div>
+            <ChevronDown className="hidden lg:block w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+          </button>
         </div>
-
-        {/* Notifications */}
-        <button
-          onClick={() => router.push("/dashboard/recordatorios")}
-          className="relative p-2 hover:bg-slate-100 rounded-xl transition-colors group"
-        >
-          <Bell className="w-5 h-5 text-slate-500 group-hover:text-slate-700 transition-colors" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-violet-500 rounded-full ring-2 ring-white" />
-        </button>
-
-        {/* User */}
-        <button
-          onClick={() => router.push("/dashboard/configuracion")}
-          className="flex items-center gap-2 pl-1 pr-2 py-1 hover:bg-slate-100 rounded-xl transition-colors group"
-        >
-          <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-xs font-bold">
-            {displayInitials}
-          </div>
-          <div className="hidden md:block text-left">
-            <p className="text-sm font-semibold text-slate-700 leading-tight">{shortName}</p>
-            <p className="text-[11px] text-slate-400 leading-tight">{displayRole}</p>
-          </div>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors" />
-        </button>
       </div>
     </header>
   );

@@ -260,32 +260,34 @@ export default function CalendarioPage() {
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
           <button
             onClick={() => setCurrent(subMonths(current, 1))}
-            className="p-2 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm transition-all"
+            className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm active:scale-90 transition-all"
+            aria-label="Mes anterior"
           >
-            <ChevronLeft className="w-4 h-4 text-slate-600" />
+            <ChevronLeft className="w-5 h-5 sm:w-4 sm:h-4 text-slate-600" />
           </button>
-          <h2 className="text-lg font-bold text-slate-800 min-w-[180px] text-center capitalize">
+          <h2 className="text-lg font-bold text-slate-800 flex-1 sm:min-w-[180px] text-center capitalize truncate">
             {format(current, "MMMM yyyy", { locale: es })}
           </h2>
           <button
             onClick={() => setCurrent(addMonths(current, 1))}
-            className="p-2 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm transition-all"
+            className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm active:scale-90 transition-all"
+            aria-label="Mes siguiente"
           >
-            <ChevronRight className="w-4 h-4 text-slate-600" />
+            <ChevronRight className="w-5 h-5 sm:w-4 sm:h-4 text-slate-600" />
           </button>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => openNewEvent("sesion")} className="flex items-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-3 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
-            <Plus className="w-4 h-4" /> Sesión
+        <div className="grid grid-cols-3 sm:flex sm:items-center gap-2">
+          <button onClick={() => openNewEvent("sesion")} className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-2 sm:px-3 py-2.5 rounded-xl font-medium text-[13px] sm:text-sm hover:from-violet-400 hover:to-purple-500 active:scale-95 transition-all shadow-lg shadow-violet-500/30">
+            <Plus className="w-4 h-4 shrink-0" /> Sesión
           </button>
-          <button onClick={() => openNewEvent("evaluacion")} className="flex items-center gap-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-2.5 rounded-xl font-medium text-sm hover:from-blue-400 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/30">
-            <Plus className="w-4 h-4" /> Evaluación
+          <button onClick={() => openNewEvent("evaluacion")} className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-2 sm:px-3 py-2.5 rounded-xl font-medium text-[13px] sm:text-sm hover:from-blue-400 hover:to-indigo-500 active:scale-95 transition-all shadow-lg shadow-blue-500/30">
+            <Plus className="w-4 h-4 shrink-0" /> <span className="truncate">Evaluación</span>
           </button>
-          <button onClick={() => openNewEvent("reunion")} className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-3 py-2.5 rounded-xl font-medium text-sm hover:from-emerald-400 hover:to-teal-500 transition-all shadow-lg shadow-emerald-500/30">
-            <Plus className="w-4 h-4" /> Reunión
+          <button onClick={() => openNewEvent("reunion")} className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-2 sm:px-3 py-2.5 rounded-xl font-medium text-[13px] sm:text-sm hover:from-emerald-400 hover:to-teal-500 active:scale-95 transition-all shadow-lg shadow-emerald-500/30">
+            <Plus className="w-4 h-4 shrink-0" /> Reunión
           </button>
         </div>
       </motion.div>
@@ -301,8 +303,9 @@ export default function CalendarioPage() {
           {/* Day headers */}
           <div className="grid grid-cols-7 border-b border-slate-100">
             {DAYS.map((d) => (
-              <div key={d} className="py-3 text-center text-xs font-semibold text-slate-400">
-                {d}
+              <div key={d} className="py-2.5 sm:py-3 text-center text-[11px] sm:text-xs font-semibold text-slate-400">
+                <span className="sm:hidden">{d[0]}</span>
+                <span className="hidden sm:inline">{d}</span>
               </div>
             ))}
           </div>
@@ -310,7 +313,7 @@ export default function CalendarioPage() {
           {/* Days */}
           <div className="grid grid-cols-7">
             {paddedDays.map((day, i) => {
-              if (!day) return <div key={`empty-${i}`} className="h-24 border-r border-b border-slate-50" />;
+              if (!day) return <div key={`empty-${i}`} className="h-[4.5rem] sm:h-24 border-r border-b border-slate-50" />;
               const isToday = isSameDay(day, new Date());
               const isSelected = selected && isSameDay(day, selected);
               const dayEvents = localEvents.filter((e) => isSameDay(e.date, day));
@@ -322,12 +325,12 @@ export default function CalendarioPage() {
                 <button
                   key={day.toISOString()}
                   onClick={() => setSelected(day)}
-                  className={`h-24 p-2 border-r border-b border-slate-50 text-left transition-all hover:bg-violet-50/50 ${
+                  className={`h-[4.5rem] sm:h-24 p-1 sm:p-2 border-r border-b border-slate-50 text-left transition-all hover:bg-violet-50/50 active:bg-violet-100/60 flex flex-col items-center sm:items-start ${
                     !inMonth ? "opacity-30" : ""
                   } ${isSelected ? "bg-violet-50 border-violet-200" : ""}`}
                 >
                   <span
-                    className={`text-sm font-medium w-7 h-7 flex items-center justify-center rounded-lg ${
+                    className={`text-sm font-medium w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center rounded-full sm:rounded-lg shrink-0 ${
                       isToday
                         ? "bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-md shadow-violet-500/30"
                         : isSelected
@@ -337,7 +340,21 @@ export default function CalendarioPage() {
                   >
                     {format(day, "d")}
                   </span>
-                  <div className="mt-1 space-y-0.5">
+                  {/* Móvil: puntos de color, como el calendario del teléfono */}
+                  <div className="sm:hidden flex items-center justify-center gap-[3px] mt-1 h-2">
+                    {dayEvents.slice(0, 3).map((ev, ei) => (
+                      <span key={`d-${ei}`} className={`w-1.5 h-1.5 rounded-full ${typeDots[ev.type] ?? "bg-violet-500"}`} />
+                    ))}
+                    {dayEvents.length === 0 && dayTasks.length > 0 && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    )}
+                    {dayEvents.length === 0 && dayTasks.length === 0 && dayReminders.length > 0 && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                    )}
+                  </div>
+
+                  {/* Escritorio: detalle de cada evento */}
+                  <div className="hidden sm:block mt-1 space-y-0.5 w-full">
                     {dayEvents.slice(0, 2).map((ev, ei) => (
                       <div
                         key={ei}
