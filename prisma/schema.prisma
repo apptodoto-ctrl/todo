@@ -15,6 +15,7 @@ model User {
   role      String   @default("Terapeuta")
   phone     String   @default("")
   specialty String   @default("Terapeuta Ocupacional")
+  currency  String   @default("CLP")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -45,6 +46,7 @@ model Patient {
   therapist   String   @default("Josefina P.")
   sessions    Int      @default(0)
   nextSession String   @default("")
+  nextSessionTime String @default("")
   status      String   @default("activo")
   initials    String
   color       String   @default("from-violet-500 to-purple-600")

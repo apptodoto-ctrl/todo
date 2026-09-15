@@ -35,11 +35,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.name = user.name;
         token.role = (user as { role?: string }).role;
+      }
+      // Al actualizar el perfil, el nombre nuevo debe reflejarse sin volver a iniciar sesión
+      if (trigger === "update" && session && typeof session === "object") {
+        const updated = session as { name?: string };
+        if (updated.name) token.name = updated.name;
       }
       return token;
     },

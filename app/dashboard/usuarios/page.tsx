@@ -21,6 +21,7 @@ interface Patient {
   therapist: string;
   sessions: number;
   nextSession: string;
+  nextSessionTime: string;
   status: string;
   initials: string;
   color: string;
@@ -63,6 +64,13 @@ function displayAge(p: { birthDate?: string; age: number }): number {
   return p.age;
 }
 
+// Formatea un monto con la moneda configurada en la cuenta
+function formatMoney(amount: number, currency: string): string {
+  const locale = currency === "ARS" ? "es-AR" : currency === "USD" ? "en-US" : "es-CL";
+  const decimals = currency === "USD" ? 2 : 0;
+  return `${currency} ${amount.toLocaleString(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+}
+
 function formatRut(value: string): string {
   // Solo aplicar formato de RUT chileno cuando el valor parece un RUT
   // (dígitos, puntos, guión y dígito verificador K). Pasaportes u otros
@@ -97,7 +105,7 @@ export default function UsuariosPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
   const [showNewPatient, setShowNewPatient] = useState(false);
-  const [newPatient, setNewPatient] = useState({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "", rut: "" });
+  const [newPatient, setNewPatient] = useState({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
@@ -111,7 +119,13 @@ export default function UsuariosPage() {
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [newObjective, setNewObjective] = useState("");
   const [savingObjective, setSavingObjective] = useState(false);
+  const [currency, setCurrency] = useState("CLP");
   const { email: currentUserEmail, name: currentUserName } = useCurrentUser();
+
+  // Moneda configurada en la cuenta (CLP / ARS / USD)
+  useEffect(() => {
+    fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.currency) setCurrency(u.currency); }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const close = () => setMenuOpenId(null);
@@ -252,6 +266,27 @@ export default function UsuariosPage() {
     }
   };
 
+  // Agenda la cita en el calendario cuando la ficha trae fecha y hora de próxima sesión
+  const scheduleNextSession = async (patient: { id: number; name: string }, date: string, time: string) => {
+    if (!date || !time) return;
+    try {
+      await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: patient.name,
+          date,
+          time,
+          type: "sesion",
+          location: "",
+          duration: 45,
+          patientId: patient.id,
+          force: true,
+        }),
+      });
+    } catch { /* la ficha ya quedó guardada; la cita puede crearse desde el calendario */ }
+  };
+
   const addPatient = async () => {
     if (!newPatient.name.trim() || !newPatient.diagnosis.trim()) return;
     const initials = newPatient.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -265,7 +300,8 @@ export default function UsuariosPage() {
     if (res.ok) {
       const patient = await res.json();
       setPatients((prev) => [...prev, patient]);
-      setNewPatient({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", phone: "", email: "", rut: "" });
+      await scheduleNextSession(patient, newPatient.nextSession, newPatient.nextSessionTime);
+      setNewPatient({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
       setShowNewPatient(false);
       setFilter("todos");
     } else {
@@ -284,7 +320,7 @@ export default function UsuariosPage() {
   };
 
   const openEdit = (p: Patient) => {
-    setEditForm({ name: p.name, age: p.age, birthDate: p.birthDate, guardian: p.guardian, guardianPhone: p.guardianPhone, prevision: p.prevision, consultReason: p.consultReason, sessionValue: p.sessionValue, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, phone: p.phone, email: p.email, rut: p.rut });
+    setEditForm({ name: p.name, age: p.age, birthDate: p.birthDate, guardian: p.guardian, guardianPhone: p.guardianPhone, prevision: p.prevision, consultReason: p.consultReason, sessionValue: p.sessionValue, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, nextSessionTime: p.nextSessionTime, phone: p.phone, email: p.email, rut: p.rut });
     setEditPatient(p);
     setMenuOpenId(null);
   };
@@ -298,6 +334,11 @@ export default function UsuariosPage() {
     });
     if (res.ok) {
       const updated = await res.json();
+      // Si cambió la próxima sesión y ahora tiene hora, se agenda en el calendario
+      const cambio = editForm.nextSession !== editPatient.nextSession || editForm.nextSessionTime !== editPatient.nextSessionTime;
+      if (cambio && editForm.nextSession && editForm.nextSessionTime) {
+        await scheduleNextSession(updated, editForm.nextSession, editForm.nextSessionTime);
+      }
       setPatients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       setSelectedPatient((prev) => (prev && prev.id === updated.id ? updated : prev));
       setEditPatient(null);
@@ -527,7 +568,7 @@ export default function UsuariosPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Valor sesión (CLP)</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Valor sesión <span className="font-normal text-slate-400">({currency})</span></label>
               <input type="number" min={0} value={editForm.sessionValue || ""} onChange={(e) => setEditForm({ ...editForm, sessionValue: parseInt(e.target.value) || 0 })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
           </div>
@@ -541,7 +582,11 @@ export default function UsuariosPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Próxima sesión</label>
-            <input type="date" value={editForm.nextSession || ""} onChange={(e) => setEditForm({ ...editForm, nextSession: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <div className="grid grid-cols-2 gap-3">
+              <input type="date" value={editForm.nextSession || ""} onChange={(e) => setEditForm({ ...editForm, nextSession: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input type="time" value={editForm.nextSessionTime || ""} onChange={(e) => setEditForm({ ...editForm, nextSessionTime: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1.5">Si cambias fecha y hora, se agenda la cita en el calendario.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -627,7 +672,7 @@ export default function UsuariosPage() {
                     <p className={`text-lg font-bold ${pendientesPago === 0 ? "text-emerald-600" : "text-amber-600"}`}>
                       {pendientesPago === 0 ? "Al día" : `${pendientesPago} pendiente${pendientesPago > 1 ? "s" : ""}`}
                     </p>
-                    {valor > 0 && pendientesPago > 0 && <p className="text-[11px] text-slate-400">${(pendientesPago * valor).toLocaleString("es-CL")} por cobrar</p>}
+                    {valor > 0 && pendientesPago > 0 && <p className="text-[11px] text-slate-400">{formatMoney(pendientesPago * valor, currency)} por cobrar</p>}
                   </div>
                 </div>
               );
@@ -892,7 +937,7 @@ export default function UsuariosPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Valor sesión (CLP)</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Valor sesión <span className="font-normal text-slate-400">({currency})</span></label>
               <input type="number" min={0} value={newPatient.sessionValue || ""} onChange={(e) => setNewPatient({ ...newPatient, sessionValue: parseInt(e.target.value) || 0 })} placeholder="Ej. 35000" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
           </div>
@@ -906,7 +951,11 @@ export default function UsuariosPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Próxima sesión</label>
-            <input type="date" value={newPatient.nextSession} onChange={(e) => setNewPatient({ ...newPatient, nextSession: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <div className="grid grid-cols-2 gap-3">
+              <input type="date" value={newPatient.nextSession} onChange={(e) => setNewPatient({ ...newPatient, nextSession: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <input type="time" value={newPatient.nextSessionTime} onChange={(e) => setNewPatient({ ...newPatient, nextSessionTime: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1.5">Con fecha y hora se crea automáticamente la cita en el calendario.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

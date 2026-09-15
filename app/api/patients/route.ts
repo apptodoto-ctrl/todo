@@ -48,7 +48,7 @@ export async function POST(req: Request) {
         });
         return NextResponse.json(
           {
-            error: `Alcanzaste el tope de ${billing.maxPatients} pacientes de tu plan.${nextTier ? ` El siguiente escalón (${nextTier.code}) permite ${nextTier.maxPatients ?? "pacientes sin tope"} por $${nextTier.priceMonthly}/mes.` : ""}`,
+            error: `Alcanzaste el tope de ${billing.maxPatients} pacientes de tu plan.${nextTier ? ` El siguiente escalón (${nextTier.code}) permite ${nextTier.maxPatients ?? "pacientes sin tope"} por USD ${nextTier.priceMonthly}/mes.` : ""}`,
             code: "patient_limit",
             nextTier: nextTier?.code ?? null,
           },

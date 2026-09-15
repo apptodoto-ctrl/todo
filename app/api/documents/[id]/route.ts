@@ -27,6 +27,33 @@ export async function GET(_req: NextRequest, { params }: { params: Params }) {
   }
 }
 
+const CATEGORIES = ["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios"];
+
+// Cambiar la categoría (o el nombre) de un documento ya subido
+export async function PUT(req: NextRequest, { params }: { params: Params }) {
+  const session = await getSessionInfo();
+  if (!session) return unauthorized();
+  const { id } = await params;
+  const check = await ownedDoc(parseInt(id), session.email);
+  if ("error" in check) return check.error;
+  try {
+    const { category, name } = await req.json();
+    if (category !== undefined && !CATEGORIES.includes(category)) {
+      return NextResponse.json({ error: "Categoría no válida" }, { status: 400 });
+    }
+    const doc = await prisma.document.update({
+      where: { id: check.doc.id },
+      data: {
+        ...(category !== undefined ? { category } : {}),
+        ...(name !== undefined && String(name).trim() ? { name: String(name).trim() } : {}),
+      },
+    });
+    return NextResponse.json(doc);
+  } catch {
+    return NextResponse.json({ error: "No se pudo actualizar el documento" }, { status: 500 });
+  }
+}
+
 export async function DELETE(_req: NextRequest, { params }: { params: Params }) {
   const session = await getSessionInfo();
   if (!session) return unauthorized();

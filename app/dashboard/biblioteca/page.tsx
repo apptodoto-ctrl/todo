@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Upload, Search, FileText, File, Image, Archive, Download, Trash2, Eye, FolderOpen, Loader2 } from "lucide-react";
 
-const categories = ["Todas", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios"];
+const categories = ["Todas", "Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios"];
+const UPLOAD_CATEGORIES = ["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios"];
 
 interface Doc {
   id: number;
@@ -74,6 +75,17 @@ export default function BibliotecaPage() {
     setDragging(true);
   };
 
+  const changeCategory = async (id: number, category: string) => {
+    const prev = documents;
+    setDocuments((docs) => docs.map((d) => (d.id === id ? { ...d, category } : d)));
+    const res = await fetch(`/api/documents/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category }),
+    });
+    if (!res.ok) setDocuments(prev);
+  };
+
   const deleteDoc = async (id: number) => {
     await fetch(`/api/documents/${id}`, { method: "DELETE" });
     setDocuments((prev) => prev.filter((d) => d.id !== id));
@@ -121,16 +133,19 @@ export default function BibliotecaPage() {
         onChange={(e) => handleFiles(e.target.files)}
       />
 
-      {/* Upload category selector */}
-      <div className="flex items-center gap-2 text-sm text-slate-500">
-        <span className="shrink-0">Categoría al subir:</span>
+      {/* Categoría con la que se guardarán los archivos que subas */}
+      <div className="bg-white border border-slate-200/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-slate-700">Categoría al subir</p>
+          <p className="text-xs text-slate-400 mt-0.5">Se aplica a los archivos que subas ahora. Puedes cambiarla después en cada documento.</p>
+        </div>
         <select
           value={uploadCategory}
           onChange={(e) => setUploadCategory(e.target.value)}
-          className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+          className="w-full sm:w-56 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
         >
-          {["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios"].map((c) => (
-            <option key={c}>{c}</option>
+          {UPLOAD_CATEGORIES.map((c) => (
+            <option key={c} value={c}>{c}</option>
           ))}
         </select>
       </div>
@@ -234,12 +249,20 @@ export default function BibliotecaPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-700 truncate">{doc.name}</p>
                     <p className="text-xs text-slate-400 mt-0.5">{doc.size} · {new Date(doc.createdAt).toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" })}</p>
-                    <span className="inline-block mt-1.5 text-[11px] font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg">
-                      {doc.category}
-                    </span>
+                    <select
+                      value={doc.category}
+                      onChange={(e) => changeCategory(doc.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1.5 text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200 px-2 py-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 cursor-pointer max-w-full"
+                      title="Cambiar categoría"
+                    >
+                      {UPLOAD_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-all">
+                <div className="flex gap-2 mt-4 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
                   <button
                     onClick={() => viewDoc(doc)}
                     className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-600 hover:text-violet-600 bg-slate-100 hover:bg-violet-50 rounded-xl py-2 transition-colors"

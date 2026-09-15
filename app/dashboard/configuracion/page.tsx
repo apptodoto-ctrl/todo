@@ -12,7 +12,7 @@ const tabs = [
 ];
 
 export default function ConfiguracionPage() {
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const [tab, setTab] = useState("perfil");
   const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
@@ -31,6 +31,7 @@ export default function ConfiguracionPage() {
     telefono: "",
     especialidad: "Terapeuta Ocupacional",
     email: "",
+    moneda: "CLP",
   });
 
   const [passwords, setPasswords] = useState({ current: "", nueva: "", confirm: "" });
@@ -47,6 +48,7 @@ export default function ConfiguracionPage() {
           apellido: parts.slice(1).join(" ") ?? "",
           telefono: u.phone ?? "",
           especialidad: u.specialty ?? "Terapeuta Ocupacional",
+          moneda: u.currency ?? "CLP",
           email: u.email,
         });
       })
@@ -95,11 +97,16 @@ export default function ConfiguracionPage() {
           name: `${profile.nombre} ${profile.apellido}`.trim(),
           phone: profile.telefono,
           specialty: profile.especialidad,
+          currency: profile.moneda,
         }),
       });
       const data = await res.json();
       if (!res.ok) showError(data.error || "No se pudo actualizar el perfil");
-      else showSaved("Perfil actualizado correctamente. El nombre en la barra lateral se actualiza al volver a iniciar sesión.");
+      else {
+        // Refresca la sesión para que el nombre nuevo aparezca en todas las pantallas
+        await updateSession({ name: `${profile.nombre} ${profile.apellido}`.trim() });
+        showSaved("Perfil actualizado correctamente");
+      }
     } catch {
       showError("Error de conexión");
     }
@@ -301,6 +308,19 @@ export default function ConfiguracionPage() {
                   onChange={(e) => setProfile({ ...profile, especialidad: e.target.value })}
                   className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
                 />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Moneda de la consulta</label>
+                <select
+                  value={profile.moneda}
+                  onChange={(e) => setProfile({ ...profile, moneda: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+                >
+                  <option value="CLP">Peso chileno (CLP)</option>
+                  <option value="ARS">Peso argentino (ARS)</option>
+                  <option value="USD">Dólar (USD)</option>
+                </select>
+                <p className="text-xs text-slate-400 mt-1.5">Se usa para el valor de las sesiones y los cobros pendientes de tus pacientes.</p>
               </div>
               <div className="sm:col-span-2">
                 <label className="text-sm font-semibold text-slate-700 block mb-1.5">Email</label>

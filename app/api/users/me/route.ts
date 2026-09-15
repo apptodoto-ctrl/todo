@@ -8,7 +8,7 @@ export async function GET() {
   if (!session) return unauthorized();
   const user = await prisma.user.findUnique({
     where: { email: session.email },
-    select: { name: true, email: true, role: true, phone: true, specialty: true },
+    select: { name: true, email: true, role: true, phone: true, specialty: true, currency: true },
   });
   if (!user) return unauthorized();
   return NextResponse.json(user);
@@ -18,7 +18,7 @@ export async function PUT(req: Request) {
   const session = await getSessionInfo();
   if (!session) return unauthorized();
   try {
-    const { name, phone, specialty } = await req.json();
+    const { name, phone, specialty, currency } = await req.json();
     if (!name?.trim()) {
       return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
     }
@@ -28,8 +28,9 @@ export async function PUT(req: Request) {
         name: name.trim(),
         ...(phone !== undefined ? { phone } : {}),
         ...(specialty !== undefined ? { specialty } : {}),
+        ...(currency && ["CLP", "ARS", "USD"].includes(currency) ? { currency } : {}),
       },
-      select: { name: true, email: true, phone: true, specialty: true },
+      select: { name: true, email: true, phone: true, specialty: true, currency: true },
     });
     return NextResponse.json(user);
   } catch {

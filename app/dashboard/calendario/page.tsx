@@ -75,6 +75,9 @@ export default function CalendarioPage() {
   const [editEventForm, setEditEventForm] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, status: "agendada" });
   const [editReminder, setEditReminder] = useState<CalReminder | null>(null);
   const [editReminderForm, setEditReminderForm] = useState({ title: "", date: "", time: "09:00", type: "general" });
+  const [eventError, setEventError] = useState("");
+  const [customName, setCustomName] = useState(false);
+  const [savingEvent, setSavingEvent] = useState(false);
   const { email: currentUserEmail } = useCurrentUser();
 
   useEffect(() => {
@@ -122,33 +125,48 @@ export default function CalendarioPage() {
       ? format(selected, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
     setNewEvent({ title: "", date: defaultDate, time: "10:00", type, location: "", duration: 45, patientId: null });
+    setEventError("");
+    setCustomName(false);
     setShowNewEvent(true);
   };
 
   const addEvent = async (force = false) => {
-    if (!newEvent.title.trim() || !newEvent.date) return;
+    setEventError("");
+    if (!newEvent.date) { setEventError("Elige la fecha de la cita."); return; }
+    if (!newEvent.title.trim()) { setEventError("Selecciona un usuario o escribe un nombre para la cita."); return; }
     const [y, m, d] = newEvent.date.split("-").map(Number);
     const eventDate = new Date(y, m - 1, d);
-    const res = await fetch("/api/appointments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location, duration: newEvent.duration, patientId: newEvent.patientId, force }),
-    });
-    if (res.status === 409) {
-      const data = await res.json();
-      if (confirm(`⚠️ ${data.error}.\n\n¿Agendar de todas formas?`)) {
-        await addEvent(true);
+    setSavingEvent(true);
+    try {
+      const res = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location, duration: newEvent.duration, patientId: newEvent.patientId, force }),
+      });
+      if (res.status === 409) {
+        const data = await res.json();
+        setSavingEvent(false);
+        if (confirm(`⚠️ ${data.error}.\n\n¿Agendar de todas formas?`)) {
+          await addEvent(true);
+        }
+        return;
       }
-      return;
+      if (res.ok) {
+        const saved = await res.json();
+        setLocalEvents((prev: CalEvent[]) => [...prev, { id: saved.id, date: eventDate, title: newEvent.title, time: newEvent.time, type: newEvent.type, location: newEvent.location, duration: newEvent.duration, status: "agendada", patientId: newEvent.patientId }]);
+        setSelected(eventDate);
+        setCurrent(new Date(y, m - 1, 1));
+        setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, patientId: null });
+        setCustomName(false);
+        setShowNewEvent(false);
+      } else {
+        const data = await res.json().catch(() => null);
+        setEventError(data?.error || "No se pudo crear la cita. Inténtalo de nuevo.");
+      }
+    } catch {
+      setEventError("Error de conexión. Revisa tu internet e inténtalo de nuevo.");
     }
-    if (res.ok) {
-      const saved = await res.json();
-      setLocalEvents((prev: CalEvent[]) => [...prev, { id: saved.id, date: eventDate, title: newEvent.title, time: newEvent.time, type: newEvent.type, location: newEvent.location, duration: newEvent.duration, status: "agendada", patientId: newEvent.patientId }]);
-      setSelected(eventDate);
-      setCurrent(new Date(y, m - 1, 1));
-      setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, patientId: null });
-      setShowNewEvent(false);
-    }
+    setSavingEvent(false);
   };
 
   const openEditEvent = (ev: CalEvent) => {
@@ -642,9 +660,14 @@ export default function CalendarioPage() {
         onClose={() => setShowNewEvent(false)}
         title="Nueva Cita"
         footer={
-          <button onClick={() => addEvent()} disabled={!newEvent.title.trim() || !newEvent.date} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30">
-            Crear Cita
-          </button>
+          <div className="space-y-2">
+            {eventError && (
+              <p className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{eventError}</p>
+            )}
+            <button onClick={() => addEvent()} disabled={savingEvent} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-60 transition-all shadow-lg shadow-violet-500/30">
+              {savingEvent ? "Creando..." : "Crear Cita"}
+            </button>
+          </div>
         }
       >
         <div className="space-y-4">
@@ -654,15 +677,30 @@ export default function CalendarioPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario *</label>
-            {patients.length > 0 ? (
-              <select value={newEvent.title} onChange={(e) => { const p = patients.find((x) => x.name === e.target.value); setNewEvent({ ...newEvent, title: e.target.value, patientId: p?.id ?? null }); }} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
-                <option value="">Seleccionar usuario...</option>
-                {patients.map((p) => (
-                  <option key={p.id} value={p.name}>{p.name}</option>
-                ))}
-              </select>
+            {patients.length > 0 && !customName ? (
+              <>
+                <select value={newEvent.title} onChange={(e) => {
+                  if (e.target.value === "__otro__") { setCustomName(true); setNewEvent({ ...newEvent, title: "", patientId: null }); return; }
+                  const p = patients.find((x) => x.name === e.target.value);
+                  setNewEvent({ ...newEvent, title: e.target.value, patientId: p?.id ?? null });
+                  setEventError("");
+                }} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
+                  <option value="">Seleccionar usuario...</option>
+                  {patients.map((p) => (
+                    <option key={p.id} value={p.name}>{p.name}</option>
+                  ))}
+                  <option value="__otro__">Otro (escribir nombre)...</option>
+                </select>
+              </>
             ) : (
-              <input type="text" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Nombre del usuario" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <>
+                <input type="text" value={newEvent.title} onChange={(e) => { setNewEvent({ ...newEvent, title: e.target.value, patientId: null }); setEventError(""); }} placeholder="Nombre del usuario o motivo de la reunión" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                {patients.length > 0 && (
+                  <button type="button" onClick={() => { setCustomName(false); setNewEvent({ ...newEvent, title: "", patientId: null }); }} className="text-xs font-semibold text-violet-600 mt-1.5">
+                    Elegir de mis usuarios
+                  </button>
+                )}
+              </>
             )}
           </div>
           <div className="grid grid-cols-2 gap-3">

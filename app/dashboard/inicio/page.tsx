@@ -25,6 +25,7 @@ interface Patient {
   age: number;
   diagnosis: string;
   status?: string;
+  createdAt?: string;
 }
 
 const patientStatusBadge: Record<string, { label: string; cls: string }> = {
@@ -50,6 +51,7 @@ export default function InicioPage() {
   const router = useRouter();
   const { name, email } = useCurrentUser();
 
+  const [profileName, setProfileName] = useState("");
   const [patients, setPatients] = useState<Patient[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -66,9 +68,13 @@ export default function InicioPage() {
       setTasks(Array.isArray(t) ? t : []);
       setAppointments(Array.isArray(a) ? a : []);
     }).catch(() => {});
+    // El nombre del perfil es la fuente de verdad para el saludo
+    fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.name) setProfileName(u.name); }).catch(() => {});
   }, [email]);
 
-  const firstName = name && name !== "Usuario" ? name.split(" ")[0] : "";
+  // Prioriza el nombre guardado en el perfil sobre el de la sesión
+  const displayName = profileName || name;
+  const firstName = displayName && displayName !== "Usuario" ? displayName.split(" ")[0] : "";
 
   const now = new Date();
   const weekEnd = new Date(now); weekEnd.setDate(now.getDate() + 7);
@@ -92,15 +98,20 @@ export default function InicioPage() {
     { label: "Citas totales", value: String(appointments.length), change: `${aptsThisWeek} esta semana`, icon: Bell, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", text: "text-emerald-600", href: "/dashboard/calendario" },
   ];
 
-  // Chart: last 6 months of appointments grouped by month
+  // Gráfico: últimos 6 meses. Las sesiones se cuentan por la fecha de la cita y
+  // los usuarios por su fecha de creación (no el total actual repetido en cada mes).
   const chartData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
     const mes = d.toLocaleString("es-CL", { month: "short" });
-    const sesiones = appointments.filter((a) => {
-      const ad = new Date(a.date);
-      return ad.getFullYear() === d.getFullYear() && ad.getMonth() === d.getMonth();
-    }).length;
-    return { mes: mes.charAt(0).toUpperCase() + mes.slice(1), sesiones, pacientes: patients.length };
+    const sameMonth = (value?: string) => {
+      if (!value) return false;
+      const parsed = new Date(value.length === 10 ? value + "T00:00:00" : value);
+      if (isNaN(parsed.getTime())) return false;
+      return parsed.getFullYear() === d.getFullYear() && parsed.getMonth() === d.getMonth();
+    };
+    const sesiones = appointments.filter((a) => sameMonth(a.date)).length;
+    const pacientes = patients.filter((p) => sameMonth(p.createdAt)).length;
+    return { mes: mes.charAt(0).toUpperCase() + mes.slice(1), sesiones, pacientes };
   });
 
   const recentPatients = patients.slice(-4).reverse();

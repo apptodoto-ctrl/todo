@@ -141,7 +141,7 @@ export default function PlanPage() {
                 {isCurrent && <span className="text-[10px] font-bold bg-violet-100 text-violet-600 px-2 py-0.5 rounded-lg">Tu plan</span>}
               </div>
               <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-3xl font-bold text-slate-800">${price}</span>
+                <span className="text-3xl font-bold text-slate-800"><span className="text-lg align-top text-slate-400 mr-0.5">USD</span>{price}</span>
                 <span className="text-sm text-slate-400">/{cycle === "yearly" ? "año" : "mes"}</span>
               </div>
               <p className="text-xs text-slate-400 mb-4 font-mono">{t.code}</p>
@@ -180,7 +180,7 @@ export default function PlanPage() {
                 className="border border-slate-200 hover:border-violet-300 rounded-xl p-4 text-center transition-all group">
                 <p className="text-2xl font-bold text-slate-800 group-hover:text-violet-700">{p.credits}</p>
                 <p className="text-xs text-slate-400">créditos</p>
-                <p className="mt-2 text-sm font-semibold text-violet-600">{busy === `pack-${p.code}` ? "..." : `$${p.price}`}</p>
+                <p className="mt-2 text-sm font-semibold text-violet-600">{busy === `pack-${p.code}` ? "..." : `USD ${p.price}`}</p>
               </button>
             ))}
           </div>
