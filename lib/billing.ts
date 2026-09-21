@@ -2,7 +2,11 @@ import { prisma } from "@/lib/db";
 
 // Estados de suscripción que mantienen el acceso completo.
 // Según el pricing: pago rechazado (past_due) conserva acceso normal durante reintentos y gracia.
-const ACTIVE_STATUSES = ["trialing", "active", "past_due"];
+// "comp" = cuenta de cortesía otorgada por un admin: acceso completo sin cobro.
+const ACTIVE_STATUSES = ["trialing", "active", "past_due", "comp"];
+
+// Escalón que reciben las cuentas de cortesía
+export const COMP_TIER = "profesional_max";
 
 export async function getSetting(key: string, fallback: string): Promise<string> {
   const s = await prisma.pricingSetting.findUnique({ where: { key } });
@@ -44,7 +48,16 @@ export interface BillingStatus {
 }
 
 export async function getBillingStatus(userEmail: string): Promise<BillingStatus> {
-  const sub = await getOrCreateSubscription(userEmail);
+  let sub = await getOrCreateSubscription(userEmail);
+  // Cortesía: sin Stripe no hay factura que renueve los créditos, así que el ciclo mensual se avanza aquí
+  if (sub.status === "comp" && (!sub.currentPeriodEnd || sub.currentPeriodEnd < new Date())) {
+    const next = new Date();
+    next.setMonth(next.getMonth() + 1);
+    sub = await prisma.subscription.update({
+      where: { userEmail },
+      data: { includedCreditsUsed: 0, currentPeriodEnd: next },
+    });
+  }
   const tier = await prisma.planTier.findUnique({ where: { code: sub.tierCode } });
 
   let effectiveStatus = sub.status;
@@ -72,7 +85,11 @@ export async function getBillingStatus(userEmail: string): Promise<BillingStatus
     purchased,
     totalRemaining: includedRemaining + purchased,
     maxPatients,
-    planName: isTrial ? "Prueba gratis" : (tier ? `${tier.plan} (${tier.code})` : sub.tierCode),
+    planName: isTrial
+      ? "Prueba gratis"
+      : sub.status === "comp"
+      ? `Cortesía · ${tier?.plan ?? "Profesional"}`
+      : (tier ? `${tier.plan} (${tier.code})` : sub.tierCode),
   };
 }
 

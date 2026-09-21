@@ -69,6 +69,7 @@ export default function PlanPage() {
   const pctUsed = Math.round(((credits.includedTotal + credits.purchased - credits.totalRemaining) / Math.max(1, credits.includedTotal + credits.purchased)) * 100);
   const isTrial = info.status === "trialing";
   const isExpired = info.status === "expired";
+  const isComp = info.status === "comp";
   const currentPlanLower = info.tiers.find((t) => t.code === info.tierCode)?.plan?.toLowerCase() ?? (isTrial ? "profesional" : "");
   const canBuyCredits = !isTrial && !isExpired && ["profesional", "centro"].includes(currentPlanLower);
 
@@ -93,6 +94,7 @@ export default function PlanPage() {
               {isExpired && "Tu acceso está en solo lectura. Tus datos siguen intactos — elige un plan para continuar."}
               {info.status === "active" && `${info.maxPatients ? `Hasta ${info.maxPatients} pacientes` : "Pacientes sin tope"} · ciclo ${info.billingCycle === "yearly" ? "anual" : "mensual"}${info.currentPeriodEnd ? ` · renueva el ${new Date(info.currentPeriodEnd).toLocaleDateString("es-CL")}` : ""}`}
               {info.status === "past_due" && "Hay un problema con tu último pago — tu acceso sigue normal mientras se reintenta. Revisa tu tarjeta en «Gestionar pago»."}
+              {isComp && `Acceso de cortesía sin cargo · pacientes sin tope${info.currentPeriodEnd ? ` · créditos se renuevan el ${new Date(info.currentPeriodEnd).toLocaleDateString("es-CL")}` : ""}`}
             </p>
           </div>
           <div className="w-full md:w-64">
@@ -116,7 +118,8 @@ export default function PlanPage() {
         </div>
       </motion.div>
 
-      {/* Selector ciclo */}
+      {/* Selector ciclo (las cuentas de cortesía no eligen plan pago) */}
+      {!isComp && (<>
       <div className="flex items-center justify-center gap-2">
         <button onClick={() => setCycle("monthly")} className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${cycle === "monthly" ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md" : "bg-white border border-slate-200 text-slate-500"}`}>Mensual</button>
         <button onClick={() => setCycle("yearly")} className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${cycle === "yearly" ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md" : "bg-white border border-slate-200 text-slate-500"}`}>
@@ -165,6 +168,7 @@ export default function PlanPage() {
         })}
       </div>
       <p className="text-center text-xs text-slate-400">¿Tienes un cupón? Podrás ingresarlo en la pantalla de pago.</p>
+      </>)}
 
       {/* Recargas */}
       {canBuyCredits && (

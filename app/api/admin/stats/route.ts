@@ -21,10 +21,12 @@ export async function GET() {
   ]);
 
   // Per-user counts
-  const [patientCounts, taskCounts] = await Promise.all([
+  const [patientCounts, taskCounts, subscriptions] = await Promise.all([
     prisma.patient.groupBy({ by: ["createdBy"], _count: { id: true } }),
     prisma.task.groupBy({ by: ["createdBy"], _count: { id: true } }),
+    prisma.subscription.findMany({ select: { userEmail: true, status: true, tierCode: true, trialEndsAt: true } }),
   ]);
+  const subMap = Object.fromEntries(subscriptions.map((s) => [s.userEmail, s]));
 
   const patientMap = Object.fromEntries(patientCounts.map((r) => [r.createdBy, r._count.id]));
   const taskMap = Object.fromEntries(taskCounts.map((r) => [r.createdBy, r._count.id]));
@@ -33,6 +35,12 @@ export async function GET() {
     ...u,
     patientCount: patientMap[u.email] ?? 0,
     taskCount: taskMap[u.email] ?? 0,
+    plan: (() => {
+      const s = subMap[u.email];
+      if (!s) return { status: "sin_plan", tierCode: "" };
+      const expired = s.status === "trialing" && s.trialEndsAt && s.trialEndsAt < new Date();
+      return { status: expired ? "trial_vencido" : s.status, tierCode: s.tierCode };
+    })(),
   }));
 
   return NextResponse.json({

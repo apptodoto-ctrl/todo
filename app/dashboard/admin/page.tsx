@@ -14,6 +14,7 @@ interface UserRow {
   createdAt: string;
   patientCount: number;
   taskCount: number;
+  plan?: { status: string; tierCode: string };
 }
 
 interface Stats {
@@ -37,6 +38,38 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
 
   const role = (session?.user as { role?: string })?.role;
+
+  const [togglingComp, setTogglingComp] = useState("");
+
+  const toggleComp = async (u: UserRow) => {
+    const enabling = u.plan?.status !== "comp";
+    const msg = enabling
+      ? `¿Dar acceso de cortesía (plan Profesional sin cobro) a ${u.name}?`
+      : `¿Quitar el acceso de cortesía a ${u.name}? Su cuenta pasará a solo lectura hasta que elija un plan.`;
+    if (!confirm(msg)) return;
+    setTogglingComp(u.email);
+    try {
+      const res = await fetch("/api/admin/users/comp", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: u.email, enabled: enabling }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "No se pudo actualizar la cuenta");
+      } else {
+        setStats((prev) =>
+          prev
+            ? { ...prev, users: prev.users.map((x) => (x.email === u.email ? { ...x, plan: { status: data.status, tierCode: data.tierCode ?? x.plan?.tierCode ?? "" } } : x)) }
+            : prev
+        );
+      }
+    } catch {
+      alert("Error de conexión");
+    }
+    setTogglingComp("");
+  };
+
 
   useEffect(() => {
     if (status === "loading") return;
@@ -133,6 +166,7 @@ export default function AdminPage() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Rol</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Pacientes</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Tareas</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Plan</th>
                 <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Registrado</th>
               </tr>
             </thead>
@@ -174,6 +208,39 @@ export default function AdminPage() {
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       <span className="text-sm font-bold text-slate-700">{u.taskCount}</span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {(() => {
+                        const st = u.plan?.status ?? "sin_plan";
+                        const badge: Record<string, { label: string; cls: string }> = {
+                          comp: { label: "Cortesía", cls: "bg-emerald-100 text-emerald-700" },
+                          active: { label: "Pagando", cls: "bg-violet-100 text-violet-700" },
+                          past_due: { label: "Pago pendiente", cls: "bg-amber-100 text-amber-700" },
+                          trialing: { label: "En prueba", cls: "bg-blue-100 text-blue-700" },
+                          trial_vencido: { label: "Prueba vencida", cls: "bg-rose-100 text-rose-700" },
+                          canceled: { label: "Sin plan", cls: "bg-slate-100 text-slate-500" },
+                          sin_plan: { label: "Sin plan", cls: "bg-slate-100 text-slate-500" },
+                        };
+                        const b = badge[st] ?? { label: st, cls: "bg-slate-100 text-slate-500" };
+                        return (
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg ${b.cls}`}>{b.label}</span>
+                            {u.role !== "admin" && (
+                              <button
+                                onClick={() => toggleComp(u)}
+                                disabled={togglingComp === u.email}
+                                className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border transition-colors disabled:opacity-50 ${
+                                  st === "comp"
+                                    ? "border-slate-200 text-slate-500 hover:bg-slate-50"
+                                    : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                                }`}
+                              >
+                                {togglingComp === u.email ? "..." : st === "comp" ? "Quitar cortesía" : "Dar cortesía"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <span className="text-xs text-slate-400 flex items-center justify-end gap-1">
