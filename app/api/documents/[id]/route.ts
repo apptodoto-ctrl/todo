@@ -37,7 +37,7 @@ export async function PUT(req: NextRequest, { params }: { params: Params }) {
   const check = await ownedDoc(parseInt(id), session.email);
   if ("error" in check) return check.error;
   try {
-    const { category, name } = await req.json();
+    const { category, name, patientId } = await req.json();
     if (category !== undefined && !CATEGORIES.includes(category)) {
       return NextResponse.json({ error: "Categoría no válida" }, { status: 400 });
     }
@@ -46,6 +46,7 @@ export async function PUT(req: NextRequest, { params }: { params: Params }) {
       data: {
         ...(category !== undefined ? { category } : {}),
         ...(name !== undefined && String(name).trim() ? { name: String(name).trim() } : {}),
+        ...(patientId !== undefined ? { patientId: patientId ? Number(patientId) : null } : {}),
       },
     });
     return NextResponse.json(doc);

@@ -5,12 +5,14 @@ import { randomUUID } from "crypto";
 import path from "path";
 import { auth } from "@/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   const createdBy = session?.user?.email;
   if (!createdBy) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  // ?patientId= devuelve solo los documentos de ese paciente (ficha clínica)
+  const patientId = req.nextUrl.searchParams.get("patientId");
   const docs = await prisma.document.findMany({
-    where: { createdBy },
+    where: { createdBy, ...(patientId ? { patientId: Number(patientId) } : {}) },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(docs);
@@ -26,6 +28,8 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const category = (formData.get("category") as string) || "Sin categoría";
+  const patientIdRaw = formData.get("patientId") as string | null;
+  const patientId = patientIdRaw && patientIdRaw !== "" ? Number(patientIdRaw) : null;
 
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
   if (file.size > MAX_FILE_SIZE) {
@@ -48,6 +52,7 @@ export async function POST(req: NextRequest) {
       type: getFileType(file.name),
       key,
       url,
+      patientId,
       createdBy,
     },
   });

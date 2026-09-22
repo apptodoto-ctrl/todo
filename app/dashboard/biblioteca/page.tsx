@@ -11,6 +11,7 @@ interface Doc {
   id: number;
   name: string;
   category: string;
+  patientId: number | null;
   size: string;
   createdAt: string;
   type: string;
@@ -33,6 +34,8 @@ export default function BibliotecaPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadCategory, setUploadCategory] = useState("Sin categoría");
+  const [uploadPatientId, setUploadPatientId] = useState("");
+  const [patients, setPatients] = useState<{ id: number; name: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDocuments = useCallback(async () => {
@@ -46,6 +49,13 @@ export default function BibliotecaPage() {
 
   useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
 
+  useEffect(() => {
+    fetch("/api/patients")
+      .then((r) => r.json())
+      .then((d) => setPatients(Array.isArray(d) ? d.map((p: { id: number; name: string }) => ({ id: p.id, name: p.name })) : []))
+      .catch(() => {});
+  }, []);
+
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setUploading(true);
@@ -54,6 +64,7 @@ export default function BibliotecaPage() {
         const fd = new FormData();
         fd.append("file", file);
         fd.append("category", uploadCategory);
+        if (uploadPatientId) fd.append("patientId", uploadPatientId);
         await fetch("/api/documents", { method: "POST", body: fd });
       }
       await fetchDocuments();
@@ -75,13 +86,13 @@ export default function BibliotecaPage() {
     setDragging(true);
   };
 
-  const changeCategory = async (id: number, category: string) => {
+  const patchDoc = async (id: number, changes: { category?: string; patientId?: number | null }) => {
     const prev = documents;
-    setDocuments((docs) => docs.map((d) => (d.id === id ? { ...d, category } : d)));
+    setDocuments((docs) => docs.map((d) => (d.id === id ? { ...d, ...changes } : d)));
     const res = await fetch(`/api/documents/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category }),
+      body: JSON.stringify(changes),
     });
     if (!res.ok) setDocuments(prev);
   };
@@ -133,21 +144,37 @@ export default function BibliotecaPage() {
         onChange={(e) => handleFiles(e.target.files)}
       />
 
-      {/* Categoría con la que se guardarán los archivos que subas */}
-      <div className="bg-white border border-slate-200/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-700">Categoría al subir</p>
-          <p className="text-xs text-slate-400 mt-0.5">Se aplica a los archivos que subas ahora. Puedes cambiarla después en cada documento.</p>
+      {/* Cómo se guardarán los archivos que subas ahora */}
+      <div className="bg-white border border-slate-200/60 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2">
+          <p className="text-sm font-semibold text-slate-700">Al subir archivos</p>
+          <p className="text-xs text-slate-400 mt-0.5">Se aplica a los archivos que subas ahora. Puedes cambiarlo después en cada documento.</p>
         </div>
-        <select
-          value={uploadCategory}
-          onChange={(e) => setUploadCategory(e.target.value)}
-          className="w-full sm:w-56 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
-        >
-          {UPLOAD_CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1.5">Categoría</label>
+          <select
+            value={uploadCategory}
+            onChange={(e) => setUploadCategory(e.target.value)}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+          >
+            {UPLOAD_CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1.5">Usuario asociado</label>
+          <select
+            value={uploadPatientId}
+            onChange={(e) => setUploadPatientId(e.target.value)}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+          >
+            <option value="">Sin usuario (material general)</option>
+            {patients.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Header toolbar */}
@@ -249,17 +276,33 @@ export default function BibliotecaPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-700 truncate">{doc.name}</p>
                     <p className="text-xs text-slate-400 mt-0.5">{doc.size} · {new Date(doc.createdAt).toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" })}</p>
-                    <select
-                      value={doc.category}
-                      onChange={(e) => changeCategory(doc.id, e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="mt-1.5 text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200 px-2 py-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 cursor-pointer max-w-full"
-                      title="Cambiar categoría"
-                    >
-                      {UPLOAD_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      <select
+                        value={doc.category}
+                        onChange={(e) => patchDoc(doc.id, { category: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200 px-2 py-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 cursor-pointer max-w-full"
+                        title="Cambiar categoría"
+                      >
+                        {UPLOAD_CATEGORIES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={doc.patientId ?? ""}
+                        onChange={(e) => patchDoc(doc.id, { patientId: e.target.value ? Number(e.target.value) : null })}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`text-[11px] font-medium border px-2 py-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 cursor-pointer max-w-full ${
+                          doc.patientId ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-slate-100 text-slate-500 border-slate-200"
+                        }`}
+                        title="Asociar a un usuario"
+                      >
+                        <option value="">Sin usuario</option>
+                        {patients.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">

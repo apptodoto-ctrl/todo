@@ -214,7 +214,7 @@ export default function AsistentesPage() {
           prompt: fullPrompt,
           systemPrompt: current
             ? systemPrompts[current.id] +
-              "\n\nIMPORTANTE: Responde en texto plano, sin markdown, sin asteriscos, sin almohadillas (#), sin viñetas especiales, sin emojis ni caracteres especiales de formato. Usa solo texto limpio con saltos de línea normales."
+              "\n\nFORMATO: Escribe en español correcto y completo, respetando SIEMPRE las tildes (á, é, í, ó, ú), la ñ y los signos de apertura (¿, ¡). Lo único que debes evitar es el formato markdown: nada de asteriscos, almohadillas (#), guiones bajos, viñetas especiales ni emojis. Usa texto corrido con saltos de línea normales."
             : "Responde en texto plano, sin markdown, sin asteriscos, sin almohadillas (#), sin viñetas especiales, sin emojis ni caracteres especiales de formato.",
         }),
       });

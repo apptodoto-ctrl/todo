@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
@@ -13,6 +13,7 @@ interface Patient {
   birthDate: string;
   guardian: string;
   guardianPhone: string;
+  guardianEmail: string;
   prevision: string;
   school: string;
   consultReason: string;
@@ -105,7 +106,7 @@ export default function UsuariosPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
   const [showNewPatient, setShowNewPatient] = useState(false);
-  const [newPatient, setNewPatient] = useState({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
+  const [newPatient, setNewPatient] = useState({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
@@ -117,6 +118,7 @@ export default function UsuariosPage() {
   const [savingSession, setSavingSession] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionRecord | null>(null);
   const [objectives, setObjectives] = useState<Objective[]>([]);
+  const [patientDocs, setPatientDocs] = useState<{ id: number; name: string; category: string; size: string; createdAt: string }[]>([]);
   const [newObjective, setNewObjective] = useState("");
   const [savingObjective, setSavingObjective] = useState(false);
   const [currency, setCurrency] = useState("CLP");
@@ -151,6 +153,10 @@ export default function UsuariosPage() {
     fetch(`/api/patients/${selectedPatient.id}/objectives`)
       .then((r) => r.json())
       .then((data) => setObjectives(Array.isArray(data) ? data : []))
+      .catch(() => {});
+    fetch(`/api/documents?patientId=${selectedPatient.id}`)
+      .then((r) => r.json())
+      .then((data) => setPatientDocs(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, [selectedPatient?.id]);
 
@@ -301,7 +307,7 @@ export default function UsuariosPage() {
       const patient = await res.json();
       setPatients((prev) => [...prev, patient]);
       await scheduleNextSession(patient, newPatient.nextSession, newPatient.nextSessionTime);
-      setNewPatient({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
+      setNewPatient({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
       setShowNewPatient(false);
       setFilter("todos");
     } else {
@@ -320,7 +326,7 @@ export default function UsuariosPage() {
   };
 
   const openEdit = (p: Patient) => {
-    setEditForm({ name: p.name, age: p.age, birthDate: p.birthDate, guardian: p.guardian, guardianPhone: p.guardianPhone, prevision: p.prevision, consultReason: p.consultReason, sessionValue: p.sessionValue, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, nextSessionTime: p.nextSessionTime, phone: p.phone, email: p.email, rut: p.rut });
+    setEditForm({ name: p.name, age: p.age, birthDate: p.birthDate, guardian: p.guardian, guardianPhone: p.guardianPhone, guardianEmail: p.guardianEmail, prevision: p.prevision, consultReason: p.consultReason, sessionValue: p.sessionValue, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, nextSessionTime: p.nextSessionTime, phone: p.phone, email: p.email, rut: p.rut });
     setEditPatient(p);
     setMenuOpenId(null);
   };
@@ -554,6 +560,11 @@ export default function UsuariosPage() {
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Teléfono tutor</label>
               <input type="tel" value={editForm.guardianPhone || ""} onChange={(e) => setEditForm({ ...editForm, guardianPhone: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Correo del tutor</label>
+              <input type="email" value={editForm.guardianEmail || ""} onChange={(e) => setEditForm({ ...editForm, guardianEmail: e.target.value })} placeholder="correo@email.com" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <p className="text-[11px] text-slate-400 mt-1.5">Recibe el aviso al agendar y los recordatorios de cada sesión.</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -849,6 +860,45 @@ export default function UsuariosPage() {
               )}
             </div>
 
+            {/* Documentos asociados a este usuario */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="w-4 h-4 text-violet-500" />
+                  <h4 className="text-sm font-bold text-slate-700">Documentos</h4>
+                </div>
+                <a href="/dashboard/biblioteca" className="text-xs font-semibold text-violet-600 hover:text-violet-700">
+                  Ir a Biblioteca
+                </a>
+              </div>
+              {patientDocs.length === 0 ? (
+                <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-3 py-2.5 text-center">
+                  Sin documentos asociados. En Biblioteca puedes asociar archivos a este usuario.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                  {patientDocs.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={async () => {
+                        const res = await fetch(`/api/documents/${d.id}`);
+                        if (res.ok) { const { url } = await res.json(); window.open(url, "_blank"); }
+                      }}
+                      className="w-full flex items-center gap-3 bg-slate-50 hover:bg-violet-50 rounded-xl p-2.5 transition-colors text-left"
+                    >
+                      <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center shrink-0">
+                        <ClipboardList className="w-4 h-4 text-violet-500" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-700 truncate">{d.name}</p>
+                        <p className="text-[11px] text-slate-400">{d.category} · {d.size} · {new Date(d.createdAt).toLocaleDateString("es-CL")}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Actions */}
             <div className="flex gap-2 pt-1">
               <a
@@ -923,6 +973,11 @@ export default function UsuariosPage() {
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Teléfono tutor</label>
               <input type="tel" value={newPatient.guardianPhone} onChange={(e) => setNewPatient({ ...newPatient, guardianPhone: e.target.value })} placeholder="+56912345678" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Correo del tutor</label>
+              <input type="email" value={newPatient.guardianEmail} onChange={(e) => setNewPatient({ ...newPatient, guardianEmail: e.target.value })} placeholder="correo@email.com" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <p className="text-[11px] text-slate-400 mt-1.5">Recibe el aviso al agendar y los recordatorios de cada sesión.</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">

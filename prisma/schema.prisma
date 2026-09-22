@@ -38,6 +38,7 @@ model Patient {
   birthDate     String   @default("")
   guardian      String   @default("")
   guardianPhone String   @default("")
+  guardianEmail String   @default("")
   prevision     String   @default("")
   school        String   @default("")
   consultReason String   @default("")
@@ -62,6 +63,7 @@ model Patient {
   sessionRecords SessionRecord[]
   objectives     Objective[]
   reports        GeneratedReport[]
+  documents      Document[]
 }
 
 model Objective {
@@ -241,6 +243,8 @@ model Appointment {
   createdBy String   @default("")
   createdAt DateTime @default(now())
 
+  createdNotifSent Boolean @default(false)
+  seriesId         String  @default("")
   reminder5dSent Boolean @default(false)
   reminder1dSent Boolean @default(false)
   reminder4hSent Boolean @default(false)
@@ -282,6 +286,10 @@ model Document {
   type      String
   key       String   @unique
   url       String
+  patientId Int?
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
   createdBy String   @default("")
   createdAt DateTime @default(now())
+
+  @@index([patientId])
 }
