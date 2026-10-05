@@ -34,18 +34,17 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-export async function ensureCalendarToken(email: string): Promise<string> {
+export async function ensureCalendarToken(email: string): Promise<string | null> {
   const user = await prisma.user.findUnique({ where: { email }, select: { calendarToken: true } });
-  if (user?.calendarToken) return user.calendarToken;
-  const token = randomBytes(24).toString("hex");
-  await prisma.user.update({ where: { email }, data: { calendarToken: token } });
-  return token;
+  if (!user) return null;
+  if (user.calendarToken) return user.calendarToken;
+  return regenerateCalendarToken(email);
 }
 
-export async function regenerateCalendarToken(email: string): Promise<string> {
+export async function regenerateCalendarToken(email: string): Promise<string | null> {
   const token = randomBytes(24).toString("hex");
-  await prisma.user.update({ where: { email }, data: { calendarToken: token } });
-  return token;
+  const updated = await prisma.user.updateMany({ where: { email }, data: { calendarToken: token } });
+  return updated.count > 0 ? token : null;
 }
 
 /**

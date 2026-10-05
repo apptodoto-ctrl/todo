@@ -7,6 +7,7 @@ export async function GET() {
   if (!session) return unauthorized();
   try {
     const token = await ensureCalendarToken(session.email);
+    if (!token) return NextResponse.json({ error: "Tu cuenta ya no existe. Vuelve a iniciar sesión." }, { status: 404 });
     return NextResponse.json({ token });
   } catch {
     return NextResponse.json({ error: "No se pudo preparar el calendario" }, { status: 500 });
@@ -18,6 +19,7 @@ export async function POST() {
   if (!session) return unauthorized();
   try {
     const token = await regenerateCalendarToken(session.email);
+    if (!token) return NextResponse.json({ error: "Tu cuenta ya no existe. Vuelve a iniciar sesión." }, { status: 404 });
     return NextResponse.json({ token });
   } catch {
     return NextResponse.json({ error: "No se pudo regenerar el enlace" }, { status: 500 });
