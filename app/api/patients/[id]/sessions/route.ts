@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { consumeFromPackage } from "@/lib/sessionPackages";
 
 type Params = Promise<{ id: string }>;
 
@@ -59,8 +60,14 @@ export async function POST(req: Request, { params }: { params: Params }) {
         paid: paid === true,
       },
     });
+    // Si el paciente tiene un paquete vigente, la sesión se descuenta de ahí
+    let usedPackage = null;
+    if (record.attended) {
+      usedPackage = await consumeFromPackage(record.id, patientId);
+    }
+    const saved = usedPackage ? await prisma.sessionRecord.findUnique({ where: { id: record.id } }) : record;
     const sessions = await syncSessionCount(patientId);
-    return NextResponse.json({ ...record, sessions }, { status: 201 });
+    return NextResponse.json({ ...saved, sessions, usedPackage: usedPackage?.id ?? null }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }

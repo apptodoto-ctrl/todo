@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen, Package } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
@@ -130,6 +130,7 @@ export default function UsuariosPage() {
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
   const [editForm, setEditForm] = useState<Partial<Patient>>({});
   const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([]);
+  const [patientPackages, setPatientPackages] = useState<{ id: number; name: string; totalSessions: number; usedSessions: number; remaining: number; expiresAt: string; paid: boolean; status: string; expired: boolean; endingSoon: boolean }[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [showAddSession, setShowAddSession] = useState(false);
   const [newSession, setNewSession] = useState({ date: "", notes: "", duration: 45, attended: true, paid: false });
@@ -186,7 +187,7 @@ export default function UsuariosPage() {
   }, [currentUserEmail]);
 
   useEffect(() => {
-    if (!selectedPatient) { setSessionRecords([]); setObjectives([]); setShowAddSession(false); setEditingSession(null); return; }
+    if (!selectedPatient) { setSessionRecords([]); setObjectives([]); setPatientPackages([]); setShowAddSession(false); setEditingSession(null); return; }
     setSessionsLoading(true);
     fetch(`/api/patients/${selectedPatient.id}/sessions`)
       .then((r) => r.json())
@@ -196,6 +197,10 @@ export default function UsuariosPage() {
       .then((r) => r.json())
       .then((data) => setObjectives(Array.isArray(data) ? data : []))
       .catch(() => {});
+    fetch(`/api/packages?patientId=${selectedPatient.id}`)
+      .then((r) => r.json())
+      .then((data) => setPatientPackages(Array.isArray(data) ? data : []))
+      .catch(() => setPatientPackages([]));
     fetch(`/api/documents?patientId=${selectedPatient.id}`)
       .then((r) => r.json())
       .then((data) => setPatientDocs(Array.isArray(data) ? data : []))
@@ -845,6 +850,41 @@ export default function UsuariosPage() {
                 </div>
               )}
             </div>
+
+            {/* Paquete de sesiones vigente */}
+            {patientPackages.filter((pk) => pk.status !== "cerrado").length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Package className="w-4 h-4 text-violet-500" />
+                  <h4 className="text-sm font-bold text-slate-700">Paquetes de sesiones</h4>
+                </div>
+                <div className="space-y-2">
+                  {patientPackages.filter((pk) => pk.status !== "cerrado").map((pk) => (
+                    <div key={pk.id} className={`rounded-xl border px-3 py-2.5 ${pk.expired && pk.remaining > 0 ? "border-rose-200 bg-rose-50/60" : pk.endingSoon ? "border-amber-200 bg-amber-50/60" : "border-violet-100 bg-violet-50/60"}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-slate-700 truncate">{pk.name}</p>
+                        <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${pk.paid ? "text-emerald-600 bg-emerald-50" : "text-slate-500 bg-white"}`}>
+                          {pk.paid ? "Pagado" : "Sin pagar"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <div className="flex-1 h-1.5 bg-white rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${pk.expired ? "bg-rose-500" : pk.endingSoon ? "bg-amber-500" : "bg-violet-500"}`} style={{ width: `${Math.min(100, Math.round((pk.usedSessions / pk.totalSessions) * 100))}%` }} />
+                        </div>
+                        <p className="text-[11px] font-semibold text-slate-600 shrink-0">quedan {pk.remaining} de {pk.totalSessions}</p>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        {pk.expired && pk.remaining > 0
+                          ? `Venció el ${pk.expiresAt} con ${pk.remaining} ${pk.remaining === 1 ? "sesión sin usar" : "sesiones sin usar"}`
+                          : pk.remaining === 0
+                            ? "Paquete agotado: toca renovar"
+                            : pk.expiresAt ? `Vence el ${pk.expiresAt}` : "Sin vencimiento"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Próximas sesiones agendadas en el calendario */}
             {(() => {

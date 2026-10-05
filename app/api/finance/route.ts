@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { packagesFor } from "@/lib/sessionPackages";
 
 /**
  * Resumen económico de la consulta: facturado del mes, pendiente de cobro
@@ -55,8 +56,15 @@ export async function GET(req: NextRequest) {
       })
       .sort((a, b) => b.unpaidAmount - a.unpaidAmount || b.amountMonth - a.amountMonth);
 
+    const packages = await packagesFor(session.email);
+    const openPackages = packages.filter((p) => p.status === "activo" || p.status === "vencido");
+
     return NextResponse.json({
       month,
+      packages,
+      packagesEndingSoon: packages.filter((p) => p.endingSoon).length,
+      packagesExpired: packages.filter((p) => p.expired && p.remaining > 0).length,
+      packagesUnpaid: openPackages.filter((p) => !p.paid).length,
       currency: user?.currency ?? "CLP",
       invoicedMonth: sum(monthSessions),
       sessionsMonth: monthSessions.length,

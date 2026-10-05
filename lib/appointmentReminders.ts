@@ -181,7 +181,8 @@ export async function convertPastAppointments(): Promise<number> {
       if (!patient) continue;
       const therapist = await prisma.user.findUnique({ where: { email: apt.createdBy }, select: { name: true } });
 
-      await prisma.sessionRecord.create({
+      const attended = apt.status !== "no_asistio";
+      const record = await prisma.sessionRecord.create({
         data: {
           patientId: apt.patientId!,
           appointmentId: apt.id,
@@ -189,12 +190,17 @@ export async function convertPastAppointments(): Promise<number> {
           notes: "",
           therapist: therapist?.name ?? patient.therapist,
           duration: apt.duration || 45,
-          attended: apt.status === "no_asistio" ? false : true,
+          attended,
           paid: apt.paid,
           confirmed: apt.status === "asistio" || apt.status === "no_asistio",
           createdBy: apt.createdBy,
         },
       });
+      // La sesión se descuenta del paquete vigente del paciente, si lo tiene
+      if (attended) {
+        const { consumeFromPackage } = await import("@/lib/sessionPackages");
+        await consumeFromPackage(record.id, apt.patientId!);
+      }
       await prisma.appointment.update({ where: { id: apt.id }, data: { convertedToSession: true } });
       const count = await prisma.sessionRecord.count({ where: { patientId: apt.patientId! } });
       await prisma.patient.update({ where: { id: apt.patientId! }, data: { sessions: count } });

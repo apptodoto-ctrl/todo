@@ -3,18 +3,28 @@
 import { motion } from "framer-motion";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Wallet, AlertTriangle, CheckCircle2, Users, ChevronLeft, ChevronRight, Loader2, Download } from "lucide-react";
+import { Wallet, AlertTriangle, CheckCircle2, Users, ChevronLeft, ChevronRight, Loader2, Download, Package, Plus, X } from "lucide-react";
+import Modal from "@/components/ui/Modal";
 
 interface PatientRow {
   id: number; name: string; initials: string; color: string; status: string;
   sessionValue: number; sessionsMonth: number; amountMonth: number;
   unpaidCount: number; unpaidAmount: number;
 }
+interface SessionPackage {
+  id: number; patientId: number; patientName: string; name: string;
+  totalSessions: number; usedSessions: number; remaining: number;
+  sessionValue: number; totalPrice: number; paid: boolean;
+  startDate: string; expiresAt: string; status: string;
+  expired: boolean; endingSoon: boolean; notes: string;
+}
 interface Finance {
   month: string; currency: string;
   invoicedMonth: number; sessionsMonth: number; paidMonth: number; pendingMonth: number;
   pendingTotal: number; pendingPatients: number;
   byPatient: PatientRow[];
+  packages: SessionPackage[];
+  packagesEndingSoon: number; packagesExpired: number; packagesUnpaid: number;
 }
 
 function money(amount: number, currency: string): string {
@@ -41,6 +51,10 @@ export default function FacturacionPage() {
   const [data, setData] = useState<Finance | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"todos" | "deuda">("todos");
+  const [showNewPackage, setShowNewPackage] = useState(false);
+  const [packageForm, setPackageForm] = useState({ patientId: "", totalSessions: "10", totalPrice: "", expiresAt: "", paid: false, notes: "" });
+  const [packageError, setPackageError] = useState("");
+  const [savingPackage, setSavingPackage] = useState(false);
 
   const load = useCallback(async (m: string) => {
     setLoading(true);
@@ -53,6 +67,54 @@ export default function FacturacionPage() {
   }, []);
 
   useEffect(() => { load(month); }, [month, load]);
+
+  const createPackage = async () => {
+    setPackageError("");
+    if (!packageForm.patientId) { setPackageError("Elige el usuario del paquete."); return; }
+    const total = Number(packageForm.totalSessions);
+    if (!total || total < 1) { setPackageError("Indica cuántas sesiones incluye el paquete."); return; }
+    setSavingPackage(true);
+    try {
+      const res = await fetch("/api/packages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId: Number(packageForm.patientId),
+          totalSessions: total,
+          totalPrice: packageForm.totalPrice ? Number(packageForm.totalPrice) : undefined,
+          expiresAt: packageForm.expiresAt,
+          paid: packageForm.paid,
+          notes: packageForm.notes,
+        }),
+      });
+      if (res.ok) {
+        setShowNewPackage(false);
+        setPackageForm({ patientId: "", totalSessions: "10", totalPrice: "", expiresAt: "", paid: false, notes: "" });
+        await load(month);
+      } else {
+        const body = await res.json().catch(() => null);
+        setPackageError(body?.error ?? "No se pudo crear el paquete.");
+      }
+    } catch {
+      setPackageError("Error de conexión. Inténtalo de nuevo.");
+    }
+    setSavingPackage(false);
+  };
+
+  const updatePackage = async (id: number, patch: Record<string, unknown>) => {
+    const res = await fetch(`/api/packages/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (res.ok) await load(month);
+  };
+
+  const removePackage = async (id: number) => {
+    if (!confirm("¿Eliminar este paquete? Las sesiones ya realizadas se mantienen.")) return;
+    const res = await fetch(`/api/packages/${id}`, { method: "DELETE" });
+    if (res.ok) await load(month);
+  };
 
   const exportCSV = () => {
     if (!data) return;
@@ -126,6 +188,100 @@ export default function FacturacionPage() {
         </div>
       )}
 
+      {/* Paquetes de sesiones */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+          <Package className="w-4 h-4 text-violet-600 shrink-0" />
+          <h3 className="font-bold text-slate-800 text-sm flex-1">Paquetes de sesiones</h3>
+          <button
+            onClick={() => { setPackageError(""); setShowNewPackage(true); }}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-3 py-1.5 rounded-lg font-semibold text-xs hover:from-violet-400 hover:to-purple-500 transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" /> Vender paquete
+          </button>
+        </div>
+
+        {(data.packagesEndingSoon > 0 || data.packagesExpired > 0 || data.packagesUnpaid > 0) && (
+          <div className="px-4 pt-3 flex flex-wrap gap-2">
+            {data.packagesEndingSoon > 0 && (
+              <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                {data.packagesEndingSoon} por agotarse
+              </span>
+            )}
+            {data.packagesExpired > 0 && (
+              <span className="text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg">
+                {data.packagesExpired} vencido{data.packagesExpired === 1 ? "" : "s"} con sesiones sin usar
+              </span>
+            )}
+            {data.packagesUnpaid > 0 && (
+              <span className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
+                {data.packagesUnpaid} sin pagar
+              </span>
+            )}
+          </div>
+        )}
+
+        {data.packages.length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-10 px-4">
+            Aún no vendes paquetes. Un paquete son N sesiones prepagadas con vigencia: las sesiones se van descontando solas.
+          </p>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {data.packages.map((pkg) => {
+              const pct = Math.min(100, Math.round((pkg.usedSessions / pkg.totalSessions) * 100));
+              const tone = pkg.expired ? "bg-rose-500" : pkg.endingSoon ? "bg-amber-500" : "bg-violet-500";
+              return (
+                <div key={pkg.id} className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-slate-800 text-sm truncate">{pkg.patientName}</p>
+                        {pkg.status === "agotado" && <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Agotado</span>}
+                        {pkg.expired && pkg.remaining > 0 && <span className="text-[10px] font-bold uppercase tracking-wide text-rose-600 bg-rose-50 px-2 py-0.5 rounded">Vencido</span>}
+                        {pkg.endingSoon && <span className="text-[10px] font-bold uppercase tracking-wide text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Por agotarse</span>}
+                        {pkg.paid
+                          ? <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Pagado</span>
+                          : <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Sin pagar</span>}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{pkg.name}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-slate-800">{money(pkg.totalPrice, data.currency)}</p>
+                      <p className="text-[11px] text-slate-400">{pkg.expiresAt ? `Vence ${pkg.expiresAt}` : "Sin vencimiento"}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className={`h-full ${tone} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-xs font-semibold text-slate-600 shrink-0">
+                      {pkg.usedSessions}/{pkg.totalSessions} usadas · quedan {pkg.remaining}
+                    </p>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {!pkg.paid && (
+                      <button onClick={() => updatePackage(pkg.id, { paid: true })} className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg hover:bg-emerald-100 transition-colors">
+                        Marcar como pagado
+                      </button>
+                    )}
+                    {pkg.status !== "cerrado" && (
+                      <button onClick={() => updatePackage(pkg.id, { status: "cerrado" })} className="text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-colors">
+                        Cerrar
+                      </button>
+                    )}
+                    <button onClick={() => removePackage(pkg.id)} className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg hover:bg-rose-100 transition-colors ml-auto">
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </motion.div>
+
       {/* Detalle por usuario */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center gap-2">
@@ -164,6 +320,108 @@ export default function FacturacionPage() {
           </div>
         )}
       </motion.div>
+
+      {/* Vender paquete */}
+      <Modal
+        open={showNewPackage}
+        onClose={() => setShowNewPackage(false)}
+        title="Vender paquete de sesiones"
+        footer={
+          <button
+            onClick={createPackage}
+            disabled={savingPackage}
+            className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 transition-all shadow-lg shadow-violet-500/30"
+          >
+            {savingPackage ? "Guardando..." : "Crear paquete"}
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          {packageError && (
+            <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl px-3 py-2.5">
+              <X className="w-4 h-4 mt-0.5 shrink-0" /> {packageError}
+            </div>
+          )}
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario *</label>
+            <select
+              value={packageForm.patientId}
+              onChange={(e) => {
+                const id = e.target.value;
+                const p = data.byPatient.find((x) => String(x.id) === id);
+                const total = Number(packageForm.totalSessions) || 0;
+                setPackageForm({ ...packageForm, patientId: id, totalPrice: p && p.sessionValue > 0 ? String(p.sessionValue * total) : packageForm.totalPrice });
+                setPackageError("");
+              }}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+            >
+              <option value="">Seleccionar usuario...</option>
+              {data.byPatient.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Sesiones *</label>
+              <input
+                type="number"
+                min={1}
+                max={200}
+                value={packageForm.totalSessions}
+                onChange={(e) => {
+                  const total = e.target.value;
+                  const p = data.byPatient.find((x) => String(x.id) === packageForm.patientId);
+                  setPackageForm({ ...packageForm, totalSessions: total, totalPrice: p && p.sessionValue > 0 ? String(p.sessionValue * (Number(total) || 0)) : packageForm.totalPrice });
+                }}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Precio total</label>
+              <input
+                type="number"
+                min={0}
+                value={packageForm.totalPrice}
+                onChange={(e) => setPackageForm({ ...packageForm, totalPrice: e.target.value })}
+                placeholder="Automático"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Vence el</label>
+            <input
+              type="date"
+              value={packageForm.expiresAt}
+              onChange={(e) => setPackageForm({ ...packageForm, expiresAt: e.target.value })}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+            />
+            <p className="text-[11px] text-slate-400 mt-1.5">Déjalo vacío si el paquete no vence.</p>
+          </div>
+          <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-3 cursor-pointer hover:border-violet-300 transition-all">
+            <input
+              type="checkbox"
+              checked={packageForm.paid}
+              onChange={(e) => setPackageForm({ ...packageForm, paid: e.target.checked })}
+              className="mt-0.5 w-4 h-4 accent-violet-600"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-slate-700">Ya está pagado</span>
+              <span className="block text-[11px] text-slate-500 mt-0.5">Las sesiones que se descuenten del paquete quedarán cobradas.</span>
+            </span>
+          </label>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nota</label>
+            <textarea
+              rows={2}
+              value={packageForm.notes}
+              onChange={(e) => setPackageForm({ ...packageForm, notes: e.target.value })}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all resize-none"
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
