@@ -4,9 +4,11 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import {
   FileText, BookOpen, Lightbulb, Sparkles,
-  Loader2, ChevronRight, User, Download, Trash2
+  Loader2, ChevronRight, User, Download, Trash2, Image as ImageIcon
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import VisualGuide from "@/components/activities/VisualGuide";
+import { parseActivityGuide, GUIDE_SYSTEM_PROMPT, type ActivityGuide } from "@/lib/activityGuide";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
 interface SavedReport {
@@ -134,6 +136,9 @@ export default function AsistentesPage() {
   const [selectedPatientId, setSelectedPatientId] = useState<number | "">("");
   const [patients, setPatients] = useState<Patient[]>([]);
   const [savedReportId, setSavedReportId] = useState<number | null>(null);
+  // IA2: la actividad se puede entregar como guía visual para la familia
+  const [visualMode, setVisualMode] = useState(false);
+  const [guide, setGuide] = useState<ActivityGuide | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [viewingReport, setViewingReport] = useState<SavedReport | null>(null);
@@ -180,10 +185,36 @@ export default function AsistentesPage() {
     actividades: "Eres un terapeuta ocupacional experto en diseño de actividades terapéuticas. Propone actividades detalladas, creativas y adaptadas a las necesidades específicas del paciente, en español.",
   };
 
+  // Deja el resultado guardado en el historial de informes
+  const saveReport = async (content: string, patient?: { id: number; name: string }) => {
+    try {
+      setSaveState("saving");
+      const saveRes = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId: patient?.id ?? null,
+          type: current?.id ?? "informe",
+          title: `${current?.title ?? "Documento"}${patient ? ` — ${patient.name}` : ""} · ${new Date().toLocaleDateString("es-CL")}`,
+          content,
+        }),
+      });
+      if (saveRes.ok) {
+        const saved: SavedReport = await saveRes.json();
+        setSavedReportId(saved.id);
+        setReports((prev) => [saved, ...prev]);
+        setSaveState("saved");
+      } else {
+        setSaveState("idle");
+      }
+    } catch { setSaveState("idle"); }
+  };
+
   const handleGenerate = async () => {
     if (!input.trim()) return;
     setLoading(true);
     setOutput(null);
+    setGuide(null);
     setSavedReportId(null);
     setSaveState("idle");
 
@@ -208,6 +239,8 @@ export default function AsistentesPage() {
 
     const fullPrompt = patientContext + input;
 
+    const isVisualGuide = current?.id === "actividades" && visualMode;
+
     try {
       const featureKeys: Record<string, string> = {
         informe: "ai_informe",
@@ -220,9 +253,11 @@ export default function AsistentesPage() {
         body: JSON.stringify({
           featureKey: featureKeys[current?.id ?? ""] ?? "ai_ideas_actividades",
           prompt: fullPrompt,
-          systemPrompt: current
+          systemPrompt: isVisualGuide
+            ? GUIDE_SYSTEM_PROMPT
+            : current
             ? systemPrompts[current.id] +
-              "\n\nFORMATO: Escribe en español correcto y completo, respetando SIEMPRE las tildes (á, é, í, ó, ú), la ñ y los signos de apertura (¿, ¡). Lo único que debes evitar es el formato markdown: nada de asteriscos, almohadillas (#), guiones bajos, viñetas especiales ni emojis. Usa texto corrido con saltos de línea normales."
+              "\n\nFORMATO: Escribe en español latinoamericano neutro (Chile, Argentina y Colombia): trata de \"ustedes\", nunca \"vosotros\" ni modismos de España. Escribe en español correcto y completo, respetando SIEMPRE las tildes (á, é, í, ó, ú), la ñ y los signos de apertura (¿, ¡). Lo único que debes evitar es el formato markdown: nada de asteriscos, almohadillas (#), guiones bajos, viñetas especiales ni emojis. Usa texto corrido con saltos de línea normales."
             : "Responde en texto plano, sin markdown, sin asteriscos, sin almohadillas (#), sin viñetas especiales, sin emojis ni caracteres especiales de formato.",
         }),
       });
@@ -234,6 +269,30 @@ export default function AsistentesPage() {
         return;
       }
       loadCredits();
+
+      // Guía visual: la IA devuelve JSON y se arma la hoja para la familia
+      if (isVisualGuide) {
+        const parsed = parseActivityGuide(data.text as string);
+        if (parsed) {
+          setGuide(parsed);
+          const asText = [
+            parsed.titulo,
+            parsed.objetivo ? `Objetivo: ${parsed.objetivo}` : "",
+            parsed.duracion ? `Duración: ${parsed.duracion}` : "",
+            parsed.materiales.length ? `Materiales: ${parsed.materiales.join(", ")}` : "",
+            "",
+            ...parsed.pasos.map((p) => `${p.numero}. ${p.titulo ? p.titulo + ": " : ""}${p.texto}`),
+            "",
+            ...parsed.consejos.map((c) => `Consejo: ${c}`),
+          ].filter(Boolean).join("\n");
+          setOutput(asText);
+          await saveReport(asText, patient);
+          setLoading(false);
+          return;
+        }
+        // Si el JSON vino mal, se muestra el texto tal cual en vez de fallar
+      }
+
       // Strip any remaining markdown/special chars just in case
       const clean = (data.text as string)
         .replace(/#{1,6}\s*/g, "")
@@ -245,27 +304,7 @@ export default function AsistentesPage() {
         .trim();
       setOutput(clean);
       // Guardar automáticamente en el historial de informes
-      try {
-        setSaveState("saving");
-        const saveRes = await fetch("/api/reports", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            patientId: patient?.id ?? null,
-            type: current?.id ?? "informe",
-            title: `${current?.title ?? "Documento"}${patient ? ` — ${patient.name}` : ""} · ${new Date().toLocaleDateString("es-CL")}`,
-            content: clean,
-          }),
-        });
-        if (saveRes.ok) {
-          const saved: SavedReport = await saveRes.json();
-          setSavedReportId(saved.id);
-          setReports((prev) => [saved, ...prev]);
-          setSaveState("saved");
-        } else {
-          setSaveState("idle");
-        }
-      } catch { setSaveState("idle"); }
+      await saveReport(clean, patient);
     } catch (err) {
       setOutput("Error al conectar con la IA. Por favor intenta de nuevo.");
     } finally {
@@ -349,6 +388,71 @@ export default function AsistentesPage() {
     }, 300);
   };
 
+  /** Imprime la hoja visual clonando lo que ya se ve en pantalla */
+  const printGuide = () => {
+    const node = document.getElementById("guia-visual");
+    if (!node || !guide) return;
+    const patient = patients.find((p) => p.id === selectedPatientId);
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>${guide.titulo}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; max-width: 760px; margin: 28px auto; padding: 0 20px; color: #1e293b; }
+    .letterhead { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #7c3aed; padding-bottom: 12px; margin-bottom: 18px; }
+    .brand { font-size: 20px; font-weight: bold; color: #7c3aed; }
+    .therapist { text-align: right; font-size: 11px; color: #475569; }
+    .vg-title { font-size: 20px; font-weight: bold; margin: 0 0 4px; text-align: center; }
+    .vg-for { font-size: 13px; color: #64748b; text-align: center; margin: 0; }
+    .vg-head { text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 18px; }
+    .vg-meta { display: flex; justify-content: center; gap: 18px; font-size: 12px; color: #64748b; margin-top: 8px; flex-wrap: wrap; }
+    .vg-meta span { display: inline-flex; align-items: center; gap: 5px; }
+    .vg-h3 { font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+    .vg-materials { margin-bottom: 18px; }
+    .vg-materials > div { display: flex; flex-wrap: wrap; gap: 6px; }
+    .vg-chip { font-size: 11px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 9px; }
+    .vg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .vg-step { border: 1px solid #ddd6fe; background: #faf5ff; border-radius: 14px; padding: 12px; text-align: center; page-break-inside: avoid; }
+    .vg-step > span:first-child { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px; background: #fff; font-size: 11px; font-weight: bold; margin-bottom: 6px; }
+    .vg-step svg { width: 38px; height: 38px; display: block; margin: 0 auto 6px; color: #7c3aed; }
+    .vg-step-title { font-size: 12px; font-weight: bold; margin: 0; }
+    .vg-step-text { font-size: 11px; color: #475569; margin: 4px 0 0; line-height: 1.4; }
+    .vg-tips { margin-top: 18px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 14px; padding: 14px; page-break-inside: avoid; }
+    .vg-tips ul { margin: 0; padding-left: 16px; }
+    .vg-tips li { font-size: 11px; color: #78350f; line-height: 1.5; margin-bottom: 4px; }
+    .vg-tips li span { display: none; }
+    .vg-meta svg, .vg-h3 svg { width: 13px; height: 13px; }
+    @media print { body { margin: 10px auto; } }
+  </style>
+</head>
+<body>
+  <div class="letterhead">
+    <div class="brand">TOdo Therapy</div>
+    <div class="therapist"><strong>${currentUserName}</strong><br/>${specialty}</div>
+  </div>
+  ${node.outerHTML}
+  <p style="margin-top:22px;font-size:10px;color:#94a3b8;text-align:center;">
+    ${patient ? `Para ${patient.name} · ` : ""}Preparado por ${currentUserName} · ${new Date().toLocaleDateString("es-CL")}
+  </p>
+</body>
+</html>`;
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 2000);
+    }, 300);
+  };
+
   const downloadPDF = () => {
     if (!output || !current) return;
     const patient = patients.find((p) => p.id === selectedPatientId);
@@ -408,6 +512,8 @@ export default function AsistentesPage() {
             onClick={() => {
               setActiveAssistant(ast.id);
               setOutput(null);
+              setGuide(null);
+              setVisualMode(false);
               setInput("");
               setSelectedPatientId("");
               setSavedReportId(null);
@@ -607,6 +713,25 @@ export default function AsistentesPage() {
               })()}
             </div>
 
+            {current.id === "actividades" && (
+              <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-3 cursor-pointer hover:border-violet-300 transition-all bg-white">
+                <input
+                  type="checkbox"
+                  checked={visualMode}
+                  onChange={(e) => { setVisualMode(e.target.checked); setGuide(null); }}
+                  className="mt-0.5 w-4 h-4 accent-violet-600"
+                />
+                <span>
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                    <ImageIcon className="w-3.5 h-3.5 text-violet-500" /> Guía visual para la familia
+                  </span>
+                  <span className="block text-[11px] text-slate-500 mt-0.5">
+                    Entrega la actividad como una hoja con un dibujo por paso, lista para imprimir y pegar en casa.
+                  </span>
+                </span>
+              </label>
+            )}
+
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-2">Información adicional</label>
               <p className="text-xs text-slate-400 mb-3">{current.prompt}</p>
@@ -618,7 +743,25 @@ export default function AsistentesPage() {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none transition-all placeholder-slate-400"
               />
             </div>
-            {output && (
+            {guide && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white border border-slate-200 rounded-xl overflow-hidden"
+              >
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Guía visual</span>
+                  <button
+                    onClick={printGuide}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Imprimir guía
+                  </button>
+                </div>
+                <VisualGuide guide={guide} patientName={patients.find((p) => p.id === selectedPatientId)?.name} />
+              </motion.div>
+            )}
+            {output && !guide && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
