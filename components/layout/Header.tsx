@@ -15,6 +15,7 @@ const pageLabels: Record<string, { title: string; subtitle: string }> = {
   "/dashboard/biblioteca": { title: "Biblioteca de Recursos", subtitle: "Documentos y materiales terapéuticos" },
   "/dashboard/recordatorios": { title: "Recordatorios", subtitle: "Notificaciones y alertas futuras" },
   "/dashboard/plan": { title: "Mi plan", subtitle: "Suscripción y créditos de IA" },
+  "/dashboard/facturacion": { title: "Facturación", subtitle: "Ingresos del mes y cobros pendientes" },
   "/dashboard/admin": { title: "Administración", subtitle: "Métricas globales de la plataforma" },
   "/dashboard/admin/pricing": { title: "Planes y precios", subtitle: "Catálogo editable de pricing" },
   "/dashboard/configuracion": { title: "Configuración", subtitle: "Perfil y preferencias de cuenta" },

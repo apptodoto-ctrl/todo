@@ -208,6 +208,8 @@ model SessionRecord {
   duration  Int      @default(45)
   attended  Boolean  @default(true)
   paid      Boolean  @default(false)
+  confirmed Boolean  @default(true)
+  appointmentId Int?  @unique
   createdBy String   @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -244,6 +246,8 @@ model Appointment {
   createdBy String   @default("")
   createdAt DateTime @default(now())
 
+  paid             Boolean @default(false)
+  convertedToSession Boolean @default(false)
   createdNotifSent Boolean @default(false)
   seriesId         String  @default("")
   reminder5dSent Boolean @default(false)

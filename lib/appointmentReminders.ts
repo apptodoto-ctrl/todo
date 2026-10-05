@@ -150,6 +150,64 @@ export async function sendAppointmentCreatedNotice(appointmentId: number): Promi
   return delivered > 0;
 }
 
+/**
+ * Cuando pasa la hora de una cita agendada, la sesión aparece sola en el historial
+ * del paciente para que la terapeuta solo confirme asistencia, pago y evolución.
+ */
+export async function convertPastAppointments(): Promise<number> {
+  const now = nowInSantiago();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const candidates = await prisma.appointment.findMany({
+    where: {
+      convertedToSession: false,
+      patientId: { not: null },
+      status: { not: "cancelada" },
+      date: { lte: todayStr },
+      type: { in: ["sesion", "grupal", "evaluacion"] },
+    },
+  });
+
+  let created = 0;
+  for (const apt of candidates) {
+    const when = appointmentDate(apt.date, apt.time);
+    if (!when) continue;
+    // Se convierte recién cuando terminó la sesión
+    const endsAt = new Date(when.getTime() + (apt.duration || 45) * 60 * 1000);
+    if (endsAt > now) continue;
+
+    try {
+      const patient = await prisma.patient.findUnique({ where: { id: apt.patientId! } });
+      if (!patient) continue;
+      const therapist = await prisma.user.findUnique({ where: { email: apt.createdBy }, select: { name: true } });
+
+      await prisma.sessionRecord.create({
+        data: {
+          patientId: apt.patientId!,
+          appointmentId: apt.id,
+          date: apt.date,
+          notes: "",
+          therapist: therapist?.name ?? patient.therapist,
+          duration: apt.duration || 45,
+          attended: apt.status === "no_asistio" ? false : true,
+          paid: apt.paid,
+          confirmed: apt.status === "asistio" || apt.status === "no_asistio",
+          createdBy: apt.createdBy,
+        },
+      });
+      await prisma.appointment.update({ where: { id: apt.id }, data: { convertedToSession: true } });
+      const count = await prisma.sessionRecord.count({ where: { patientId: apt.patientId! } });
+      await prisma.patient.update({ where: { id: apt.patientId! }, data: { sessions: count } });
+      created++;
+    } catch (err) {
+      // Si ya existía una sesión para esa cita, solo se marca como convertida
+      await prisma.appointment.update({ where: { id: apt.id }, data: { convertedToSession: true } }).catch(() => {});
+      console.error(`[sessions] no se pudo convertir la cita ${apt.id}:`, err);
+    }
+  }
+  return created;
+}
+
 // Un único recordatorio 24 h antes (las TOs pidieron menos notificaciones)
 const BANDS = [
   { flag: "reminder1dSent" as const, maxH: 24, minH: 0, heading: "Recordatorio: sesión mañana", when: "mañana" },

@@ -30,6 +30,7 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
         ...(body.duration !== undefined ? { duration: Number(body.duration) } : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
         ...(body.patientId !== undefined ? { patientId: body.patientId ? Number(body.patientId) : null } : {}),
+        ...(body.paid !== undefined ? { paid: body.paid === true } : {}),
       },
     });
     return NextResponse.json(updated);

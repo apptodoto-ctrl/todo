@@ -7,9 +7,11 @@ export function startReminderScheduler() {
 
   const tick = async () => {
     try {
-      const { processAppointmentReminders } = await import("@/lib/appointmentReminders");
+      const { processAppointmentReminders, convertPastAppointments } = await import("@/lib/appointmentReminders");
       const { sent, checked } = await processAppointmentReminders();
       if (sent > 0) console.log(`[reminders] ${sent} recordatorio(s) enviado(s) de ${checked} citas revisadas`);
+      const converted = await convertPastAppointments();
+      if (converted > 0) console.log(`[sessions] ${converted} cita(s) pasaron al historial clínico`);
     } catch (err) {
       console.error("[reminders] scheduler error:", err);
     }

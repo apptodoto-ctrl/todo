@@ -24,7 +24,7 @@ export async function PUT(req: Request, { params }: { params: Params }) {
     const { id, sessionId } = await params;
     const err = await checkOwnership(Number(id), session.email);
     if (err) return err;
-    const { date, notes, duration, attended, paid } = await req.json();
+    const { date, notes, duration, attended, paid, confirmed } = await req.json();
     const record = await prisma.sessionRecord.update({
       where: { id: Number(sessionId) },
       data: {
@@ -33,6 +33,8 @@ export async function PUT(req: Request, { params }: { params: Params }) {
         ...(duration !== undefined ? { duration: Number(duration) } : {}),
         ...(attended !== undefined ? { attended: attended === true } : {}),
         ...(paid !== undefined ? { paid: paid === true } : {}),
+        // Cualquier edición de la terapeuta da por confirmada la sesión automática
+        ...(confirmed !== undefined ? { confirmed: confirmed === true } : { confirmed: true }),
       },
     });
     return NextResponse.json(record);

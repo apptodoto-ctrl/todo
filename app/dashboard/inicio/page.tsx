@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import {
   Users, Calendar, CheckSquare, Bell, Clock, ArrowUpRight,
-  Activity,
+  Activity, Wallet,
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useState, useEffect } from "react";
@@ -26,6 +26,12 @@ interface Patient {
   diagnosis: string;
   status?: string;
   createdAt?: string;
+}
+
+function money(amount: number, currency: string): string {
+  const locale = currency === "ARS" ? "es-AR" : currency === "COP" ? "es-CO" : currency === "USD" ? "en-US" : "es-CL";
+  const decimals = currency === "USD" ? 2 : 0;
+  return `${currency} ${amount.toLocaleString(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 }
 
 const patientStatusBadge: Record<string, { label: string; cls: string }> = {
@@ -52,6 +58,9 @@ export default function InicioPage() {
   const { name, email } = useCurrentUser();
 
   const [profileName, setProfileName] = useState("");
+  const [finance, setFinance] = useState<{ invoicedMonth: number; pendingTotal: number; currency: string } | null>(null);
+  const [sessionsWeek, setSessionsWeek] = useState(0);
+  const [sessionsMonth, setSessionsMonth] = useState(0);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -67,9 +76,22 @@ export default function InicioPage() {
       setPatients(Array.isArray(p) ? p : []);
       setTasks(Array.isArray(t) ? t : []);
       setAppointments(Array.isArray(a) ? a : []);
+      // Sesiones de la semana a partir de las citas ya realizadas
+      const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 7);
+      if (Array.isArray(a)) {
+        setSessionsWeek(a.filter((x: { date: string; status?: string }) => {
+          const d = new Date(x.date + "T00:00:00");
+          return d >= weekStart && d <= new Date() && x.status !== "cancelada";
+        }).length);
+      }
     }).catch(() => {});
     // El nombre del perfil es la fuente de verdad para el saludo
     fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.name) setProfileName(u.name); }).catch(() => {});
+    // Resumen económico del mes (facturado y por cobrar)
+    fetch("/api/finance").then((r) => r.json()).then((d) => {
+      if (d?.currency) setFinance({ invoicedMonth: d.invoicedMonth, pendingTotal: d.pendingTotal, currency: d.currency });
+      if (Array.isArray(d?.byPatient)) setSessionsMonth(d.byPatient.reduce((acc: number, p: { sessionsMonth: number }) => acc + p.sessionsMonth, 0));
+    }).catch(() => {});
   }, [email]);
 
   // Prioriza el nombre guardado en el perfil sobre el de la sesión
@@ -86,16 +108,22 @@ export default function InicioPage() {
     return d.toDateString() === now.toDateString();
   }).length;
   const pendingTasks = tasks.filter((t) => t.status !== "completada").length;
+  // Citas futuras de los próximos 7 días que aún no se realizan
+  const aptsPending = appointments.filter((a) => {
+    const d = new Date(a.date + "T00:00:00");
+    return d >= now && d <= weekEnd;
+  }).length;
+  const activePatients = patients.filter((p) => (p.status ?? "activo") === "activo").length;
   const overdueTasks = tasks.filter((t) => {
     if (!t.due || t.status === "completada") return false;
     return new Date(t.due + "T23:59:59") < now;
   }).length;
 
   const statsData = [
-    { label: "Usuarios activos", value: String(patients.length), change: `${patients.length} registrados`, icon: Users, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600", href: "/dashboard/usuarios" },
-    { label: "Citas esta semana", value: String(aptsThisWeek), change: `${aptsToday} hoy`, icon: Calendar, color: "from-blue-500 to-indigo-600", bg: "bg-blue-50", text: "text-blue-600", href: "/dashboard/calendario" },
-    { label: "Tareas pendientes", value: String(pendingTasks), change: `${overdueTasks} vencidas`, icon: CheckSquare, color: "from-amber-500 to-orange-500", bg: "bg-amber-50", text: "text-amber-600", href: "/dashboard/tareas" },
-    { label: "Citas totales", value: String(appointments.length), change: `${aptsThisWeek} esta semana`, icon: Bell, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", text: "text-emerald-600", href: "/dashboard/calendario" },
+    { label: "Sesiones esta semana", value: String(sessionsWeek), change: `${sessionsMonth} este mes`, icon: Activity, color: "from-violet-500 to-purple-600", bg: "bg-violet-50", text: "text-violet-600", href: "/dashboard/usuarios" },
+    { label: "Sesiones de hoy", value: String(aptsToday), change: `${aptsPending} pendientes esta semana`, icon: Calendar, color: "from-blue-500 to-indigo-600", bg: "bg-blue-50", text: "text-blue-600", href: "/dashboard/calendario" },
+    { label: "Usuarios activos", value: String(activePatients), change: `${patients.length} en total`, icon: Users, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", text: "text-emerald-600", href: "/dashboard/usuarios" },
+    { label: "Facturado del mes", value: finance ? money(finance.invoicedMonth, finance.currency) : "—", change: finance && finance.pendingTotal > 0 ? `${money(finance.pendingTotal, finance.currency)} por cobrar` : "sin deuda pendiente", icon: Wallet, color: "from-amber-500 to-orange-500", bg: "bg-amber-50", text: "text-amber-600", href: "/dashboard/facturacion" },
   ];
 
   // Gráfico: últimos 6 meses. Las sesiones se cuentan por la fecha de la cita y

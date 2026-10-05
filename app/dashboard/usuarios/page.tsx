@@ -41,6 +41,7 @@ interface SessionRecord {
   duration: number;
   attended: boolean;
   paid: boolean;
+  confirmed: boolean;
 }
 
 interface Objective {
@@ -105,6 +106,7 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
   activo: { label: "Activo", cls: "bg-emerald-100 text-emerald-700" },
   evaluacion: { label: "En Evaluación", cls: "bg-blue-100 text-blue-700" },
   alta: { label: "Alta", cls: "bg-slate-100 text-slate-600" },
+  no_continua: { label: "No continúa", cls: "bg-rose-100 text-rose-700" },
 };
 
 const container = {
@@ -131,6 +133,17 @@ export default function UsuariosPage() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [showAddSession, setShowAddSession] = useState(false);
   const [newSession, setNewSession] = useState({ date: "", notes: "", duration: 45, attended: true, paid: false });
+
+  // Confirma de un toque una sesión que entró sola desde el calendario
+  const confirmSession = async (s: SessionRecord, attended: boolean) => {
+    if (!selectedPatient) return;
+    setSessionRecords((prev) => prev.map((x) => (x.id === s.id ? { ...x, attended, confirmed: true } : x)));
+    await fetch(`/api/patients/${selectedPatient.id}/sessions/${s.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attended, confirmed: true }),
+    });
+  };
   const [savingSession, setSavingSession] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionRecord | null>(null);
   const [objectives, setObjectives] = useState<Objective[]>([]);
@@ -141,6 +154,7 @@ export default function UsuariosPage() {
   // Pacientes adultos sin tutor: el contacto es del propio paciente
   const [selfContact, setSelfContact] = useState(false);
   const [currency, setCurrency] = useState("CLP");
+  const [debtByPatient, setDebtByPatient] = useState<Record<number, { unpaidCount: number; unpaidAmount: number }>>({});
   const { email: currentUserEmail, name: currentUserName } = useCurrentUser();
 
   // Moneda configurada en la cuenta (CLP / ARS / USD / COP)
@@ -148,6 +162,13 @@ export default function UsuariosPage() {
     fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.currency) setCurrency(u.currency); }).catch(() => {});
     // Las citas agendadas alimentan "Próxima sesión" y "Próximas sesiones" del perfil
     fetch("/api/appointments").then((r) => r.json()).then((d) => setAppointments(Array.isArray(d) ? d : [])).catch(() => {});
+    // Deuda por paciente para la alerta del listado y del perfil
+    fetch("/api/finance").then((r) => r.json()).then((d) => {
+      if (!Array.isArray(d?.byPatient)) return;
+      const map: Record<number, { unpaidCount: number; unpaidAmount: number }> = {};
+      for (const p of d.byPatient) map[p.id] = { unpaidCount: p.unpaidCount, unpaidAmount: p.unpaidAmount };
+      setDebtByPatient(map);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -180,6 +201,58 @@ export default function UsuariosPage() {
       .then((data) => setPatientDocs(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, [selectedPatient?.id]);
+
+  // Descarga todas las evoluciones del paciente en un solo documento imprimible
+  const printEvolutions = () => {
+    if (!selectedPatient) return;
+    const rows = [...sessionRecords].sort((a, b) => a.date.localeCompare(b.date));
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Evoluciones ${selectedPatient.name}</title>
+      <style>
+        body { font-family: Arial, sans-serif; max-width: 780px; margin: 40px auto; padding: 0 24px; color: #1e293b; line-height: 1.6; }
+        .letterhead { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #7c3aed; padding-bottom:14px; margin-bottom:18px; }
+        .brand { font-size:22px; font-weight:bold; color:#7c3aed; }
+        .meta { font-size:12px; color:#475569; text-align:right; }
+        h1 { font-size:18px; margin:0 0 4px; }
+        .datos { font-size:13px; color:#475569; margin-bottom:22px; }
+        .sesion { border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:12px; page-break-inside: avoid; }
+        .fecha { font-weight:bold; font-size:13px; }
+        .tags { font-size:11px; color:#64748b; margin-top:2px; }
+        .notas { font-size:13px; white-space:pre-wrap; margin-top:8px; }
+        .firma { margin-top:50px; padding-top:8px; border-top:1px solid #94a3b8; width:260px; font-size:12px; color:#475569; text-align:center; }
+        @media print { body { margin:20px; } }
+      </style></head><body>
+      <div class="letterhead">
+        <div class="brand">TOdo Therapy</div>
+        <div class="meta"><strong>${currentUserName}</strong><br/>Generado el ${new Date().toLocaleDateString("es-CL")}</div>
+      </div>
+      <h1>Registro de evoluciones</h1>
+      <div class="datos">
+        <strong>${selectedPatient.name}</strong> · ${displayAge(selectedPatient)} años${selectedPatient.rut ? ` · ${selectedPatient.rut}` : ""}<br/>
+        Diagnóstico: ${selectedPatient.diagnosis} · ${rows.length} ${rows.length === 1 ? "sesión registrada" : "sesiones registradas"}
+      </div>
+      ${rows.map((s) => `
+        <div class="sesion">
+          <div class="fecha">${s.date.split("-").reverse().join("-")}</div>
+          <div class="tags">${s.duration} min · ${s.attended ? "Asistió" : "No asistió"} · ${s.paid ? "Pagada" : "Pendiente de pago"}${s.therapist ? ` · ${s.therapist}` : ""}</div>
+          <div class="notas">${(s.notes || "Sin notas registradas.").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+        </div>`).join("")}
+      <div class="firma">${currentUserName}</div>
+      </body></html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 2000);
+    }, 300);
+  };
 
   const addSession = async () => {
     if (!selectedPatient || !newSession.date) return;
@@ -403,6 +476,7 @@ export default function UsuariosPage() {
             { key: "activo", label: "Activos" },
             { key: "evaluacion", label: "Evaluación" },
             { key: "alta", label: "Alta" },
+            { key: "no_continua", label: "No continúa" },
           ].map((f) => (
             <button
               key={f.key}
@@ -469,6 +543,12 @@ export default function UsuariosPage() {
               </div>
 
               <div className="space-y-2 mb-4">
+                {(debtByPatient[p.id]?.unpaidCount ?? 0) > 0 && (
+                  <div className="flex items-center gap-2 text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1.5">
+                    <DollarSign className="w-3.5 h-3.5 shrink-0" />
+                    <span>Debe {formatMoney(debtByPatient[p.id].unpaidAmount, currency)} · {debtByPatient[p.id].unpaidCount} {debtByPatient[p.id].unpaidCount === 1 ? "sesión" : "sesiones"}</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-xs text-slate-600">
                   <ClipboardList className="w-3.5 h-3.5 text-slate-400" />
                   <span>{p.diagnosis}</span>
@@ -597,6 +677,7 @@ export default function UsuariosPage() {
               <option value="activo">Activo</option>
               <option value="evaluacion">En Evaluación</option>
               <option value="alta">Alta</option>
+              <option value="no_continua">No continúa</option>
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -631,9 +712,26 @@ export default function UsuariosPage() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-slate-800">{selectedPatient.name}</h3>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${statusConfig[selectedPatient.status]?.cls}`}>
-                  {statusConfig[selectedPatient.status]?.label}
-                </span>
+                <select
+                  value={selectedPatient.status}
+                  onChange={async (e) => {
+                    const status = e.target.value;
+                    setSelectedPatient((prev) => (prev ? { ...prev, status } : prev));
+                    setPatients((prev) => prev.map((x) => (x.id === selectedPatient.id ? { ...x, status } : x)));
+                    await fetch(`/api/patients/${selectedPatient.id}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ status }),
+                    });
+                  }}
+                  className={`mt-1 text-xs font-semibold px-2.5 py-1 rounded-lg border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${statusConfig[selectedPatient.status]?.cls ?? "bg-slate-100 text-slate-600"}`}
+                  title="Cambiar estado del usuario"
+                >
+                  <option value="activo">Activo</option>
+                  <option value="evaluacion">En Evaluación</option>
+                  <option value="alta">Alta</option>
+                  <option value="no_continua">No continúa</option>
+                </select>
               </div>
             </div>
 
@@ -781,12 +879,19 @@ export default function UsuariosPage() {
                   <NotebookPen className="w-4 h-4 text-violet-500" />
                   <h4 className="text-sm font-bold text-slate-700">Historial de sesiones</h4>
                 </div>
+                <div className="flex items-center gap-1.5">
+                {sessionRecords.length > 0 && (
+                  <button onClick={printEvolutions} className="flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-violet-700 bg-slate-100 hover:bg-violet-50 px-2.5 py-1.5 rounded-lg transition-all" title="Descargar todas las evoluciones">
+                    <Download className="w-3.5 h-3.5" /> PDF
+                  </button>
+                )}
                 <button
                   onClick={() => { setShowAddSession(!showAddSession); setNewSession({ date: new Date().toISOString().slice(0, 10), notes: "", duration: 45, attended: true, paid: false }); }}
                   className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1.5 rounded-lg transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" /> Registrar sesión
                 </button>
+                </div>
               </div>
 
               {showAddSession && (
@@ -866,6 +971,7 @@ export default function UsuariosPage() {
                           <span className="text-xs font-bold text-slate-600">{s.date.split("-").reverse().join("-")}</span>
                           <span className="text-[11px] text-slate-400">· {s.duration} min</span>
                           {!s.attended && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-600">No asistió</span>}
+                          {!s.confirmed && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700">Por confirmar</span>}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {s.attended && (
@@ -882,6 +988,13 @@ export default function UsuariosPage() {
                         </div>
                       </div>
                       {s.notes && <p className="text-xs text-slate-600 whitespace-pre-wrap">{s.notes}</p>}
+                      {!s.confirmed && (
+                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200">
+                          <span className="text-[11px] text-slate-500">Entró desde el calendario:</span>
+                          <button onClick={() => confirmSession(s, true)} className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors">✓ Asistió</button>
+                          <button onClick={() => confirmSession(s, false)} className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors">✗ No asistió</button>
+                        </div>
+                      )}
                     </div>
                     )
                   ))}
@@ -1042,6 +1155,7 @@ export default function UsuariosPage() {
               <option value="activo">Activo</option>
               <option value="evaluacion">En Evaluación</option>
               <option value="alta">Alta</option>
+              <option value="no_continua">No continúa</option>
             </select>
           </div>
         </div>

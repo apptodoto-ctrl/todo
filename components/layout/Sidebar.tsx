@@ -14,6 +14,7 @@ import {
   BookOpen,
   Bell,
   Settings,
+  Wallet,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -33,6 +34,7 @@ const navItems = [
   { href: "/dashboard/pipeline", icon: Kanban, label: "Pipeline" },
   { href: "/dashboard/biblioteca", icon: BookOpen, label: "Biblioteca" },
   { href: "/dashboard/recordatorios", icon: Bell, label: "Recordatorios" },
+  { href: "/dashboard/facturacion", icon: Wallet, label: "Facturación" },
   { href: "/dashboard/plan", icon: Crown, label: "Mi plan" },
   { href: "/dashboard/configuracion", icon: Settings, label: "Configuración" },
 ];

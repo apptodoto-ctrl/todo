@@ -139,12 +139,20 @@ export default function AsistentesPage() {
   const [viewingReport, setViewingReport] = useState<SavedReport | null>(null);
   const [specialty, setSpecialty] = useState("Terapeuta Ocupacional");
   const [credits, setCredits] = useState<{ totalRemaining: number; includedTotal: number; purchased: number } | null>(null);
+  const [featureCosts, setFeatureCosts] = useState<Record<string, number>>({});
   const { name: currentUserName } = useCurrentUser();
 
   const loadCredits = () => {
     fetch("/api/billing/status")
       .then((r) => r.json())
-      .then((d) => { if (d?.credits) setCredits(d.credits); })
+      .then((d) => {
+        if (d?.credits) setCredits(d.credits);
+        if (Array.isArray(d?.features)) {
+          const map: Record<string, number> = {};
+          for (const f of d.features) map[f.key] = f.creditCost;
+          setFeatureCosts(map);
+        }
+      })
       .catch(() => {});
   };
 
@@ -423,9 +431,21 @@ export default function AsistentesPage() {
                 {ast.title}
               </h3>
               <p className="text-xs text-slate-400 mb-4 line-clamp-2">{ast.description}</p>
-              <button className="flex items-center gap-2 text-sm font-semibold text-violet-600 hover:text-violet-700 transition-colors">
-                Usar Asistente <ChevronRight className="w-4 h-4" />
-              </button>
+              <div className="flex items-center justify-between gap-2">
+                <button className="flex items-center gap-2 text-sm font-semibold text-violet-600 hover:text-violet-700 transition-colors">
+                  Usar Asistente <ChevronRight className="w-4 h-4" />
+                </button>
+                {(() => {
+                  const key = ast.id === "informe" ? "ai_informe" : ast.id === "cuentos" ? "ai_cuento" : "ai_ideas_actividades";
+                  const cost = featureCosts[key];
+                  if (cost === undefined) return null;
+                  return (
+                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg shrink-0">
+                      {cost} crédito{cost === 1 ? "" : "s"}
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
           </motion.div>
         ))}
