@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Camera, Save, Eye, EyeOff, Shield, AlertTriangle, User, Lock, Upload, Loader2, Download } from "lucide-react";
+import { Camera, Save, Eye, EyeOff, Shield, AlertTriangle, User, Lock, Upload, Loader2, Download, CalendarDays, Copy, Check, RefreshCw } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 
 const tabs = [
@@ -21,6 +21,10 @@ export default function ConfiguracionPage() {
   const [error, setError] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
+  // C3: enlace privado para ver la agenda en Google Calendar
+  const [calendarToken, setCalendarToken] = useState("");
+  const [calendarCopied, setCalendarCopied] = useState(false);
+  const [calendarBusy, setCalendarBusy] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -54,6 +58,45 @@ export default function ConfiguracionPage() {
       })
       .catch(() => {});
   }, [session]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch("/api/users/me/calendar")
+      .then((r) => r.json())
+      .then((d) => { if (d?.token) setCalendarToken(d.token); })
+      .catch(() => {});
+  }, [session]);
+
+  const calendarUrl = calendarToken
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/calendar/${calendarToken}.ics`
+    : "";
+
+  const copyCalendarUrl = async () => {
+    if (!calendarUrl) return;
+    try {
+      await navigator.clipboard.writeText(calendarUrl);
+      setCalendarCopied(true);
+      setTimeout(() => setCalendarCopied(false), 2500);
+    } catch {
+      setError("No se pudo copiar. Selecciona el enlace y cópialo a mano.");
+    }
+  };
+
+  const regenerateCalendarUrl = async () => {
+    if (!confirm("Se generará un enlace nuevo y el anterior dejará de funcionar. ¿Continuar?")) return;
+    setCalendarBusy(true);
+    try {
+      const res = await fetch("/api/users/me/calendar", { method: "POST" });
+      const d = await res.json();
+      if (d?.token) {
+        setCalendarToken(d.token);
+        setSaved("Enlace del calendario regenerado. Vuelve a suscribirte con el nuevo.");
+      }
+    } catch {
+      setError("No se pudo regenerar el enlace.");
+    }
+    setCalendarBusy(false);
+  };
 
   // Avatar persisted locally per user
   useEffect(() => {
@@ -338,6 +381,64 @@ export default function ConfiguracionPage() {
             <button onClick={saveProfile} disabled={savingProfile} className="mt-6 flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-6 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 transition-all shadow-lg shadow-violet-500/30">
               {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Actualizar perfil
             </button>
+          </div>
+
+          {/* Ver la agenda en Google Calendar */}
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <CalendarDays className="w-4 h-4 text-violet-500" />
+              <h3 className="font-bold text-slate-800">Ver tu agenda en Google Calendar</h3>
+            </div>
+            <p className="text-sm text-slate-500 mb-4">
+              Suscribe tu calendario de Google (o el de tu teléfono) a este enlace y verás ahí todas tus citas de TOdo, actualizándose solas.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                readOnly
+                value={calendarUrl}
+                onFocus={(e) => e.target.select()}
+                placeholder="Preparando tu enlace..."
+                className="flex-1 min-w-0 border border-slate-200 bg-slate-50 rounded-xl px-3 py-2.5 text-xs text-slate-600 font-mono focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+              />
+              <button
+                onClick={copyCalendarUrl}
+                disabled={!calendarUrl}
+                className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 transition-all shrink-0"
+              >
+                {calendarCopied ? <><Check className="w-4 h-4" /> Copiado</> : <><Copy className="w-4 h-4" /> Copiar</>}
+              </button>
+            </div>
+
+            <ol className="mt-4 space-y-1.5 text-sm text-slate-600 list-decimal list-inside">
+              <li>Abre Google Calendar en el computador.</li>
+              <li>En la barra de la izquierda, junto a <strong>Otros calendarios</strong>, pulsa el <strong>+</strong>.</li>
+              <li>Elige <strong>Desde URL</strong>, pega el enlace y pulsa <strong>Añadir calendario</strong>.</li>
+            </ol>
+
+            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-[12px] text-amber-800">
+              Google revisa estos calendarios cada varias horas, así que una cita recién creada puede tardar en aparecer allí. En TOdo la ves al instante.
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <a
+                href={calendarUrl || undefined}
+                download="todo-therapy.ics"
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border transition-colors ${calendarUrl ? "text-violet-700 bg-violet-50 border-violet-200 hover:bg-violet-100" : "text-slate-300 border-slate-200 pointer-events-none"}`}
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar .ics
+              </a>
+              <button
+                onClick={regenerateCalendarUrl}
+                disabled={calendarBusy || !calendarToken}
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${calendarBusy ? "animate-spin" : ""}`} /> Generar enlace nuevo
+              </button>
+              <p className="text-[11px] text-slate-400">
+                El enlace es privado: quien lo tenga puede ver tu agenda. No lo compartas.
+              </p>
+            </div>
           </div>
         </motion.div>
       )}

@@ -21,6 +21,9 @@ model User {
 
   resetToken       String?   @unique
   resetTokenExpiry DateTime?
+  calendarToken    String    @default("")
+
+  @@index([calendarToken])
 }
 
 model Pipeline {
