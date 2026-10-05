@@ -224,6 +224,9 @@ model Task {
   priority    String   @default("media")
   status      String   @default("pendiente")
   due         String   @default("")
+  time        String   @default("")
+  notify      Boolean  @default(false)
+  notifiedAt  DateTime?
   category    String   @default("Clínico")
   patientName String   @default("")
   patientId   Int?
@@ -231,6 +234,8 @@ model Task {
   createdBy   String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([notify, notifiedAt])
 }
 
 model Appointment {

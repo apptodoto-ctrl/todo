@@ -22,12 +22,16 @@ export async function PUT(req: Request, { params }: { params: Params }) {
     const { patient, patientId, ...rest } = body;
     delete rest.createdBy;
     delete rest.id;
+    delete rest.notifiedAt;
+    // Si cambia la fecha, la hora o se reactiva el aviso, vuelve a quedar pendiente de notificar
+    const reschedules = rest.due !== undefined || rest.time !== undefined || rest.notify !== undefined;
     const task = await prisma.task.update({
       where: { id: Number(id) },
       data: {
         ...rest,
         ...(patient !== undefined ? { patientName: patient } : {}),
         ...(patientId ? { patientId: Number(patientId) } : {}),
+        ...(reschedules ? { notifiedAt: null } : {}),
       },
     });
     return NextResponse.json({ ...task, patient: task.patientName });

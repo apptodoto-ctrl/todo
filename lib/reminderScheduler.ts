@@ -12,6 +12,9 @@ export function startReminderScheduler() {
       if (sent > 0) console.log(`[reminders] ${sent} recordatorio(s) enviado(s) de ${checked} citas revisadas`);
       const converted = await convertPastAppointments();
       if (converted > 0) console.log(`[sessions] ${converted} cita(s) pasaron al historial clínico`);
+      const { processTaskReminders } = await import("@/lib/taskReminders");
+      const tasks = await processTaskReminders();
+      if (tasks.sent > 0) console.log(`[tasks] ${tasks.sent} aviso(s) de tareas enviados`);
     } catch (err) {
       console.error("[reminders] scheduler error:", err);
     }

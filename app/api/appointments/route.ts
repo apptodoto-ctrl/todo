@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
 import { sendAppointmentCreatedNotice } from "@/lib/appointmentReminders";
 import { randomUUID } from "crypto";
+import { seriesOccurrences } from "@/lib/appointmentSeries";
 
 export async function GET() {
   const session = await getSessionInfo();
@@ -27,32 +28,56 @@ export async function POST(req: Request) {
   const session = await getSessionInfo();
   if (!session) return unauthorized();
   try {
-    const { force, repeatWeeks, ...body } = await req.json();
+    const { force, repeatWeeks, slots, ...body } = await req.json();
     const duration = body.duration ? Number(body.duration) : 45;
-    // Serie de sesiones: misma hora y día de la semana durante N semanas
+    // Serie de sesiones: hasta N semanas, con uno o varios días/horas por semana
     const weeks = Math.max(0, Math.min(52, Number(repeatWeeks) || 0));
+    const occurrences = seriesOccurrences(
+      String(body.date ?? ""),
+      String(body.time ?? ""),
+      weeks,
+      Array.isArray(slots) ? slots : []
+    );
 
-    // Detección de choques de horario en el mismo día
+    // Detección de choques de horario en cualquier fecha de la serie
     if (body.date && body.time && !force) {
-      const sameDay = await prisma.appointment.findMany({
-        where: { createdBy: session.email, date: body.date, status: { not: "cancelada" } },
+      const existing = await prisma.appointment.findMany({
+        where: {
+          createdBy: session.email,
+          date: { in: occurrences.map((o) => o.date) },
+          status: { not: "cancelada" },
+        },
       });
-      const start = toMinutes(body.time);
-      const end = start + duration;
-      const conflict = sameDay.find((a) => {
-        const aStart = toMinutes(a.time);
-        const aEnd = aStart + (a.duration || 45);
-        return start < aEnd && aStart < end;
-      });
+      let conflict: { title: string; time: string; date: string } | undefined;
+      for (const occ of occurrences) {
+        const start = toMinutes(occ.time);
+        const end = start + duration;
+        const hit = existing.find((a) => {
+          if (a.date !== occ.date) return false;
+          const aStart = toMinutes(a.time);
+          const aEnd = aStart + (a.duration || 45);
+          return start < aEnd && aStart < end;
+        });
+        if (hit) {
+          conflict = hit;
+          break;
+        }
+      }
       if (conflict) {
+        const sameDay = conflict.date === body.date;
         return NextResponse.json(
-          { error: `Choca con "${conflict.title}" a las ${conflict.time}`, conflict: true },
+          {
+            error: sameDay
+              ? `Choca con "${conflict.title}" a las ${conflict.time}`
+              : `Choca con "${conflict.title}" el ${conflict.date} a las ${conflict.time}`,
+            conflict: true,
+          },
           { status: 409 }
         );
       }
     }
 
-    const seriesId = weeks > 0 ? randomUUID() : "";
+    const seriesId = occurrences.length > 1 ? randomUUID() : "";
     const base = {
       ...body,
       duration,
@@ -61,15 +86,14 @@ export async function POST(req: Request) {
       seriesId,
     };
 
-    const appointment = await prisma.appointment.create({ data: base });
+    const [first, ...others] = occurrences;
+    const appointment = await prisma.appointment.create({
+      data: { ...base, date: first.date, time: first.time },
+    });
 
-    // Repeticiones semanales
     const extra = [];
-    for (let i = 1; i <= weeks; i++) {
-      const [y, m, d] = String(body.date).split("-").map(Number);
-      const next = new Date(y, m - 1, d + i * 7);
-      const dateStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
-      extra.push(await prisma.appointment.create({ data: { ...base, date: dateStr } }));
+    for (const occ of others) {
+      extra.push(await prisma.appointment.create({ data: { ...base, date: occ.date, time: occ.time } }));
     }
 
     // Aviso inmediato al paciente y al tutor (no debe bloquear la creación de la cita)

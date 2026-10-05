@@ -35,7 +35,6 @@ const secondaryItems = [
   { href: "/dashboard/tareas", icon: CheckSquare, label: "Tareas", tint: "from-amber-500 to-orange-500" },
   { href: "/dashboard/pipeline", icon: Kanban, label: "Pipeline", tint: "from-blue-500 to-indigo-600" },
   { href: "/dashboard/biblioteca", icon: BookOpen, label: "Biblioteca", tint: "from-pink-500 to-rose-500" },
-  { href: "/dashboard/recordatorios", icon: Bell, label: "Recordatorios", tint: "from-emerald-500 to-teal-600" },
   { href: "/dashboard/facturacion", icon: Wallet, label: "Facturación", tint: "from-fuchsia-500 to-pink-600" },
   { href: "/dashboard/plan", icon: Crown, label: "Mi plan", tint: "from-violet-500 to-purple-600" },
   { href: "/dashboard/configuracion", icon: Settings, label: "Configuración", tint: "from-slate-500 to-slate-700" },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processAppointmentReminders } from "@/lib/appointmentReminders";
+import { processTaskReminders } from "@/lib/taskReminders";
 import { getSessionInfo } from "@/lib/apiAuth";
 
 // Disparo manual del proceso de recordatorios: con sesión iniciada,
@@ -14,7 +15,8 @@ export async function POST(req: NextRequest) {
   }
   try {
     const result = await processAppointmentReminders();
-    return NextResponse.json(result);
+    const tasks = await processTaskReminders();
+    return NextResponse.json({ ...result, tasks });
   } catch (err) {
     console.error("Cron reminders error:", err);
     return NextResponse.json({ error: "Error procesando recordatorios" }, { status: 500 });

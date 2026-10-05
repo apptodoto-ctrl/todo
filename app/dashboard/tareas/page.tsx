@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Check, Clock, AlertCircle, Trash2, ArrowUpDown, Pencil } from "lucide-react";
+import { Plus, Check, Clock, AlertCircle, Trash2, ArrowUpDown, Pencil, Bell } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
@@ -16,6 +16,8 @@ interface Task {
   priority: Priority;
   status: Status;
   due: string;
+  time: string;
+  notify: boolean;
   patient?: string;
   category: string;
 }
@@ -36,7 +38,7 @@ export default function TareasPage() {
   const [sortAsc, setSortAsc] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
-  const [newTask, setNewTask] = useState({ title: "", description: "", priority: "media" as Priority, due: "", patient: "", category: "Clínico" });
+  const [newTask, setNewTask] = useState({ title: "", description: "", priority: "media" as Priority, due: "", time: "", notify: false, patient: "", category: "Clínico" });
   const { email: currentUserEmail } = useCurrentUser();
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function TareasPage() {
     if (res.ok) {
       const task = await res.json();
       setTasks((prev) => [...prev, task]);
-      setNewTask({ title: "", description: "", priority: "media", due: "", patient: "", category: "Clínico" });
+      setNewTask({ title: "", description: "", priority: "media", due: "", time: "", notify: false, patient: "", category: "Clínico" });
       setShowNewTask(false);
       setFilter("todas");
     }
@@ -131,7 +133,7 @@ export default function TareasPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Toolbar */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-600">{tasks.length} tareas en total</p>
+        <p className="text-sm text-slate-600">{tasks.length} {tasks.length === 1 ? "tarea" : "tareas"} en total</p>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSortAsc(!sortAsc)}
@@ -145,7 +147,7 @@ export default function TareasPage() {
             onClick={() => setShowNewTask(true)}
             className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30"
           >
-            <Plus className="w-4 h-4" /> Nueva Tarea
+            <Plus className="w-4 h-4" /> Nueva
           </button>
         </div>
       </div>
@@ -249,9 +251,14 @@ export default function TareasPage() {
                       {task.patient && (
                         <span className="text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-lg">{task.patient}</span>
                       )}
+                      {task.notify && (
+                        <span className="flex items-center gap-1 text-[11px] font-semibold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-lg" title="Te avisamos por correo">
+                          <Bell className="w-3 h-3" /> Aviso
+                        </span>
+                      )}
                       {task.due && (() => { const m = getDueMeta(task.due, task.status); return (
                         <span className={`ml-auto flex items-center gap-1 text-xs ${m.cls}`}>
-                          <Clock className="w-3 h-3" /> {m.label}
+                          <Clock className="w-3 h-3" /> {m.label}{task.time ? ` · ${task.time}` : ""}
                         </span>
                       ); })()}
                     </div>
@@ -328,6 +335,9 @@ export default function TareasPage() {
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
               >
                 <option>Clínico</option>
+                <option>Recordatorio</option>
+                <option>Cita</option>
+                <option>Pago</option>
                 <option>Documentación</option>
                 <option>Preparación</option>
                 <option>Comunicación</option>
@@ -342,7 +352,16 @@ export default function TareasPage() {
               <input
                 type="date"
                 value={newTask.due}
-                onChange={(e) => setNewTask({ ...newTask, due: e.target.value })}
+                onChange={(e) => setNewTask({ ...newTask, due: e.target.value, notify: e.target.value ? newTask.notify : false })}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
+              <input
+                type="time"
+                value={newTask.time}
+                onChange={(e) => setNewTask({ ...newTask, time: e.target.value })}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
               />
             </div>
@@ -360,6 +379,23 @@ export default function TareasPage() {
               </select>
             </div>
           </div>
+          <label className={`flex items-start gap-3 rounded-xl border p-3 transition-all ${newTask.due ? "border-slate-200 bg-white cursor-pointer hover:border-violet-300" : "border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed"}`}>
+            <input
+              type="checkbox"
+              checked={newTask.notify}
+              disabled={!newTask.due}
+              onChange={(e) => setNewTask({ ...newTask, notify: e.target.checked })}
+              className="mt-0.5 w-4 h-4 accent-violet-600"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-slate-700">Avisarme por correo</span>
+              <span className="block text-[11px] text-slate-500 mt-0.5">
+                {newTask.due
+                  ? `Te escribimos el ${newTask.due}${newTask.time ? ` a las ${newTask.time}` : " por la mañana"}.`
+                  : "Elige una fecha límite para poder activar el aviso."}
+              </span>
+            </span>
+          </label>
         </div>
       </Modal>
 
@@ -420,6 +456,9 @@ export default function TareasPage() {
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
                 >
                   <option>Clínico</option>
+                  <option>Recordatorio</option>
+                  <option>Cita</option>
+                  <option>Pago</option>
                   <option>Documentación</option>
                   <option>Preparación</option>
                   <option>Comunicación</option>
@@ -438,6 +477,17 @@ export default function TareasPage() {
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
                 />
               </div>
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
+                <input
+                  type="time"
+                  value={editingTask.time ?? ""}
+                  onChange={(e) => setEditingTask({ ...editingTask, time: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario</label>
                 <select
@@ -464,6 +514,21 @@ export default function TareasPage() {
                 <option value="completada">Completada</option>
               </select>
             </div>
+            <label className={`flex items-start gap-3 rounded-xl border p-3 transition-all ${editingTask.due ? "border-slate-200 bg-white cursor-pointer hover:border-violet-300" : "border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed"}`}>
+              <input
+                type="checkbox"
+                checked={!!editingTask.notify}
+                disabled={!editingTask.due}
+                onChange={(e) => setEditingTask({ ...editingTask, notify: e.target.checked })}
+                className="mt-0.5 w-4 h-4 accent-violet-600"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-slate-700">Avisarme por correo</span>
+                <span className="block text-[11px] text-slate-500 mt-0.5">
+                  {editingTask.due ? "Te escribimos cuando llegue la fecha y hora." : "Elige una fecha límite para poder activar el aviso."}
+                </span>
+              </span>
+            </label>
           </div>
         )}
       </Modal>

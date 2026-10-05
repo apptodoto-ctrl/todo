@@ -22,10 +22,12 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { patient, patientId, ...rest } = body;
+    delete rest.notifiedAt;
     const task = await prisma.task.create({
       data: {
         ...rest,
         patientName: rest.patientName ?? patient ?? "",
+        notify: rest.notify === true && !!rest.due,
         createdBy: session.email,
         ...(patientId ? { patientId: Number(patientId) } : {}),
       },

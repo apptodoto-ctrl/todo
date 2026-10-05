@@ -9,11 +9,10 @@ const pageLabels: Record<string, { title: string; subtitle: string }> = {
   "/dashboard/inicio": { title: "Inicio", subtitle: "Resumen de tu práctica clínica" },
   "/dashboard/calendario": { title: "Calendario", subtitle: "Gestión de citas y eventos" },
   "/dashboard/usuarios": { title: "Usuarios", subtitle: "Gestión de usuarios y profesionales" },
-  "/dashboard/tareas": { title: "Tareas", subtitle: "Seguimiento de actividades pendientes" },
+  "/dashboard/tareas": { title: "Tareas y recordatorios", subtitle: "Pendientes y avisos por correo" },
   "/dashboard/asistentes": { title: "Asistentes Virtuales", subtitle: "Herramientas de inteligencia artificial" },
   "/dashboard/pipeline": { title: "Pipeline de Casos", subtitle: "Vista Kanban del proceso clínico" },
   "/dashboard/biblioteca": { title: "Biblioteca de Recursos", subtitle: "Documentos y materiales terapéuticos" },
-  "/dashboard/recordatorios": { title: "Recordatorios", subtitle: "Notificaciones y alertas futuras" },
   "/dashboard/plan": { title: "Mi plan", subtitle: "Suscripción y créditos de IA" },
   "/dashboard/facturacion": { title: "Facturación", subtitle: "Ingresos del mes y cobros pendientes" },
   "/dashboard/admin": { title: "Administración", subtitle: "Métricas globales de la plataforma" },
@@ -60,9 +59,9 @@ export default function Header() {
 
           {/* Notificaciones */}
           <button
-            onClick={() => router.push("/dashboard/recordatorios")}
+            onClick={() => router.push("/dashboard/tareas")}
             className="relative w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-xl transition-colors active:scale-90 duration-150 group"
-            aria-label="Recordatorios"
+            aria-label="Tareas y recordatorios"
           >
             <Bell className="w-[22px] h-[22px] lg:w-5 lg:h-5 text-slate-500 group-hover:text-slate-700 transition-colors" />
           </button>

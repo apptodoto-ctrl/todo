@@ -8,6 +8,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { es } from "date-fns/locale";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import TimeGrid from "@/components/calendar/TimeGrid";
+import { seriesOccurrences } from "@/lib/appointmentSeries";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -35,18 +36,11 @@ interface CalTask {
   id: number;
   title: string;
   due: string;
+  time: string;
+  notify: boolean;
   patient?: string;
   priority: string;
   status: string;
-}
-
-interface CalReminder {
-  id: number;
-  title: string;
-  date: string;
-  time: string;
-  type: string;
-  done: boolean;
 }
 
 const typeColors: Record<string, string> = {
@@ -63,6 +57,16 @@ const typeDots: Record<string, string> = {
   grupal: "bg-amber-600",
 };
 
+const WEEKDAYS = [
+  { value: 1, short: "L", label: "Lunes" },
+  { value: 2, short: "M", label: "Martes" },
+  { value: 3, short: "M", label: "Miércoles" },
+  { value: 4, short: "J", label: "Jueves" },
+  { value: 5, short: "V", label: "Viernes" },
+  { value: 6, short: "S", label: "Sábado" },
+  { value: 0, short: "D", label: "Domingo" },
+];
+
 export default function CalendarioPage() {
   const [current, setCurrent] = useState(new Date());
   const [selected, setSelected] = useState<Date | null>(new Date());
@@ -70,27 +74,18 @@ export default function CalendarioPage() {
   const [showNewEvent, setShowNewEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, patientId: null as number | null });
   const [repeatWeeks, setRepeatWeeks] = useState(0);
+  // Serie con varios días/horas por semana (ej. martes 17:00 y jueves 15:00)
+  const [extraSlots, setExtraSlots] = useState<{ weekday: number; time: string }[]>([]);
   const [patients, setPatients] = useState<{ id: number; name: string; phone?: string; guardianPhone?: string }[]>([]);
   const [tasks, setTasks] = useState<CalTask[]>([]);
-  const [reminders, setReminders] = useState<CalReminder[]>([]);
   const [editEvent, setEditEvent] = useState<CalEvent | null>(null);
   const [editEventForm, setEditEventForm] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, status: "agendada" });
-  const [editReminder, setEditReminder] = useState<CalReminder | null>(null);
-  const [editReminderForm, setEditReminderForm] = useState({ title: "", date: "", time: "09:00", type: "general" });
   const [eventError, setEventError] = useState("");
   const [customName, setCustomName] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   // Vista del calendario: mes (por defecto), semana o día
   const [view, setView] = useState<"mes" | "semana" | "dia">("mes");
   const { email: currentUserEmail } = useCurrentUser();
-
-  useEffect(() => {
-    if (!currentUserEmail) return;
-    fetch("/api/reminders")
-      .then((r) => r.json())
-      .then((data) => setReminders(Array.isArray(data) ? data : []))
-      .catch(() => setReminders([]));
-  }, [currentUserEmail]);
 
   useEffect(() => {
     if (!currentUserEmail) return;
@@ -124,6 +119,19 @@ export default function CalendarioPage() {
       .catch(() => {});
   }, [currentUserEmail]);
 
+  // Día de la semana de la primera cita: siempre forma parte de la serie
+  const baseWeekday = newEvent.date ? new Date(`${newEvent.date}T00:00:00`).getDay() : new Date().getDay();
+  const seriesCount = seriesOccurrences(newEvent.date, newEvent.time, repeatWeeks, extraSlots).length;
+
+  const toggleSlot = (weekday: number) => {
+    if (weekday === baseWeekday) return;
+    setExtraSlots((prev) =>
+      prev.some((s) => s.weekday === weekday)
+        ? prev.filter((s) => s.weekday !== weekday)
+        : [...prev, { weekday, time: newEvent.time }]
+    );
+  };
+
   const openNewEvent = (type = "sesion") => {
     const defaultDate = selected
       ? format(selected, "yyyy-MM-dd")
@@ -132,6 +140,7 @@ export default function CalendarioPage() {
     setEventError("");
     setCustomName(false);
     setRepeatWeeks(0);
+    setExtraSlots([]);
     setShowNewEvent(true);
   };
 
@@ -146,7 +155,7 @@ export default function CalendarioPage() {
       const res = await fetch("/api/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location, duration: newEvent.duration, patientId: newEvent.patientId, repeatWeeks, force }),
+        body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location, duration: newEvent.duration, patientId: newEvent.patientId, repeatWeeks, slots: extraSlots, force }),
       });
       if (res.status === 409) {
         const data = await res.json();
@@ -159,7 +168,7 @@ export default function CalendarioPage() {
       if (res.ok) {
         const saved = await res.json();
         // Una serie devuelve todas las citas creadas; una cita suelta, solo la suya
-        const created: { id: number; date: string }[] = saved.series ?? [saved];
+        const created: { id: number; date: string; time: string }[] = saved.series ?? [saved];
         setLocalEvents((prev: CalEvent[]) => [
           ...prev,
           ...created.map((c) => {
@@ -168,7 +177,7 @@ export default function CalendarioPage() {
               id: c.id,
               date: new Date(cy, cm - 1, cd),
               title: newEvent.title,
-              time: newEvent.time,
+              time: c.time ?? newEvent.time,
               type: newEvent.type,
               location: newEvent.location,
               duration: newEvent.duration,
@@ -182,6 +191,7 @@ export default function CalendarioPage() {
         setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, patientId: null });
         setCustomName(false);
         setRepeatWeeks(0);
+        setExtraSlots([]);
         setShowNewEvent(false);
       } else {
 
@@ -245,30 +255,6 @@ export default function CalendarioPage() {
     if (res.ok) setLocalEvents((prev) => prev.filter((e) => e.id !== ev.id));
   };
 
-  const openEditReminder = (r: CalReminder) => {
-    setEditReminderForm({ title: r.title, date: r.date, time: r.time, type: r.type });
-    setEditReminder(r);
-  };
-
-  const saveEditReminder = async () => {
-    if (!editReminder || !editReminderForm.title.trim()) return;
-    const res = await fetch(`/api/reminders/${editReminder.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editReminderForm),
-    });
-    if (res.ok) {
-      setReminders((prev) => prev.map((r) => (r.id === editReminder.id ? { ...r, ...editReminderForm } : r)));
-      setEditReminder(null);
-    }
-  };
-
-  const deleteReminder = async (id: number) => {
-    if (!confirm("¿Eliminar este recordatorio?")) return;
-    const res = await fetch(`/api/reminders/${id}`, { method: "DELETE" });
-    if (res.ok) setReminders((prev) => prev.filter((r) => r.id !== id));
-  };
-
   const deleteTask = async (id: number) => {
     if (!confirm("¿Eliminar esta tarea?")) return;
     const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
@@ -309,9 +295,6 @@ export default function CalendarioPage() {
     ? tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), selected))
     : [];
 
-  const selectedReminders = selected
-    ? reminders.filter((r) => r.date && !r.done && (() => { try { return isSameDay(new Date(r.date + "T00:00:00"), selected); } catch { return false; } })())
-    : [];
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -388,6 +371,7 @@ export default function CalendarioPage() {
                 setEventError("");
                 setCustomName(false);
                 setRepeatWeeks(0);
+                setExtraSlots([]);
                 setShowNewEvent(true);
               }}
               onSelectEvent={(ev) => { setSelected(ev.date); openEditEvent(ev); }}
@@ -412,7 +396,6 @@ export default function CalendarioPage() {
               const isSelected = selected && isSameDay(day, selected);
               const dayEvents = localEvents.filter((e) => isSameDay(e.date, day));
               const dayTasks = tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), day));
-              const dayReminders = reminders.filter((r) => r.date && !r.done && (() => { try { return isSameDay(new Date(r.date + "T00:00:00"), day); } catch { return false; } })());
               const inMonth = isSameMonth(day, current);
 
               return (
@@ -442,9 +425,6 @@ export default function CalendarioPage() {
                     {dayEvents.length === 0 && dayTasks.length > 0 && (
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                     )}
-                    {dayEvents.length === 0 && dayTasks.length === 0 && dayReminders.length > 0 && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-                    )}
                   </div>
 
                   {/* Escritorio: detalle de cada evento */}
@@ -466,14 +446,9 @@ export default function CalendarioPage() {
                         ✓ {t.title.split(" ")[0]}
                       </div>
                     ))}
-                    {dayReminders.slice(0, Math.max(0, 2 - dayEvents.length - dayTasks.length)).map((r, ri) => (
-                      <div key={ri} className="text-[10px] font-medium px-1.5 py-0.5 rounded truncate border bg-orange-50 text-orange-700 border-orange-200">
-                        🔔 {r.title.split(" ")[0]}
-                      </div>
-                    ))}
-                    {dayEvents.length + dayTasks.length + dayReminders.length > 2 && (
+                    {dayEvents.length + dayTasks.length > 2 && (
                       <div className="text-[10px] text-slate-400 font-medium pl-1">
-                        +{dayEvents.length + dayTasks.length + dayReminders.length - 2} más
+                        +{dayEvents.length + dayTasks.length - 2} más
                       </div>
                     )}
                   </div>
@@ -507,7 +482,7 @@ export default function CalendarioPage() {
             ))}
           </div>
 
-          {selectedEvents.length === 0 && selectedTasks.length === 0 && selectedReminders.length === 0 ? (
+          {selectedEvents.length === 0 && selectedTasks.length === 0 ? (
             <div className="text-center py-10 text-slate-400">
               <Clock className="w-10 h-10 mx-auto mb-3 text-slate-200" />
               <p className="text-sm">Sin eventos este día</p>
@@ -601,34 +576,14 @@ export default function CalendarioPage() {
                         <p className={`text-sm font-semibold ${
                           done ? "line-through text-slate-400" : "text-slate-700"
                         }`}>{t.title}</p>
-                        {t.patient && <p className="text-xs text-slate-400 mt-1">{t.patient}</p>}
+                        <div className="flex items-center gap-2 mt-1">
+                          {t.patient && <p className="text-xs text-slate-400">{t.patient}</p>}
+                          {t.time && <span className="text-xs text-slate-400">{t.time}</span>}
+                          {t.notify && <Bell className="w-3 h-3 text-orange-500" />}
+                        </div>
                       </div>
                     );
                   })}
-                </>
-              )}
-              {selectedReminders.length > 0 && (
-                <>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide pt-1">Recordatorios</p>
-                  {selectedReminders.map((r) => (
-                    <div key={r.id} className="p-3.5 rounded-xl border border-orange-100 bg-orange-50/60 hover:bg-orange-50 transition-all">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-lg border bg-orange-100 text-orange-700 border-orange-200 capitalize">{r.type}</span>
-                        <div className="flex items-center gap-1">
-                          <span className="flex items-center gap-1 text-xs text-orange-500 font-medium">
-                            <Bell className="w-3 h-3" /> {r.time}
-                          </span>
-                          <button onClick={() => openEditReminder(r)} className="p-1 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all" title="Editar">
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                          <button onClick={() => deleteReminder(r.id)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Eliminar">
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                      <p className="text-sm font-semibold text-slate-700">{r.title}</p>
-                    </div>
-                  ))}
                 </>
               )}
             </div>
@@ -712,43 +667,6 @@ export default function CalendarioPage() {
         </div>
       </Modal>
 
-      {/* Edit Reminder Modal */}
-      <Modal
-        open={!!editReminder}
-        onClose={() => setEditReminder(null)}
-        title="Editar Recordatorio"
-        footer={
-          <button onClick={saveEditReminder} disabled={!editReminderForm.title.trim()} className="w-full bg-gradient-to-r from-orange-400 to-amber-500 text-white font-semibold py-3 rounded-xl hover:from-orange-300 hover:to-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-orange-500/30">
-            Guardar cambios
-          </button>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Título *</label>
-            <input autoFocus type="text" value={editReminderForm.title} onChange={(e) => setEditReminderForm({ ...editReminderForm, title: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha</label>
-              <input type="date" value={editReminderForm.date} onChange={(e) => setEditReminderForm({ ...editReminderForm, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all" />
-            </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Hora</label>
-              <input type="time" value={editReminderForm.time} onChange={(e) => setEditReminderForm({ ...editReminderForm, time: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all" />
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tipo</label>
-            <select value={editReminderForm.type} onChange={(e) => setEditReminderForm({ ...editReminderForm, type: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all bg-white">
-              <option value="general">General</option>
-              <option value="cita">Cita</option>
-              <option value="tarea">Tarea</option>
-              <option value="pago">Pago</option>
-            </select>
-          </div>
-        </div>
-      </Modal>
 
       {/* New Event Modal */}
       <Modal
@@ -769,7 +687,7 @@ export default function CalendarioPage() {
         <div className="space-y-4">
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha *</label>
-            <input autoFocus type="date" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <input autoFocus type="date" value={newEvent.date} onChange={(e) => { const date = e.target.value; const wd = date ? new Date(`${date}T00:00:00`).getDay() : -1; setNewEvent({ ...newEvent, date }); setExtraSlots((prev) => prev.filter((s) => s.weekday !== wd)); }} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Usuario *</label>
@@ -833,7 +751,52 @@ export default function CalendarioPage() {
               <option value={23}>24 semanas (6 meses)</option>
             </select>
             {repeatWeeks > 0 && (
-              <p className="text-[11px] text-violet-600 mt-1.5">Se crearán {repeatWeeks + 1} sesiones, el mismo día y hora cada semana.</p>
+              <div className="mt-3 bg-violet-50/60 border border-violet-100 rounded-xl p-3">
+                <p className="text-xs font-semibold text-slate-700 mb-2">Días de la semana</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEKDAYS.map((d) => {
+                    const isBase = d.value === baseWeekday;
+                    const slot = extraSlots.find((s) => s.weekday === d.value);
+                    const on = isBase || !!slot;
+                    return (
+                      <button
+                        key={d.value}
+                        type="button"
+                        disabled={isBase}
+                        onClick={() => toggleSlot(d.value)}
+                        title={isBase ? "Día de la primera cita" : undefined}
+                        className={`w-9 h-9 rounded-lg text-xs font-bold transition-all ${
+                          on ? "bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-sm" : "bg-white border border-slate-200 text-slate-500 hover:border-violet-300"
+                        } ${isBase ? "cursor-default" : ""}`}
+                      >
+                        {d.short}
+                      </button>
+                    );
+                  })}
+                </div>
+                {extraSlots.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {extraSlots
+                      .slice()
+                      .sort((a, b) => a.weekday - b.weekday)
+                      .map((s) => (
+                        <div key={s.weekday} className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-slate-600 w-20 shrink-0">{WEEKDAYS.find((d) => d.value === s.weekday)?.label}</span>
+                          <input
+                            type="time"
+                            value={s.time}
+                            onChange={(e) => setExtraSlots((prev) => prev.map((x) => (x.weekday === s.weekday ? { ...x, time: e.target.value } : x)))}
+                            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 bg-white"
+                          />
+                        </div>
+                      ))}
+                  </div>
+                )}
+                <p className="text-[11px] text-violet-700 mt-2.5">
+                  Se crearán {seriesCount} citas en {repeatWeeks + 1} semanas
+                  {extraSlots.length > 0 ? ", combinando los días y horas elegidos." : `, todos los ${WEEKDAYS.find((d) => d.value === baseWeekday)?.label.toLowerCase()} a las ${newEvent.time}.`}
+                </p>
+              </div>
             )}
           </div>
           <div>
