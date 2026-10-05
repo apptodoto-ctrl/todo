@@ -4,9 +4,10 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, CheckSquare, Bell, Pencil, Trash2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import TimeGrid from "@/components/calendar/TimeGrid";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -79,6 +80,8 @@ export default function CalendarioPage() {
   const [eventError, setEventError] = useState("");
   const [customName, setCustomName] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
+  // Vista del calendario: mes (por defecto), semana o día
+  const [view, setView] = useState<"mes" | "semana" | "dia">("mes");
   const { email: currentUserEmail } = useCurrentUser();
 
   useEffect(() => {
@@ -272,6 +275,24 @@ export default function CalendarioPage() {
     if (res.ok) setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // Navegación y título según la vista activa
+  const weekDays = eachDayOfInterval({
+    start: startOfWeek(current, { weekStartsOn: 1 }),
+    end: endOfWeek(current, { weekStartsOn: 1 }),
+  });
+
+  const goPrev = () =>
+    setCurrent(view === "mes" ? subMonths(current, 1) : view === "semana" ? subWeeks(current, 1) : subDays(current, 1));
+  const goNext = () =>
+    setCurrent(view === "mes" ? addMonths(current, 1) : view === "semana" ? addWeeks(current, 1) : addDays(current, 1));
+
+  const periodLabel =
+    view === "mes"
+      ? format(current, "MMMM yyyy", { locale: es })
+      : view === "semana"
+      ? `${format(weekDays[0], "d MMM", { locale: es })} – ${format(weekDays[6], "d MMM yyyy", { locale: es })}`
+      : format(current, "EEEE d 'de' MMMM", { locale: es });
+
   const monthStart = startOfMonth(current);
   const monthEnd = endOfMonth(current);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -302,22 +323,39 @@ export default function CalendarioPage() {
       >
         <div className="flex items-center gap-1 sm:gap-3">
           <button
-            onClick={() => setCurrent(subMonths(current, 1))}
+            onClick={goPrev}
             className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm active:scale-90 transition-all"
-            aria-label="Mes anterior"
+            aria-label="Período anterior"
           >
             <ChevronLeft className="w-5 h-5 sm:w-4 sm:h-4 text-slate-600" />
           </button>
-          <h2 className="text-lg font-bold text-slate-800 flex-1 sm:min-w-[180px] text-center capitalize truncate">
-            {format(current, "MMMM yyyy", { locale: es })}
+          <h2 className="text-lg font-bold text-slate-800 flex-1 sm:min-w-[200px] text-center first-letter:uppercase truncate">
+            {periodLabel}
           </h2>
           <button
-            onClick={() => setCurrent(addMonths(current, 1))}
+            onClick={goNext}
             className="w-10 h-10 flex items-center justify-center shrink-0 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm active:scale-90 transition-all"
-            aria-label="Mes siguiente"
+            aria-label="Período siguiente"
           >
             <ChevronRight className="w-5 h-5 sm:w-4 sm:h-4 text-slate-600" />
           </button>
+        </div>
+        <div className="flex bg-white border border-slate-200 rounded-xl p-1 gap-1 self-start">
+          {([
+            { key: "mes" as const, label: "Mes" },
+            { key: "semana" as const, label: "Semana" },
+            { key: "dia" as const, label: "Día" },
+          ]).map((v) => (
+            <button
+              key={v.key}
+              onClick={() => setView(v.key)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                view === v.key ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
         </div>
         <div className="grid grid-cols-3 sm:flex sm:items-center gap-2">
           <button onClick={() => openNewEvent("sesion")} className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-2 sm:px-3 py-2.5 rounded-xl font-medium text-[13px] sm:text-sm hover:from-violet-400 hover:to-purple-500 active:scale-95 transition-all shadow-lg shadow-violet-500/30">
@@ -333,13 +371,29 @@ export default function CalendarioPage() {
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Calendar grid */}
+        {/* Calendario: vista de mes, semana o día */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/60 overflow-hidden"
+          className="lg:col-span-2"
         >
+          {view !== "mes" ? (
+            <TimeGrid
+              days={view === "semana" ? weekDays : [current]}
+              events={localEvents}
+              onSelectSlot={(d, time) => {
+                setSelected(d);
+                setNewEvent({ title: "", date: format(d, "yyyy-MM-dd"), time, type: "sesion", location: "", duration: 45, patientId: null });
+                setEventError("");
+                setCustomName(false);
+                setRepeatWeeks(0);
+                setShowNewEvent(true);
+              }}
+              onSelectEvent={(ev) => { setSelected(ev.date); openEditEvent(ev); }}
+            />
+          ) : (
+          <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden">
           {/* Day headers */}
           <div className="grid grid-cols-7 border-b border-slate-100">
             {DAYS.map((d) => (
@@ -427,6 +481,8 @@ export default function CalendarioPage() {
               );
             })}
           </div>
+          </div>
+          )}
         </motion.div>
 
         {/* Events panel */}
