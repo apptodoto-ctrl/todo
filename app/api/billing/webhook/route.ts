@@ -3,10 +3,34 @@ import type Stripe from "stripe";
 import { prisma } from "@/lib/db";
 import { getStripe } from "@/lib/stripe";
 import { resetCycleCredits } from "@/lib/billing";
+import { sendEmail } from "@/lib/email";
 
 async function emailFromCustomer(customerId: string): Promise<string | null> {
   const sub = await prisma.subscription.findFirst({ where: { stripeCustomerId: customerId } });
   return sub?.userEmail ?? null;
+}
+
+// Avisa al correo de administración cada movimiento de suscripción
+async function notifyBilling(subject: string, lines: string[]) {
+  try {
+    const setting = await prisma.pricingSetting.findUnique({ where: { key: "billing_notify_email" } });
+    const to = setting?.value;
+    if (!to?.includes("@")) return;
+    await sendEmail(
+      to,
+      `TOdo · ${subject}`,
+      `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;">
+         <div style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);padding:20px;border-radius:12px 12px 0 0;">
+           <h1 style="color:white;margin:0;font-size:18px;">${subject}</h1>
+         </div>
+         <div style="background:#f8fafc;padding:20px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;">
+           ${lines.map((l) => `<p style="color:#475569;margin:0 0 6px;">${l}</p>`).join("")}
+         </div>
+       </div>`
+    );
+  } catch (err) {
+    console.error("[billing] aviso de pago falló:", err);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -58,6 +82,7 @@ export async function POST(req: NextRequest) {
             },
           });
           await prisma.creditLedger.create({ data: { userEmail, amount: 0, reason: `plan_start_${cs.metadata.tierCode}` } });
+          await notifyBilling("Nueva suscripción", [`Terapeuta: <strong>${userEmail}</strong>`, `Plan: ${cs.metadata.tierCode}`, `Ciclo: ${cs.metadata.cycle === "yearly" ? "anual" : "mensual"}`]);
         }
         break;
       }
@@ -87,6 +112,7 @@ export async function POST(req: NextRequest) {
           where: { userEmail },
           data: { status: "canceled", stripeSubscriptionId: "" },
         });
+        await notifyBilling("Suscripción cancelada", [`Terapeuta: <strong>${userEmail}</strong>`, "La cuenta pasa a solo lectura al terminar el ciclo pagado."]);
         break;
       }
 
@@ -101,6 +127,7 @@ export async function POST(req: NextRequest) {
         if (inv.billing_reason === "subscription_cycle") {
           await resetCycleCredits(userEmail);
         }
+        await notifyBilling("Pago recibido", [`Terapeuta: <strong>${userEmail}</strong>`, `Monto: ${((inv.amount_paid ?? 0) / 100).toFixed(2)} ${(inv.currency ?? "usd").toUpperCase()}`, `Motivo: ${inv.billing_reason ?? "pago"}`]);
         break;
       }
 
@@ -112,6 +139,7 @@ export async function POST(req: NextRequest) {
         if (!userEmail) break;
         // Acceso normal durante reintentos y gracia (Stripe reintenta según su configuración)
         await prisma.subscription.updateMany({ where: { userEmail }, data: { status: "past_due" } });
+        await notifyBilling("Pago rechazado", [`Terapeuta: <strong>${userEmail}</strong>`, "Stripe reintentará el cobro. La cuenta mantiene acceso mientras tanto."]);
         break;
       }
     }

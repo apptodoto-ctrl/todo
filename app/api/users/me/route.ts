@@ -22,15 +22,21 @@ export async function PUT(req: Request) {
     if (!name?.trim()) {
       return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
     }
+    const newName = name.trim();
     const user = await prisma.user.update({
       where: { email: session.email },
       data: {
-        name: name.trim(),
+        name: newName,
         ...(phone !== undefined ? { phone } : {}),
         ...(specialty !== undefined ? { specialty } : {}),
-        ...(currency && ["CLP", "ARS", "USD"].includes(currency) ? { currency } : {}),
+        ...(currency && ["CLP", "ARS", "COP", "USD"].includes(currency) ? { currency } : {}),
       },
       select: { name: true, email: true, phone: true, specialty: true, currency: true },
+    });
+    // El nombre de la terapeuta aparece en la ficha de cada paciente: se actualiza en todas
+    await prisma.patient.updateMany({
+      where: { createdBy: session.email },
+      data: { therapist: newName },
     });
     return NextResponse.json(user);
   } catch {

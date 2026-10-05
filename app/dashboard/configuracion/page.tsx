@@ -318,6 +318,7 @@ export default function ConfiguracionPage() {
                 >
                   <option value="CLP">Peso chileno (CLP)</option>
                   <option value="ARS">Peso argentino (ARS)</option>
+                  <option value="COP">Peso colombiano (COP)</option>
                   <option value="USD">Dólar (USD)</option>
                 </select>
                 <p className="text-xs text-slate-400 mt-1.5">Se usa para el valor de las sesiones y los cobros pendientes de tus pacientes.</p>

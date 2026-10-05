@@ -141,15 +141,22 @@ export async function sendAppointmentCreatedNotice(appointmentId: number): Promi
 
   // Si había destinatarios pero ninguno recibió, se deja pendiente para reintentar en la próxima pasada
   if (recipients.length > 0 && delivered === 0) return false;
-  await prisma.appointment.update({ where: { id: apt.id }, data: { createdNotifSent: true } });
+  // Agendada con menos de 24 h: el aviso de creación ya cumple, no se manda además el recordatorio
+  const horasFaltantes = (when.getTime() - Date.now()) / (1000 * 60 * 60);
+  await prisma.appointment.update({
+    where: { id: apt.id },
+    data: { createdNotifSent: true, ...(horasFaltantes < 24 ? { reminder1dSent: true } : {}) },
+  });
   return delivered > 0;
 }
 
-// Ventanas de recordatorio pedidas: 24 horas y 4 horas antes
+// Un único recordatorio 24 h antes (las TOs pidieron menos notificaciones)
 const BANDS = [
-  { flag: "reminder1dSent" as const, maxH: 24, minH: 4, heading: "Recordatorio: sesión mañana", when: "mañana" },
-  { flag: "reminder4hSent" as const, maxH: 4, minH: 0, heading: "Recordatorio: sesión en pocas horas", when: "hoy" },
+  { flag: "reminder1dSent" as const, maxH: 24, minH: 0, heading: "Recordatorio: sesión mañana", when: "mañana" },
 ];
+
+// La terapeuta solo recibe aviso de lo suyo (reuniones y evaluaciones), no de cada sesión de paciente
+const THERAPIST_NOTIFY_TYPES = ["reunion", "evaluacion"];
 
 export async function processAppointmentReminders(): Promise<{ sent: number; checked: number }> {
   const now = nowInSantiago();
@@ -161,7 +168,7 @@ export async function processAppointmentReminders(): Promise<{ sent: number; che
     where: {
       date: { gte: todayStr, lte: horizonStr },
       status: { notIn: ["cancelada", "asistio", "no_asistio"] },
-      OR: [{ createdNotifSent: false }, { reminder1dSent: false }, { reminder4hSent: false }],
+      OR: [{ createdNotifSent: false }, { reminder1dSent: false }],
     },
   });
 
@@ -206,8 +213,8 @@ export async function processAppointmentReminders(): Promise<{ sent: number; che
         );
       }
 
-      // Terapeuta
-      if (apt.createdBy) {
+      // Terapeuta: solo reuniones y evaluaciones propias
+      if (apt.createdBy && THERAPIST_NOTIFY_TYPES.includes(apt.type)) {
         await sendEmail(
           apt.createdBy,
           `Agenda: ${apt.title} ${band.when} a las ${apt.time || "09:00"}`,

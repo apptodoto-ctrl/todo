@@ -19,7 +19,7 @@ export default function AuthPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ email: "", password: "", confirmPassword: "", name: "" });
+  const [form, setForm] = useState({ email: "", password: "", confirmPassword: "", name: "", currency: "CLP" });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +34,7 @@ export default function AuthPage() {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+        body: JSON.stringify({ name: form.name, email: form.email, password: form.password, currency: form.currency }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Error al crear la cuenta."); setLoading(false); return; }
@@ -238,6 +238,26 @@ export default function AuthPage() {
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       className="w-full bg-white/[0.07] border border-white/[0.12] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all text-sm"
                     />
+                  </div>
+                )}
+
+                {/* País / moneda (solo registro) */}
+                {tab === "register" && (
+                  <div>
+                    <label className="block text-sm font-medium text-white/70 mb-2">
+                      ¿En qué país atiendes?
+                    </label>
+                    <select
+                      value={form.currency}
+                      onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                      className="w-full bg-white/[0.07] border border-white/[0.12] rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all text-sm [&>option]:text-slate-900"
+                    >
+                      <option value="CLP">Chile — peso chileno (CLP)</option>
+                      <option value="ARS">Argentina — peso argentino (ARS)</option>
+                      <option value="COP">Colombia — peso colombiano (COP)</option>
+                      <option value="USD">Otro país — dólar (USD)</option>
+                    </select>
+                    <p className="text-xs text-white/40 mt-1.5">Define la moneda del valor de tus sesiones. Puedes cambiarlo luego en Configuración.</p>
                   </div>
                 )}
 

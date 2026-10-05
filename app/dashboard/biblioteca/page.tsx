@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Upload, Search, FileText, File, Image, Archive, Download, Trash2, Eye, FolderOpen, Loader2 } from "lucide-react";
 
-const categories = ["Todas", "Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios"];
-const UPLOAD_CATEGORIES = ["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios"];
+const categories = ["Todas", "Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios", "Factura / Boleta", "Historia clínica externa"];
+const UPLOAD_CATEGORIES = ["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios", "Factura / Boleta", "Historia clínica externa"];
 
 interface Doc {
   id: number;
@@ -28,6 +28,7 @@ const fileIcons: Record<string, { icon: typeof FileText; color: string; bg: stri
 
 export default function BibliotecaPage() {
   const [category, setCategory] = useState("Todas");
+  const [patientFilter, setPatientFilter] = useState("");
   const [search, setSearch] = useState("");
   const [dragging, setDragging] = useState(false);
   const [documents, setDocuments] = useState<Doc[]>([]);
@@ -130,7 +131,10 @@ export default function BibliotecaPage() {
   const filtered = documents.filter((d) => {
     const matchCat = category === "Todas" || d.category === category;
     const matchSearch = d.name.toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
+    const matchPatient =
+      patientFilter === "" ||
+      (patientFilter === "sin" ? d.patientId === null : d.patientId === Number(patientFilter));
+    return matchCat && matchSearch && matchPatient;
   });
 
   return (
@@ -189,6 +193,17 @@ export default function BibliotecaPage() {
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
           />
         </div>
+        <select
+          value={patientFilter}
+          onChange={(e) => setPatientFilter(e.target.value)}
+          className="w-full sm:w-52 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+        >
+          <option value="">Todos los usuarios</option>
+          <option value="sin">Sin usuario asociado</option>
+          {patients.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}

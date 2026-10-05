@@ -15,6 +15,7 @@ interface Patient {
   guardianPhone: string;
   guardianEmail: string;
   prevision: string;
+  coverageEntity: string;
   school: string;
   consultReason: string;
   sessionValue: number;
@@ -65,9 +66,24 @@ function displayAge(p: { birthDate?: string; age: number }): number {
   return p.age;
 }
 
+// Próximas citas agendadas de un paciente (desde el calendario, no un campo manual)
+function upcomingFor(
+  patientId: number,
+  appointments: { id: number; date: string; time: string; type: string; status: string; patientId: number | null }[]
+) {
+  const now = new Date();
+  return appointments
+    .filter((a) => a.patientId === patientId && !["cancelada", "asistio", "no_asistio"].includes(a.status))
+    .filter((a) => {
+      const d = new Date(`${a.date}T${a.time || "00:00"}:00`);
+      return !isNaN(d.getTime()) && d >= now;
+    })
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+}
+
 // Formatea un monto con la moneda configurada en la cuenta
 function formatMoney(amount: number, currency: string): string {
-  const locale = currency === "ARS" ? "es-AR" : currency === "USD" ? "en-US" : "es-CL";
+  const locale = currency === "ARS" ? "es-AR" : currency === "COP" ? "es-CO" : currency === "USD" ? "en-US" : "es-CL";
   const decimals = currency === "USD" ? 2 : 0;
   return `${currency} ${amount.toLocaleString(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 }
@@ -106,7 +122,7 @@ export default function UsuariosPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
   const [showNewPatient, setShowNewPatient] = useState(false);
-  const [newPatient, setNewPatient] = useState({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
+  const [newPatient, setNewPatient] = useState({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", coverageEntity: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
@@ -119,14 +135,19 @@ export default function UsuariosPage() {
   const [editingSession, setEditingSession] = useState<SessionRecord | null>(null);
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [patientDocs, setPatientDocs] = useState<{ id: number; name: string; category: string; size: string; createdAt: string }[]>([]);
+  const [appointments, setAppointments] = useState<{ id: number; date: string; time: string; type: string; status: string; patientId: number | null }[]>([]);
   const [newObjective, setNewObjective] = useState("");
   const [savingObjective, setSavingObjective] = useState(false);
+  // Pacientes adultos sin tutor: el contacto es del propio paciente
+  const [selfContact, setSelfContact] = useState(false);
   const [currency, setCurrency] = useState("CLP");
   const { email: currentUserEmail, name: currentUserName } = useCurrentUser();
 
-  // Moneda configurada en la cuenta (CLP / ARS / USD)
+  // Moneda configurada en la cuenta (CLP / ARS / USD / COP)
   useEffect(() => {
     fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.currency) setCurrency(u.currency); }).catch(() => {});
+    // Las citas agendadas alimentan "Próxima sesión" y "Próximas sesiones" del perfil
+    fetch("/api/appointments").then((r) => r.json()).then((d) => setAppointments(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -244,10 +265,10 @@ export default function UsuariosPage() {
   };
 
   const exportCSV = () => {
-    const headers = ["Nombre", "Edad", "Fecha nacimiento", "Documento", "Diagnóstico", "Estado", "Tutor", "Teléfono tutor", "Previsión", "Teléfono", "Email", "Sesiones", "Próxima sesión"];
+    const headers = ["Nombre", "Edad", "Fecha nacimiento", "Documento", "Diagnóstico", "Estado", "Tutor", "Teléfono tutor", "Cobertura", "Entidad", "Teléfono", "Email", "Sesiones", "Próxima sesión"];
     const rows = patients.map((p) => [
       p.name, displayAge(p), p.birthDate, p.rut, p.diagnosis, statusConfig[p.status]?.label ?? p.status,
-      p.guardian, p.guardianPhone, p.prevision, p.phone, p.email, p.sessions, p.nextSession,
+      p.guardian, p.guardianPhone, p.prevision, p.coverageEntity, p.phone, p.email, p.sessions, p.nextSession,
     ]);
     const csv = [headers, ...rows]
       .map((row) => row.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"))
@@ -272,27 +293,6 @@ export default function UsuariosPage() {
     }
   };
 
-  // Agenda la cita en el calendario cuando la ficha trae fecha y hora de próxima sesión
-  const scheduleNextSession = async (patient: { id: number; name: string }, date: string, time: string) => {
-    if (!date || !time) return;
-    try {
-      await fetch("/api/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: patient.name,
-          date,
-          time,
-          type: "sesion",
-          location: "",
-          duration: 45,
-          patientId: patient.id,
-          force: true,
-        }),
-      });
-    } catch { /* la ficha ya quedó guardada; la cita puede crearse desde el calendario */ }
-  };
-
   const addPatient = async () => {
     if (!newPatient.name.trim() || !newPatient.diagnosis.trim()) return;
     const initials = newPatient.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -301,13 +301,23 @@ export default function UsuariosPage() {
     const res = await fetch("/api/patients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newPatient, age: newPatient.birthDate ? displayAge(newPatient) : newPatient.age, sessionValue: Number(newPatient.sessionValue) || 0, therapist: currentUserName, sessions: 0, initials, color, createdBy: currentUserEmail }),
+      body: JSON.stringify({
+        ...newPatient,
+        age: newPatient.birthDate ? displayAge(newPatient) : newPatient.age,
+        sessionValue: Number(newPatient.sessionValue) || 0,
+        // Adulto sin tutor: el contacto queda como del propio paciente
+        ...(selfContact ? { guardian: "", phone: newPatient.guardianPhone, email: newPatient.guardianEmail } : {}),
+        therapist: currentUserName,
+        sessions: 0,
+        initials,
+        color,
+        createdBy: currentUserEmail,
+      }),
     });
     if (res.ok) {
       const patient = await res.json();
       setPatients((prev) => [...prev, patient]);
-      await scheduleNextSession(patient, newPatient.nextSession, newPatient.nextSessionTime);
-      setNewPatient({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
+      setNewPatient({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", coverageEntity: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
       setShowNewPatient(false);
       setFilter("todos");
     } else {
@@ -326,7 +336,7 @@ export default function UsuariosPage() {
   };
 
   const openEdit = (p: Patient) => {
-    setEditForm({ name: p.name, age: p.age, birthDate: p.birthDate, guardian: p.guardian, guardianPhone: p.guardianPhone, guardianEmail: p.guardianEmail, prevision: p.prevision, consultReason: p.consultReason, sessionValue: p.sessionValue, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, nextSessionTime: p.nextSessionTime, phone: p.phone, email: p.email, rut: p.rut });
+    setEditForm({ name: p.name, age: p.age, birthDate: p.birthDate, guardian: p.guardian, guardianPhone: p.guardianPhone, guardianEmail: p.guardianEmail, prevision: p.prevision, coverageEntity: p.coverageEntity, consultReason: p.consultReason, sessionValue: p.sessionValue, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, nextSessionTime: p.nextSessionTime, phone: p.phone, email: p.email, rut: p.rut });
     setEditPatient(p);
     setMenuOpenId(null);
   };
@@ -340,11 +350,6 @@ export default function UsuariosPage() {
     });
     if (res.ok) {
       const updated = await res.json();
-      // Si cambió la próxima sesión y ahora tiene hora, se agenda en el calendario
-      const cambio = editForm.nextSession !== editPatient.nextSession || editForm.nextSessionTime !== editPatient.nextSessionTime;
-      if (cambio && editForm.nextSession && editForm.nextSessionTime) {
-        await scheduleNextSession(updated, editForm.nextSession, editForm.nextSessionTime);
-      }
       setPatients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       setSelectedPatient((prev) => (prev && prev.id === updated.id ? updated : prev));
       setEditPatient(null);
@@ -470,7 +475,7 @@ export default function UsuariosPage() {
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-600">
                   <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Próxima: {p.nextSession}</span>
+                  <span>Próxima: {(() => { const n = upcomingFor(p.id, appointments)[0]; return n ? `${n.date.split("-").reverse().join("-")} ${n.time}` : "sin agendar"; })()}</span>
                 </div>
               </div>
 
@@ -569,14 +574,17 @@ export default function UsuariosPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Previsión</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Cobertura de salud</label>
               <select value={editForm.prevision || ""} onChange={(e) => setEditForm({ ...editForm, prevision: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
                 <option value="">Sin especificar</option>
-                <option value="Fonasa">Fonasa</option>
-                <option value="Isapre">Isapre</option>
+                <option value="Pública">Pública</option>
+                <option value="Privada">Privada</option>
                 <option value="Particular">Particular</option>
-                <option value="Otra">Otra</option>
               </select>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Entidad</label>
+              <input type="text" value={editForm.coverageEntity || ""} onChange={(e) => setEditForm({ ...editForm, coverageEntity: e.target.value })} placeholder="Fonasa, Isapre, OSDE, EPS..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Valor sesión <span className="font-normal text-slate-400">({currency})</span></label>
@@ -590,14 +598,6 @@ export default function UsuariosPage() {
               <option value="evaluacion">En Evaluación</option>
               <option value="alta">Alta</option>
             </select>
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Próxima sesión</label>
-            <div className="grid grid-cols-2 gap-3">
-              <input type="date" value={editForm.nextSession || ""} onChange={(e) => setEditForm({ ...editForm, nextSession: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-              <input type="time" value={editForm.nextSessionTime || ""} onChange={(e) => setEditForm({ ...editForm, nextSessionTime: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1.5">Si cambias fecha y hora, se agenda la cita en el calendario.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -644,9 +644,12 @@ export default function UsuariosPage() {
                 { icon: Activity, label: "Terapeuta", value: selectedPatient.therapist },
                 { icon: ClipboardList, label: "Diagnóstico", value: selectedPatient.diagnosis },
                 { icon: Hash, label: "Sesiones", value: `${selectedPatient.sessions} realizadas` },
-                { icon: Calendar, label: "Próxima sesión", value: selectedPatient.nextSession || "—" },
+                { icon: Calendar, label: "Próxima sesión", value: (() => {
+                  const next = upcomingFor(selectedPatient.id, appointments)[0];
+                  return next ? `${next.date.split("-").reverse().join("-")} · ${next.time} hrs` : "Sin cita agendada";
+                })() },
                 ...(selectedPatient.guardian ? [{ icon: User, label: "Tutor / Apoderado", value: `${selectedPatient.guardian}${selectedPatient.guardianPhone ? ` · ${selectedPatient.guardianPhone}` : ""}` }] : []),
-                ...(selectedPatient.prevision ? [{ icon: ClipboardList, label: "Previsión", value: selectedPatient.prevision }] : []),
+                ...(selectedPatient.prevision || selectedPatient.coverageEntity ? [{ icon: ClipboardList, label: "Cobertura de salud", value: [selectedPatient.prevision, selectedPatient.coverageEntity].filter(Boolean).join(" · ") }] : []),
               ].map(({ icon: Icon, label, value }) => (
                 <div key={label} className="bg-slate-50 rounded-xl p-3">
                   <div className="flex items-center gap-2 mb-1">
@@ -744,6 +747,32 @@ export default function UsuariosPage() {
                 </div>
               )}
             </div>
+
+            {/* Próximas sesiones agendadas en el calendario */}
+            {(() => {
+              const next = upcomingFor(selectedPatient.id, appointments);
+              if (next.length === 0) return null;
+              return (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calendar className="w-4 h-4 text-violet-500" />
+                    <h4 className="text-sm font-bold text-slate-700">Próximas sesiones</h4>
+                    <span className="text-[11px] text-slate-400">({next.length} agendada{next.length > 1 ? "s" : ""})</span>
+                  </div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {next.slice(0, 10).map((a) => (
+                      <div key={a.id} className="flex items-center justify-between gap-2 bg-violet-50/60 border border-violet-100 rounded-xl px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-bold text-slate-700">{a.date.split("-").reverse().join("-")}</span>
+                          <span className="text-xs text-slate-500">{a.time} hrs</span>
+                        </div>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-white text-violet-600 border border-violet-200 capitalize">{a.type}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Historial de sesiones */}
             <div>
@@ -965,31 +994,42 @@ export default function UsuariosPage() {
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Motivo de consulta</label>
             <textarea rows={2} value={newPatient.consultReason} onChange={(e) => setNewPatient({ ...newPatient, consultReason: e.target.value })} placeholder="Por qué consulta, quién deriva..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all resize-none" />
           </div>
+          <div className="bg-slate-50 rounded-xl p-3">
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input type="checkbox" checked={selfContact} onChange={(e) => setSelfContact(e.target.checked)} className="accent-violet-500" />
+              El paciente es su propio contacto (adulto sin tutor)
+            </label>
+          </div>
           <div className="grid grid-cols-2 gap-3">
+            {!selfContact && (
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tutor / Apoderado</label>
+                <input type="text" value={newPatient.guardian} onChange={(e) => setNewPatient({ ...newPatient, guardian: e.target.value })} placeholder="Nombre del tutor" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              </div>
+            )}
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Tutor / Apoderado</label>
-              <input type="text" value={newPatient.guardian} onChange={(e) => setNewPatient({ ...newPatient, guardian: e.target.value })} placeholder="Nombre (si aplica)" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-            </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Teléfono tutor</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Teléfono / WhatsApp</label>
               <input type="tel" value={newPatient.guardianPhone} onChange={(e) => setNewPatient({ ...newPatient, guardianPhone: e.target.value })} placeholder="+56912345678" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Correo del tutor</label>
+            <div className={selfContact ? "" : "col-span-2"}>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Correo</label>
               <input type="email" value={newPatient.guardianEmail} onChange={(e) => setNewPatient({ ...newPatient, guardianEmail: e.target.value })} placeholder="correo@email.com" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-              <p className="text-[11px] text-slate-400 mt-1.5">Recibe el aviso al agendar y los recordatorios de cada sesión.</p>
+              <p className="text-[11px] text-slate-400 mt-1.5">Recibe el aviso al agendar la cita y el recordatorio 24 horas antes.</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Previsión</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Cobertura de salud</label>
               <select value={newPatient.prevision} onChange={(e) => setNewPatient({ ...newPatient, prevision: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
                 <option value="">Sin especificar</option>
-                <option value="Fonasa">Fonasa</option>
-                <option value="Isapre">Isapre</option>
+                <option value="Pública">Pública</option>
+                <option value="Privada">Privada</option>
                 <option value="Particular">Particular</option>
-                <option value="Otra">Otra</option>
               </select>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Entidad</label>
+              <input type="text" value={newPatient.coverageEntity} onChange={(e) => setNewPatient({ ...newPatient, coverageEntity: e.target.value })} placeholder="Fonasa, Isapre, OSDE, EPS..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Valor sesión <span className="font-normal text-slate-400">({currency})</span></label>
@@ -1003,24 +1043,6 @@ export default function UsuariosPage() {
               <option value="evaluacion">En Evaluación</option>
               <option value="alta">Alta</option>
             </select>
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Próxima sesión</label>
-            <div className="grid grid-cols-2 gap-3">
-              <input type="date" value={newPatient.nextSession} onChange={(e) => setNewPatient({ ...newPatient, nextSession: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-              <input type="time" value={newPatient.nextSessionTime} onChange={(e) => setNewPatient({ ...newPatient, nextSessionTime: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1.5">Con fecha y hora se crea automáticamente la cita en el calendario.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Teléfono / WhatsApp</label>
-              <input type="tel" value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })} placeholder="+56912345678" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-            </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Email</label>
-              <input type="email" value={newPatient.email} onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })} placeholder="correo@email.com" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-            </div>
           </div>
         </div>
       </Modal>

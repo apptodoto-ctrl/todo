@@ -40,6 +40,7 @@ model Patient {
   guardianPhone String   @default("")
   guardianEmail String   @default("")
   prevision     String   @default("")
+  coverageEntity String  @default("")
   school        String   @default("")
   consultReason String   @default("")
   sessionValue  Int      @default(0)

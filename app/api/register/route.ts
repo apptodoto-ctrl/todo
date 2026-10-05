@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password } = await req.json();
+    const { name, email, password, currency } = await req.json();
 
     if (!name?.trim() || !email?.trim() || !password) {
       return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 });
@@ -21,7 +21,13 @@ export async function POST(req: Request) {
 
     const hashed = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
-      data: { name: name.trim(), email: email.trim().toLowerCase(), password: hashed },
+      data: {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: hashed,
+        // Moneda del país de la terapeuta: define los montos de su ficha clínica
+        ...(currency && ["CLP", "ARS", "COP", "USD"].includes(currency) ? { currency } : {}),
+      },
     });
 
     return NextResponse.json({ id: user.id, name: user.name, email: user.email }, { status: 201 });

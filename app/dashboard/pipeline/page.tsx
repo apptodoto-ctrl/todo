@@ -334,7 +334,8 @@ export default function PipelinePage() {
   const [loading, setLoading] = useState(true);
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
-  const [newCase, setNewCase] = useState({ patient: "", age: 0, diagnosis: "", days: 0 });
+  const [newCase, setNewCase] = useState({ patient: "", age: 0, diagnosis: "", days: 0, patientId: null as number | null });
+  const [caseError, setCaseError] = useState("");
   const [showColModal, setShowColModal] = useState(false);
   const [editingCol, setEditingCol] = useState<Column | null>(null);
   const [newColName, setNewColName] = useState("");
@@ -547,12 +548,14 @@ export default function PipelinePage() {
   // ─── Case CRUD ───────────────────────────────────────────────────────────────
   const openAddCase = (id: string) => {
     setActiveColumnId(id);
-    setNewCase({ patient: "", age: 0, diagnosis: "", days: 0 });
+    setNewCase({ patient: "", age: 0, diagnosis: "", days: 0, patientId: null });
+    setCaseError("");
     setShowCaseModal(true);
   };
 
   const addCase = async () => {
-    if (!newCase.patient.trim() || !activeColumnId) return;
+    setCaseError("");
+    if (!newCase.patient.trim() || !activeColumnId) { setCaseError("Selecciona o escribe el nombre del usuario."); return; }
     const initials = newCase.patient.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
     const res = await fetch("/api/pipeline/cases", {
       method: "POST",
@@ -570,6 +573,9 @@ export default function PipelinePage() {
         }))
       );
       setShowCaseModal(false);
+    } else {
+      const data = await res.json().catch(() => null);
+      setCaseError(data?.error || "No se pudo agregar el usuario al pipeline.");
     }
   };
 
@@ -908,13 +914,17 @@ export default function PipelinePage() {
         title="Agregar Usuario"
         subtitle={activeColumnId ? columns.find((c) => c.id === activeColumnId)?.label : undefined}
         footer={
-          <button
-            onClick={addCase}
-            disabled={!newCase.patient.trim()}
-            className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/30"
-          >
-            Agregar Usuario
-          </button>
+          <div className="space-y-2">
+            {caseError && (
+              <p className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{caseError}</p>
+            )}
+            <button
+              onClick={addCase}
+              className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30"
+            >
+              Agregar Usuario
+            </button>
+          </div>
         }
       >
         <div className="space-y-4">
@@ -925,7 +935,8 @@ export default function PipelinePage() {
               value={newCase.patient}
               onChange={(e) => {
                 const p = pipelinePatients.find((x) => x.name === e.target.value);
-                setNewCase({ ...newCase, patient: e.target.value, age: p?.age ?? newCase.age, diagnosis: p?.diagnosis ?? newCase.diagnosis });
+                setNewCase({ ...newCase, patient: e.target.value, age: p?.age ?? newCase.age, diagnosis: p?.diagnosis ?? newCase.diagnosis, patientId: p?.id ?? null });
+                setCaseError("");
               }}
               className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
             >
