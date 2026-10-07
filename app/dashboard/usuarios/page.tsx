@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen, Package } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import { CURRENCIES, CURRENCY_LABELS } from "@/lib/currency";
 
 interface Patient {
   id: number;
@@ -155,6 +156,27 @@ export default function UsuariosPage() {
   // Pacientes adultos sin tutor: el contacto es del propio paciente
   const [selfContact, setSelfContact] = useState(false);
   const [currency, setCurrency] = useState("CLP");
+  const [currencySaved, setCurrencySaved] = useState(false);
+
+  // La moneda es de toda la consulta: se puede cambiar aquí mismo sin ir a Configuración
+  const changeCurrency = async (value: string) => {
+    const previous = currency;
+    setCurrency(value);
+    try {
+      const res = await fetch("/api/users/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currency: value }),
+      });
+      if (!res.ok) throw new Error("no se pudo");
+      setCurrencySaved(true);
+      setTimeout(() => setCurrencySaved(false), 2500);
+    } catch {
+      setCurrency(previous);
+      alert("No se pudo cambiar la moneda. Revisa tu conexión e inténtalo de nuevo.");
+    }
+  };
+
   const [debtByPatient, setDebtByPatient] = useState<Record<number, { unpaidCount: number; unpaidAmount: number }>>({});
   const { email: currentUserEmail, name: currentUserName } = useCurrentUser();
 
@@ -672,8 +694,24 @@ export default function UsuariosPage() {
               <input type="text" value={editForm.coverageEntity || ""} onChange={(e) => setEditForm({ ...editForm, coverageEntity: e.target.value })} placeholder="Fonasa, Isapre, OSDE, EPS..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Valor sesión <span className="font-normal text-slate-400">({currency})</span></label>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <label className="text-sm font-semibold text-slate-700">Valor sesión</label>
+                <div className="flex items-center gap-1.5">
+                  {currencySaved && <span className="text-[11px] font-semibold text-emerald-600">Moneda guardada</span>}
+                  <select
+                    value={currency}
+                    onChange={(e) => changeCurrency(e.target.value)}
+                    title="Moneda de toda tu consulta"
+                    className="border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                  >
+                    {CURRENCIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <input type="number" min={0} value={editForm.sessionValue || ""} onChange={(e) => setEditForm({ ...editForm, sessionValue: parseInt(e.target.value) || 0 })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <p className="text-[11px] text-slate-400 mt-1.5">{CURRENCY_LABELS[currency]} · es la moneda de toda tu consulta</p>
             </div>
           </div>
           <div>
@@ -1185,8 +1223,24 @@ export default function UsuariosPage() {
               <input type="text" value={newPatient.coverageEntity} onChange={(e) => setNewPatient({ ...newPatient, coverageEntity: e.target.value })} placeholder="Fonasa, Isapre, OSDE, EPS..." className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             </div>
             <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Valor sesión <span className="font-normal text-slate-400">({currency})</span></label>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <label className="text-sm font-semibold text-slate-700">Valor sesión</label>
+                <div className="flex items-center gap-1.5">
+                  {currencySaved && <span className="text-[11px] font-semibold text-emerald-600">Moneda guardada</span>}
+                  <select
+                    value={currency}
+                    onChange={(e) => changeCurrency(e.target.value)}
+                    title="Moneda de toda tu consulta"
+                    className="border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+                  >
+                    {CURRENCIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <input type="number" min={0} value={newPatient.sessionValue || ""} onChange={(e) => setNewPatient({ ...newPatient, sessionValue: parseInt(e.target.value) || 0 })} placeholder="Ej. 35000" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+              <p className="text-[11px] text-slate-400 mt-1.5">{CURRENCY_LABELS[currency]} · es la moneda de toda tu consulta</p>
             </div>
           </div>
           <div>
