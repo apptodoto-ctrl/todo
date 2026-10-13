@@ -17,6 +17,8 @@ export const STATE_LABELS: Record<string, string> = {
   suspendida: "Suspendida",
   cancelada: "Cancelada",
   comp: "Cortesía",
+  sin_suscripcion: "Sin plan aún",
+  subcuenta: "Subcuenta del Centro",
 };
 
 /** Qué puede hacer una cuenta en cada situación */

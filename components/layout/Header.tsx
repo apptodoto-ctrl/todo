@@ -19,6 +19,7 @@ const pageLabels: Record<string, { title: string; subtitle: string }> = {
   "/dashboard/facturacion": { title: "Facturación", subtitle: "Ingresos del mes y cobros pendientes" },
   "/dashboard/admin": { title: "Administración", subtitle: "Métricas globales de la plataforma" },
   "/dashboard/admin/pricing": { title: "Planes y precios", subtitle: "Catálogo editable de pricing" },
+  "/dashboard/admin/cuentas": { title: "Cuentas", subtitle: "Panel del equipo TOdo" },
   "/dashboard/configuracion": { title: "Configuración", subtitle: "Perfil y preferencias de cuenta" },
 };
 

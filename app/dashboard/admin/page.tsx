@@ -109,12 +109,20 @@ export default function AdminPage() {
           <h1 className="text-xl font-bold text-slate-800">Panel de Administración</h1>
           <p className="text-sm text-slate-500">Métricas globales de la plataforma</p>
         </div>
-        <button
-          onClick={() => router.push("/dashboard/admin/pricing")}
-          className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30"
-        >
-          <Crown className="w-4 h-4" /> Planes y precios
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => router.push("/dashboard/admin/cuentas")}
+            className="flex items-center gap-2 bg-white border border-violet-200 text-violet-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-violet-50 transition-all"
+          >
+            <Users className="w-4 h-4" /> Cuentas
+          </button>
+          <button
+            onClick={() => router.push("/dashboard/admin/pricing")}
+            className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30"
+          >
+            <Crown className="w-4 h-4" /> Planes y precios
+          </button>
+        </div>
       </motion.div>
 
       {/* Stat cards */}
