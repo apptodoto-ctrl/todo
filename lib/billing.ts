@@ -67,6 +67,12 @@ export async function getBillingStatus(userEmail: string): Promise<BillingStatus
   if (["canceled", "unpaid", "incomplete_expired"].includes(sub.status)) {
     effectiveStatus = "expired";
   }
+  // La situación que fija el equipo de TOdo manda sobre el estado de Stripe:
+  // "solo lectura" deja ver y descargar, pero no crear ni editar;
+  // "suspendida" y "cancelada" no dejan ni entrar.
+  if (sub.accountState === "solo_lectura") effectiveStatus = "solo_lectura";
+  if (sub.accountState === "suspendida") effectiveStatus = "suspendida";
+  if (sub.accountState === "cancelada") effectiveStatus = "expired";
 
   const isTrial = sub.status === "trialing";
   const includedTotal = isTrial ? sub.trialCredits : (tier?.aiCredits ?? 0);
@@ -95,6 +101,16 @@ export async function getBillingStatus(userEmail: string): Promise<BillingStatus
 
 export function hasFullAccess(effectiveStatus: string): boolean {
   return ACTIVE_STATUSES.includes(effectiveStatus);
+}
+
+/** ¿Puede siquiera entrar? Una cuenta suspendida, no. */
+export function canSignIn(effectiveStatus: string): boolean {
+  return effectiveStatus !== "suspendida";
+}
+
+/** Solo lectura: ve y descarga lo suyo, pero no crea ni edita nada */
+export function isReadOnly(effectiveStatus: string): boolean {
+  return effectiveStatus === "solo_lectura";
 }
 
 // ¿El plan del usuario tiene acceso a esta función de IA?

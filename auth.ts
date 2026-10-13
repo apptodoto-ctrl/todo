@@ -24,6 +24,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!user) return null;
         const valid = await bcrypt.compare(credentials.password as string, user.password);
         if (!valid) return null;
+
+        // Una cuenta suspendida no entra, aunque la contraseña sea correcta
+        const sub = await prisma.subscription.findUnique({
+          where: { userEmail: user.email },
+          select: { accountState: true },
+        });
+        if (sub?.accountState === "suspendida") return null;
+
+        // Deja constancia de la última entrada, para el panel del equipo
+        if (sub) {
+          prisma.subscription
+            .update({ where: { userEmail: user.email }, data: { lastSeenAt: new Date() } })
+            .catch(() => {});
+        }
+
         return { id: user.id, name: user.name, email: user.email, role: user.role };
       },
     }),
