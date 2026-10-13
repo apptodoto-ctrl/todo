@@ -6,6 +6,7 @@ import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User,
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CURRENCIES, CURRENCY_LABELS } from "@/lib/currency";
+import { DEFAULT_COUNTRY, countryConfig, formatDocument } from "@/lib/countries";
 
 interface Patient {
   id: number;
@@ -90,19 +91,6 @@ function formatMoney(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 }
 
-function formatRut(value: string): string {
-  // Solo aplicar formato de RUT chileno cuando el valor parece un RUT
-  // (dígitos, puntos, guión y dígito verificador K). Pasaportes u otros
-  // documentos con letras se dejan tal cual.
-  if (!/^[0-9.\-kK]*$/.test(value)) return value.toUpperCase();
-  const clean = value.replace(/[^0-9kK]/g, "").toUpperCase();
-  if (clean.length === 0) return "";
-  const dv = clean.slice(-1);
-  const body = clean.slice(0, -1);
-  const formatted = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return formatted ? `${formatted}-${dv}` : dv;
-}
-
 const statusConfig: Record<string, { label: string; cls: string }> = {
   activo: { label: "Activo", cls: "bg-emerald-100 text-emerald-700" },
   evaluacion: { label: "En Evaluación", cls: "bg-blue-100 text-blue-700" },
@@ -156,6 +144,7 @@ export default function UsuariosPage() {
   // Pacientes adultos sin tutor: el contacto es del propio paciente
   const [selfContact, setSelfContact] = useState(false);
   const [currency, setCurrency] = useState("CLP");
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [currencySaved, setCurrencySaved] = useState(false);
 
   // La moneda es de toda la consulta: se puede cambiar aquí mismo sin ir a Configuración
@@ -182,7 +171,7 @@ export default function UsuariosPage() {
 
   // Moneda configurada en la cuenta (CLP / ARS / USD / COP)
   useEffect(() => {
-    fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.currency) setCurrency(u.currency); }).catch(() => {});
+    fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.currency) setCurrency(u.currency); if (u?.country) setCountry(u.country); }).catch(() => {});
     // Las citas agendadas alimentan "Próxima sesión" y "Próximas sesiones" del perfil
     fetch("/api/appointments").then((r) => r.json()).then((d) => setAppointments(Array.isArray(d) ? d : [])).catch(() => {});
     // Deuda por paciente para la alerta del listado y del perfil
@@ -456,13 +445,16 @@ export default function UsuariosPage() {
     }
   };
 
-  const filtered = patients.filter((p: Patient) => {
-    const matchSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.diagnosis.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === "todos" || p.status === filter;
-    return matchSearch && matchFilter;
-  });
+  const filtered = patients
+    .filter((p: Patient) => {
+      const matchSearch =
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.diagnosis.toLowerCase().includes(search.toLowerCase());
+      const matchFilter = filter === "todos" || p.status === filter;
+      return matchSearch && matchFilter;
+    })
+    // Orden alfabético: es como las terapeutas buscan a sus usuarios
+    .sort((a, b) => a.name.trim().localeCompare(b.name.trim(), "es", { sensitivity: "base" }));
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -653,8 +645,9 @@ export default function UsuariosPage() {
             </div>
           )}
           <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT / Documento</label>
-            <input type="text" value={editForm.rut || ""} onChange={(e) => setEditForm({ ...editForm, rut: formatRut(e.target.value) })} placeholder="12.345.678-9 o pasaporte/DNI" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">{countryConfig(country).documentLabel}</label>
+            <input type="text" value={editForm.rut || ""} onChange={(e) => setEditForm({ ...editForm, rut: formatDocument(e.target.value, country) })} placeholder={countryConfig(country).documentPlaceholder} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            {countryConfig(country).documentHint && <p className="text-[11px] text-slate-400 mt-1.5">{countryConfig(country).documentHint}</p>}
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico</label>
@@ -1049,7 +1042,7 @@ export default function UsuariosPage() {
                           <span className="text-xs font-bold text-slate-600">{s.date.split("-").reverse().join("-")}</span>
                           <span className="text-[11px] text-slate-400">· {s.duration} min</span>
                           {!s.attended && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-600">No asistió</span>}
-                          {!s.confirmed && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700">Por confirmar</span>}
+                          {!s.confirmed && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700">Pendiente: confirmar asistencia, pago y evolución</span>}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {s.attended && (
@@ -1068,7 +1061,7 @@ export default function UsuariosPage() {
                       {s.notes && <p className="text-xs text-slate-600 whitespace-pre-wrap">{s.notes}</p>}
                       {!s.confirmed && (
                         <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200">
-                          <span className="text-[11px] text-slate-500">Entró desde el calendario:</span>
+                          <span className="text-[11px] text-slate-500">Entró sola desde el calendario. ¿Asistió?</span>
                           <button onClick={() => confirmSession(s, true)} className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors">✓ Asistió</button>
                           <button onClick={() => confirmSession(s, false)} className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors">✗ No asistió</button>
                         </div>
@@ -1174,8 +1167,9 @@ export default function UsuariosPage() {
             </div>
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">RUT / Documento</label>
-            <input type="text" value={newPatient.rut} onChange={(e) => setNewPatient({ ...newPatient, rut: formatRut(e.target.value) })} placeholder="12.345.678-9 o pasaporte/DNI" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">{countryConfig(country).documentLabel}</label>
+            <input type="text" value={newPatient.rut} onChange={(e) => setNewPatient({ ...newPatient, rut: formatDocument(e.target.value, country) })} placeholder={countryConfig(country).documentPlaceholder} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+            {countryConfig(country).documentHint && <p className="text-[11px] text-slate-400 mt-1.5">{countryConfig(country).documentHint}</p>}
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Diagnóstico *</label>

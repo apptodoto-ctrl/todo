@@ -16,6 +16,7 @@ model User {
   phone     String   @default("")
   specialty String   @default("Terapeuta Ocupacional")
   currency  String   @default("CLP")
+  country   String   @default("CL")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -212,6 +213,7 @@ model SessionRecord {
   duration  Int      @default(45)
   attended  Boolean  @default(true)
   paid      Boolean  @default(false)
+  value     Int?
   confirmed Boolean  @default(true)
   appointmentId Int?  @unique
   packageId Int?
@@ -258,6 +260,7 @@ model Appointment {
   createdAt DateTime @default(now())
 
   paid             Boolean @default(false)
+  value            Int?
   convertedToSession Boolean @default(false)
   createdNotifSent Boolean @default(false)
   seriesId         String  @default("")

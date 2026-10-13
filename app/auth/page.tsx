@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { COUNTRIES, DEFAULT_COUNTRY, countryConfig } from "@/lib/countries";
+import { CURRENCY_LABELS } from "@/lib/currency";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, Brain, Loader2, ArrowRight, CheckCircle2, ShieldCheck, ArrowLeft, Mail } from "lucide-react";
 
@@ -19,7 +21,7 @@ export default function AuthPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ email: "", password: "", confirmPassword: "", name: "", currency: "CLP" });
+  const [form, setForm] = useState({ email: "", password: "", confirmPassword: "", name: "", country: DEFAULT_COUNTRY });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +36,7 @@ export default function AuthPage() {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password, currency: form.currency }),
+        body: JSON.stringify({ name: form.name, email: form.email, password: form.password, country: form.country }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Error al crear la cuenta."); setLoading(false); return; }
@@ -248,16 +250,19 @@ export default function AuthPage() {
                       ¿En qué país atiendes?
                     </label>
                     <select
-                      value={form.currency}
-                      onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                      value={form.country}
+                      onChange={(e) => setForm({ ...form, country: e.target.value })}
                       className="w-full bg-white/[0.07] border border-white/[0.12] rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all text-sm [&>option]:text-slate-900"
                     >
-                      <option value="CLP">Chile — peso chileno (CLP)</option>
-                      <option value="ARS">Argentina — peso argentino (ARS)</option>
-                      <option value="COP">Colombia — peso colombiano (COP)</option>
-                      <option value="USD">Otro país — dólar (USD)</option>
+                      {COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name} — {CURRENCY_LABELS[c.currency] ?? c.currency}
+                        </option>
+                      ))}
                     </select>
-                    <p className="text-xs text-white/40 mt-1.5">Define la moneda del valor de tus sesiones. Puedes cambiarlo luego en Configuración.</p>
+                    <p className="text-xs text-white/40 mt-1.5">
+                      Define la moneda de tus sesiones y el documento que pides a cada paciente ({countryConfig(form.country).documentLabel}). Puedes cambiarlo luego en Configuración.
+                    </p>
                   </div>
                 )}
 

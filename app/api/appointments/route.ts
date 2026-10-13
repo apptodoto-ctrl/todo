@@ -4,6 +4,7 @@ import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
 import { sendAppointmentCreatedNotice } from "@/lib/appointmentReminders";
 import { randomUUID } from "crypto";
 import { seriesOccurrences } from "@/lib/appointmentSeries";
+import { findPatientByName } from "@/lib/patientMatch";
 
 export async function GET() {
   const session = await getSessionInfo();
@@ -29,6 +30,8 @@ export async function POST(req: Request) {
   if (!session) return unauthorized();
   try {
     const { force, repeatWeeks, slots, ...body } = await req.json();
+    // Valor propio de esta cita: vacío = se cobra el valor del usuario
+    body.value = body.value === "" || body.value === undefined || body.value === null ? null : Number(body.value);
     const duration = body.duration ? Number(body.duration) : 45;
     // Serie de sesiones: hasta N semanas, con uno o varios días/horas por semana
     const weeks = Math.max(0, Math.min(52, Number(repeatWeeks) || 0));
@@ -77,11 +80,17 @@ export async function POST(req: Request) {
       }
     }
 
+    // Si se escribió el nombre a mano, se liga a la ficha cuando no hay dudas:
+    // de eso dependen "Próxima sesión", el historial y los cobros del paciente.
+    const patientId = body.patientId
+      ? Number(body.patientId)
+      : await findPatientByName(session.email, String(body.title ?? ""));
+
     const seriesId = occurrences.length > 1 ? randomUUID() : "";
     const base = {
       ...body,
       duration,
-      patientId: body.patientId ? Number(body.patientId) : null,
+      patientId,
       createdBy: session.email,
       seriesId,
     };

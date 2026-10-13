@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
-import { packagesFor } from "@/lib/sessionPackages";
+import { packagesFor, absorbExistingSessions, today } from "@/lib/sessionPackages";
 
 export async function GET(req: NextRequest) {
   const session = await getSessionInfo();
@@ -43,13 +43,15 @@ export async function POST(req: Request) {
         sessionValue,
         totalPrice,
         paid: body.paid === true,
-        startDate: String(body.startDate || ""),
+        startDate: String(body.startDate || today()),
         expiresAt: String(body.expiresAt || ""),
         notes: String(body.notes || "").slice(0, 500),
         createdBy: session.email,
       },
     });
-    return NextResponse.json(pkg, { status: 201 });
+    // Las sesiones que el paciente ya tenía desde la fecha de inicio cuentan
+    const absorbed = await absorbExistingSessions(pkg.id);
+    return NextResponse.json({ ...pkg, absorbed }, { status: 201 });
   } catch (err) {
     console.error("Package create error:", err);
     return NextResponse.json({ error: "No se pudo crear el paquete" }, { status: 500 });

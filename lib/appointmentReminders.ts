@@ -192,6 +192,7 @@ export async function convertPastAppointments(): Promise<number> {
           duration: apt.duration || 45,
           attended,
           paid: apt.paid,
+          value: apt.value,
           confirmed: apt.status === "asistio" || apt.status === "no_asistio",
           createdBy: apt.createdBy,
         },

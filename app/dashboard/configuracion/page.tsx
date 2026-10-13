@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { Camera, Save, Eye, EyeOff, Shield, AlertTriangle, User, Lock, Upload, Loader2, Download, CalendarDays, Copy, Check, RefreshCw } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
+import { COUNTRIES, DEFAULT_COUNTRY, countryConfig } from "@/lib/countries";
 
 const tabs = [
   { id: "perfil", label: "Perfil", icon: User },
@@ -36,6 +37,7 @@ export default function ConfiguracionPage() {
     especialidad: "Terapeuta Ocupacional",
     email: "",
     moneda: "CLP",
+    pais: DEFAULT_COUNTRY,
   });
 
   const [passwords, setPasswords] = useState({ current: "", nueva: "", confirm: "" });
@@ -53,6 +55,7 @@ export default function ConfiguracionPage() {
           telefono: u.phone ?? "",
           especialidad: u.specialty ?? "Terapeuta Ocupacional",
           moneda: u.currency ?? "CLP",
+          pais: u.country ?? DEFAULT_COUNTRY,
           email: u.email,
         });
       })
@@ -140,7 +143,7 @@ export default function ConfiguracionPage() {
           name: `${profile.nombre} ${profile.apellido}`.trim(),
           phone: profile.telefono,
           specialty: profile.especialidad,
-          currency: profile.moneda,
+          country: profile.pais,
         }),
       });
       const data = await res.json();
@@ -353,18 +356,19 @@ export default function ConfiguracionPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Moneda de la consulta</label>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">País donde atiendes</label>
                 <select
-                  value={profile.moneda}
-                  onChange={(e) => setProfile({ ...profile, moneda: e.target.value })}
+                  value={profile.pais}
+                  onChange={(e) => setProfile({ ...profile, pais: e.target.value, moneda: countryConfig(e.target.value).currency })}
                   className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
                 >
-                  <option value="CLP">Peso chileno (CLP)</option>
-                  <option value="ARS">Peso argentino (ARS)</option>
-                  <option value="COP">Peso colombiano (COP)</option>
-                  <option value="USD">Dólar (USD)</option>
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.name}</option>
+                  ))}
                 </select>
-                <p className="text-xs text-slate-400 mt-1.5">Se usa para el valor de las sesiones y los cobros pendientes de tus pacientes.</p>
+                <p className="text-xs text-slate-400 mt-1.5">
+                  Define la moneda de tus sesiones ({countryConfig(profile.pais).currency}) y el documento que pides a cada paciente ({countryConfig(profile.pais).documentLabel}).
+                </p>
               </div>
               <div className="sm:col-span-2">
                 <label className="text-sm font-semibold text-slate-700 block mb-1.5">Email</label>

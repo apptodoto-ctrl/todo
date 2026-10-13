@@ -3,13 +3,14 @@ import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
 import bcrypt from "bcryptjs";
 import { isCurrency } from "@/lib/currency";
+import { isCountry, countryConfig } from "@/lib/countries";
 
 export async function GET() {
   const session = await getSessionInfo();
   if (!session) return unauthorized();
   const user = await prisma.user.findUnique({
     where: { email: session.email },
-    select: { name: true, email: true, role: true, phone: true, specialty: true, currency: true },
+    select: { name: true, email: true, role: true, phone: true, specialty: true, currency: true, country: true },
   });
   if (!user) return unauthorized();
   return NextResponse.json(user);
@@ -19,7 +20,7 @@ export async function PUT(req: Request) {
   const session = await getSessionInfo();
   if (!session) return unauthorized();
   try {
-    const { name, phone, specialty, currency } = await req.json();
+    const { name, phone, specialty, currency, country } = await req.json();
     if (!name?.trim()) {
       return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
     }
@@ -30,9 +31,10 @@ export async function PUT(req: Request) {
         name: newName,
         ...(phone !== undefined ? { phone } : {}),
         ...(specialty !== undefined ? { specialty } : {}),
-        ...(isCurrency(currency) ? { currency } : {}),
+        // El país manda sobre la moneda: al cambiarlo se ajusta sola
+        ...(isCountry(country) ? { country, currency: countryConfig(country).currency } : isCurrency(currency) ? { currency } : {}),
       },
-      select: { name: true, email: true, phone: true, specialty: true, currency: true },
+      select: { name: true, email: true, phone: true, specialty: true, currency: true, country: true },
     });
     // El nombre de la terapeuta aparece en la ficha de cada paciente: se actualiza en todas
     await prisma.patient.updateMany({
@@ -53,14 +55,23 @@ export async function PATCH(req: Request) {
   const session = await getSessionInfo();
   if (!session) return unauthorized();
   try {
-    const { currency } = await req.json();
+    const { currency, country } = await req.json();
+    if (country !== undefined) {
+      if (!isCountry(country)) return NextResponse.json({ error: "País no válido" }, { status: 400 });
+      const user = await prisma.user.update({
+        where: { email: session.email },
+        data: { country, currency: countryConfig(country).currency },
+        select: { currency: true, country: true },
+      });
+      return NextResponse.json(user);
+    }
     if (!isCurrency(currency)) {
       return NextResponse.json({ error: "Moneda no válida" }, { status: 400 });
     }
     const user = await prisma.user.update({
       where: { email: session.email },
       data: { currency },
-      select: { currency: true },
+      select: { currency: true, country: true },
     });
     return NextResponse.json(user);
   } catch {

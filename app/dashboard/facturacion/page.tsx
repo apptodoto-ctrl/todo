@@ -52,7 +52,7 @@ export default function FacturacionPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"todos" | "deuda">("todos");
   const [showNewPackage, setShowNewPackage] = useState(false);
-  const [packageForm, setPackageForm] = useState({ patientId: "", totalSessions: "10", totalPrice: "", expiresAt: "", paid: false, notes: "" });
+  const [packageForm, setPackageForm] = useState({ patientId: "", totalSessions: "10", totalPrice: "", startDate: "", expiresAt: "", paid: false, notes: "" });
   const [packageError, setPackageError] = useState("");
   const [savingPackage, setSavingPackage] = useState(false);
 
@@ -82,6 +82,7 @@ export default function FacturacionPage() {
           patientId: Number(packageForm.patientId),
           totalSessions: total,
           totalPrice: packageForm.totalPrice ? Number(packageForm.totalPrice) : undefined,
+          startDate: packageForm.startDate,
           expiresAt: packageForm.expiresAt,
           paid: packageForm.paid,
           notes: packageForm.notes,
@@ -89,7 +90,7 @@ export default function FacturacionPage() {
       });
       if (res.ok) {
         setShowNewPackage(false);
-        setPackageForm({ patientId: "", totalSessions: "10", totalPrice: "", expiresAt: "", paid: false, notes: "" });
+        setPackageForm({ patientId: "", totalSessions: "10", totalPrice: "", startDate: "", expiresAt: "", paid: false, notes: "" });
         await load(month);
       } else {
         const body = await res.json().catch(() => null);
@@ -183,8 +184,15 @@ export default function FacturacionPage() {
       </div>
 
       {sinValor > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800">
-          {sinValor} usuario{sinValor === 1 ? "" : "s"} sin valor de sesión definido: sus sesiones no suman al facturado. Edítalo en la ficha del usuario.
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800 flex flex-wrap items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span className="flex-1 min-w-0">
+            <strong>{sinValor} usuario{sinValor === 1 ? "" : "s"} sin valor de sesión.</strong>{" "}
+            Sus sesiones aparecen en 0 porque falta ese dato, no porque el sistema falle.
+          </span>
+          <button onClick={() => router.push("/dashboard/usuarios")} className="text-xs font-semibold text-amber-900 bg-white border border-amber-300 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors">
+            Definirlo ahora
+          </button>
         </div>
       )}
 
@@ -247,7 +255,9 @@ export default function FacturacionPage() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-bold text-slate-800">{money(pkg.totalPrice, data.currency)}</p>
-                      <p className="text-[11px] text-slate-400">{pkg.expiresAt ? `Vence ${pkg.expiresAt}` : "Sin vencimiento"}</p>
+                      <p className="text-[11px] text-slate-400">
+                        {pkg.startDate ? `Desde ${pkg.startDate}` : ""}{pkg.startDate && pkg.expiresAt ? " · " : ""}{pkg.expiresAt ? `vence ${pkg.expiresAt}` : pkg.startDate ? "sin vencimiento" : "Sin vencimiento"}
+                      </p>
                     </div>
                   </div>
 
@@ -266,6 +276,17 @@ export default function FacturacionPage() {
                         Marcar como pagado
                       </button>
                     )}
+                    <button
+                      onClick={() => {
+                        const value = prompt("¿Desde qué fecha cuentan las sesiones de este paquete? (AAAA-MM-DD)", pkg.startDate || "");
+                        if (value === null) return;
+                        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) { alert("Escribe la fecha como AAAA-MM-DD, por ejemplo 2026-10-01."); return; }
+                        updatePackage(pkg.id, { startDate: value });
+                      }}
+                      className="text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-lg hover:bg-violet-100 transition-colors"
+                    >
+                      Cambiar fecha de inicio
+                    </button>
                     {pkg.status !== "cerrado" && (
                       <button onClick={() => updatePackage(pkg.id, { status: "cerrado" })} className="text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-colors">
                         Cerrar
@@ -308,11 +329,20 @@ export default function FacturacionPage() {
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-slate-700">{money(p.amountMonth, data.currency)}</p>
-                  {p.unpaidCount > 0 ? (
-                    <p className="text-[11px] font-semibold text-rose-600">Debe {money(p.unpaidAmount, data.currency)} · {p.unpaidCount} {p.unpaidCount === 1 ? "sesión" : "sesiones"}</p>
+                  {p.sessionValue === 0 && p.sessionsMonth > 0 ? (
+                    <>
+                      <p className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">Falta el valor</p>
+                      <p className="text-[11px] text-amber-600 mt-0.5">No es un error: defínelo en la ficha</p>
+                    </>
                   ) : (
-                    <p className="text-[11px] text-emerald-600">Al día</p>
+                    <>
+                      <p className="text-sm font-bold text-slate-700">{money(p.amountMonth, data.currency)}</p>
+                      {p.unpaidCount > 0 ? (
+                        <p className="text-[11px] font-semibold text-rose-600">Debe {money(p.unpaidAmount, data.currency)} · {p.unpaidCount} {p.unpaidCount === 1 ? "sesión" : "sesiones"}</p>
+                      ) : (
+                        <p className="text-[11px] text-emerald-600">Al día</p>
+                      )}
+                    </>
                   )}
                 </div>
               </button>
@@ -389,16 +419,29 @@ export default function FacturacionPage() {
               />
             </div>
           </div>
-          <div>
-            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Vence el</label>
-            <input
-              type="date"
-              value={packageForm.expiresAt}
-              onChange={(e) => setPackageForm({ ...packageForm, expiresAt: e.target.value })}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
-            />
-            <p className="text-[11px] text-slate-400 mt-1.5">Déjalo vacío si el paquete no vence.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Empieza el</label>
+              <input
+                type="date"
+                value={packageForm.startDate}
+                onChange={(e) => setPackageForm({ ...packageForm, startDate: e.target.value })}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Vence el</label>
+              <input
+                type="date"
+                value={packageForm.expiresAt}
+                onChange={(e) => setPackageForm({ ...packageForm, expiresAt: e.target.value })}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+              />
+            </div>
           </div>
+          <p className="text-[11px] text-slate-500 -mt-2">
+            Las sesiones que el usuario ya tenga desde la fecha de inicio se descuentan solas, aunque las hayas registrado antes de crear el paquete. Si lo dejas vacío, empieza hoy. Sin fecha de vencimiento, el paquete no caduca.
+          </p>
           <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-3 cursor-pointer hover:border-violet-300 transition-all">
             <input
               type="checkbox"

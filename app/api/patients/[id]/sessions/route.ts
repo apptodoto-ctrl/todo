@@ -44,7 +44,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
     const patientId = Number(id);
     const err = await checkOwnership(patientId, session.email);
     if (err) return err;
-    const { date, notes, duration, attended, paid } = await req.json();
+    const { date, notes, duration, attended, paid, value } = await req.json();
     if (!date) {
       return NextResponse.json({ error: "La fecha es requerida" }, { status: 400 });
     }
@@ -58,6 +58,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
         duration: duration ? Number(duration) : 45,
         attended: attended !== false,
         paid: paid === true,
+        value: value === "" || value === undefined || value === null ? null : Number(value),
       },
     });
     // Si el paciente tiene un paquete vigente, la sesión se descuenta de ahí

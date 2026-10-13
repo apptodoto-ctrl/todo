@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { absorbExistingSessions } from "@/lib/sessionPackages";
 
 type Params = Promise<{ id: string }>;
 
@@ -26,6 +27,7 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
         ...(body.paid !== undefined ? { paid: body.paid === true } : {}),
         ...(body.status !== undefined ? { status: String(body.status) } : {}),
         ...(body.expiresAt !== undefined ? { expiresAt: String(body.expiresAt) } : {}),
+        ...(body.startDate !== undefined ? { startDate: String(body.startDate) } : {}),
         ...(body.name !== undefined ? { name: String(body.name).slice(0, 120) } : {}),
         ...(body.notes !== undefined ? { notes: String(body.notes).slice(0, 500) } : {}),
         ...(body.totalSessions !== undefined ? { totalSessions: Number(body.totalSessions) } : {}),
@@ -35,6 +37,10 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
     // Marcar el paquete como pagado deja cobradas sus sesiones
     if (body.paid === true) {
       await prisma.sessionRecord.updateMany({ where: { packageId: pkg.id }, data: { paid: true } });
+    }
+    // Cambiar fechas o cupo puede hacer entrar sesiones que antes quedaban fuera
+    if (body.startDate !== undefined || body.expiresAt !== undefined || body.totalSessions !== undefined) {
+      await absorbExistingSessions(pkg.id);
     }
     return NextResponse.json(pkg);
   } catch (err) {

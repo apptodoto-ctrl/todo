@@ -72,11 +72,11 @@ export default function CalendarioPage() {
   const [selected, setSelected] = useState<Date | null>(new Date());
   const [localEvents, setLocalEvents] = useState<CalEvent[]>([]);
   const [showNewEvent, setShowNewEvent] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, patientId: null as number | null });
+  const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, patientId: null as number | null, value: "" });
   const [repeatWeeks, setRepeatWeeks] = useState(0);
   // Serie con varios días/horas por semana (ej. martes 17:00 y jueves 15:00)
   const [extraSlots, setExtraSlots] = useState<{ weekday: number; time: string }[]>([]);
-  const [patients, setPatients] = useState<{ id: number; name: string; phone?: string; guardianPhone?: string }[]>([]);
+  const [patients, setPatients] = useState<{ id: number; name: string; phone?: string; guardianPhone?: string; sessionValue?: number }[]>([]);
   const [tasks, setTasks] = useState<CalTask[]>([]);
   const [editEvent, setEditEvent] = useState<CalEvent | null>(null);
   const [editEventForm, setEditEventForm] = useState({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, status: "agendada" });
@@ -85,13 +85,18 @@ export default function CalendarioPage() {
   const [savingEvent, setSavingEvent] = useState(false);
   // Vista del calendario: mes (por defecto), semana o día
   const [view, setView] = useState<"mes" | "semana" | "dia">("mes");
+  const [currency, setCurrency] = useState("CLP");
   const { email: currentUserEmail } = useCurrentUser();
+
+  useEffect(() => {
+    fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.currency) setCurrency(u.currency); }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!currentUserEmail) return;
     fetch(`/api/patients?createdBy=${encodeURIComponent(currentUserEmail)}`)
       .then((r) => r.json())
-      .then((data) => setPatients(Array.isArray(data) ? data.map((p: { id: number; name: string; phone?: string; guardianPhone?: string }) => ({ id: p.id, name: p.name, phone: p.phone, guardianPhone: p.guardianPhone })) : []))
+      .then((data) => setPatients(Array.isArray(data) ? data.map((p: { id: number; name: string; phone?: string; guardianPhone?: string; sessionValue?: number }) => ({ id: p.id, name: p.name, phone: p.phone, guardianPhone: p.guardianPhone, sessionValue: p.sessionValue })) : []))
       .catch(() => {});
   }, [currentUserEmail]);
 
@@ -136,7 +141,7 @@ export default function CalendarioPage() {
     const defaultDate = selected
       ? format(selected, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    setNewEvent({ title: "", date: defaultDate, time: "10:00", type, location: "", duration: 45, patientId: null });
+    setNewEvent({ title: "", date: defaultDate, time: "10:00", type, location: "", duration: 45, patientId: null, value: "" });
     setEventError("");
     setCustomName(false);
     setRepeatWeeks(0);
@@ -155,7 +160,7 @@ export default function CalendarioPage() {
       const res = await fetch("/api/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location, duration: newEvent.duration, patientId: newEvent.patientId, repeatWeeks, slots: extraSlots, force }),
+        body: JSON.stringify({ title: newEvent.title, date: newEvent.date, time: newEvent.time, type: newEvent.type, location: newEvent.location, duration: newEvent.duration, patientId: newEvent.patientId, value: newEvent.value, repeatWeeks, slots: extraSlots, force }),
       });
       if (res.status === 409) {
         const data = await res.json();
@@ -188,7 +193,7 @@ export default function CalendarioPage() {
         ]);
         setSelected(eventDate);
         setCurrent(new Date(y, m - 1, 1));
-        setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, patientId: null });
+        setNewEvent({ title: "", date: "", time: "10:00", type: "sesion", location: "", duration: 45, patientId: null, value: "" });
         setCustomName(false);
         setRepeatWeeks(0);
         setExtraSlots([]);
@@ -367,7 +372,7 @@ export default function CalendarioPage() {
               events={localEvents}
               onSelectSlot={(d, time) => {
                 setSelected(d);
-                setNewEvent({ title: "", date: format(d, "yyyy-MM-dd"), time, type: "sesion", location: "", duration: 45, patientId: null });
+                setNewEvent({ title: "", date: format(d, "yyyy-MM-dd"), time, type: "sesion", location: "", duration: 45, patientId: null, value: "" });
                 setEventError("");
                 setCustomName(false);
                 setRepeatWeeks(0);
@@ -696,7 +701,7 @@ export default function CalendarioPage() {
                 <select value={newEvent.title} onChange={(e) => {
                   if (e.target.value === "__otro__") { setCustomName(true); setNewEvent({ ...newEvent, title: "", patientId: null }); return; }
                   const p = patients.find((x) => x.name === e.target.value);
-                  setNewEvent({ ...newEvent, title: e.target.value, patientId: p?.id ?? null });
+                  setNewEvent({ ...newEvent, title: e.target.value, patientId: p?.id ?? null, value: p?.sessionValue ? String(p.sessionValue) : "" });
                   setEventError("");
                 }} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
                   <option value="">Seleccionar usuario...</option>
@@ -740,6 +745,26 @@ export default function CalendarioPage() {
               <option value={60}>1 hora</option>
               <option value={90}>1 hora 30</option>
             </select>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">
+              Valor de esta sesión <span className="font-normal text-slate-400">({currency})</span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={newEvent.value}
+              onChange={(e) => setNewEvent({ ...newEvent, value: e.target.value })}
+              placeholder={newEvent.patientId ? "Valor del usuario" : "Sin valor"}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
+            />
+            {newEvent.value === "" ? (
+              <p className="text-[11px] text-amber-600 mt-1.5">
+                Sin valor propio: se cobrará el valor del usuario. Si el usuario tampoco lo tiene, esta sesión no sumará a tu facturación.
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-400 mt-1.5">Solo para esta cita; no cambia el valor del usuario.</p>
+            )}
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Repetir cada semana</label>

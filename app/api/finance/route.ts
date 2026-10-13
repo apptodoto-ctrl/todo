@@ -26,24 +26,29 @@ export async function GET(req: NextRequest) {
     const patientIds = patients.map((p) => p.id);
     const sessions = await prisma.sessionRecord.findMany({
       where: { patientId: { in: patientIds } },
-      select: { id: true, patientId: true, date: true, attended: true, paid: true },
+      select: { id: true, patientId: true, date: true, attended: true, paid: true, value: true },
     });
 
     const valueOf = new Map(patients.map((p) => [p.id, p.sessionValue || 0]));
+    // Cada sesión puede tener su propio valor; si no, vale el del usuario
+    const valueOfSession = (s: { patientId: number; value: number | null }) =>
+      s.value !== null && s.value !== undefined ? s.value : valueOf.get(s.patientId) ?? 0;
     // Solo las sesiones a las que el paciente asistió generan cobro
     const billable = sessions.filter((s) => s.attended);
 
     const monthSessions = billable.filter((s) => s.date.startsWith(month));
-    const sum = (list: typeof billable) => list.reduce((acc, s) => acc + (valueOf.get(s.patientId) ?? 0), 0);
+    const sum = (list: typeof billable) => list.reduce((acc, s) => acc + valueOfSession(s), 0);
 
     const byPatient = patients
       .map((p) => {
         const mine = billable.filter((s) => s.patientId === p.id);
         const unpaid = mine.filter((s) => !s.paid);
         const mineMonth = mine.filter((s) => s.date.startsWith(month));
+        const sinValor = mine.filter((s) => valueOfSession(s) === 0).length;
         return {
           id: p.id,
           name: p.name,
+          sessionsWithoutValue: sinValor,
           initials: p.initials,
           color: p.color,
           status: p.status,
