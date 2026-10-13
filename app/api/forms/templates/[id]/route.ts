@@ -1,32 +1,36 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, ownScope } from "@/lib/center";
 import { sanitizeSections } from "@/lib/formTemplates";
 
 type Params = Promise<{ id: string }>;
 
-async function owned(id: number, email: string) {
-  const template = await prisma.formTemplate.findUnique({ where: { id } });
-  if (!template) return { error: notFound() };
-  if (template.createdBy !== email) return { error: forbidden() };
-  return { template };
+/** Dentro de un Centro, la Administradora alcanza lo de todo su equipo */
+async function owned(id: number) {
+  const scope = await getScope();
+  if (!scope) return { error: unauthorized() };
+  const template = await prisma.formTemplate.findFirst({ where: { id, ...ownScope(scope) } });
+  if (template) return { template };
+  const existe = await prisma.formTemplate.findUnique({ where: { id } });
+  return { error: existe ? forbidden() : notFound() };
 }
 
 export async function GET(_: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   const { id } = await params;
-  const { error, template } = await owned(Number(id), session.email);
+  const { error, template } = await owned(Number(id));
   if (error) return error;
   return NextResponse.json(template);
 }
 
 export async function PATCH(req: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { id } = await params;
-    const { error } = await owned(Number(id), session.email);
+    const { error } = await owned(Number(id));
     if (error) return error;
     const body = await req.json();
     const updated = await prisma.formTemplate.update({
@@ -45,11 +49,11 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 }
 
 export async function DELETE(_: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { id } = await params;
-    const { error } = await owned(Number(id), session.email);
+    const { error } = await owned(Number(id));
     if (error) return error;
     // Borrar la plantilla se lleva las fichas llenadas: mejor avisar antes
     const usos = await prisma.formResponse.count({ where: { templateId: Number(id) } });

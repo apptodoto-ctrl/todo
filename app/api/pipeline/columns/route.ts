@@ -1,17 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, ownScope } from "@/lib/center";
+
+/** ¿Este pipeline está al alcance de quien pide? */
+async function esDelAlcance(pipelineId: string) {
+  const scope = await getScope();
+  if (!scope) return false;
+  return !!(await prisma.pipeline.findFirst({ where: { id: pipelineId, ...ownScope(scope) } }));
+}
 
 export async function GET(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { searchParams } = new URL(req.url);
     const pipelineId = searchParams.get("pipelineId");
     const columns = await prisma.pipelineColumn.findMany({
       where: {
         ...(pipelineId ? { pipelineId } : {}),
-        pipeline: { createdBy: session.email },
+        pipeline: ownScope(scope),
       },
       include: { cases: { orderBy: { createdAt: "asc" } } },
       orderBy: { order: "asc" },
@@ -23,8 +31,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const body = await req.json();
     if (!body.pipelineId) {
@@ -32,7 +40,7 @@ export async function POST(req: Request) {
     }
     const pipeline = await prisma.pipeline.findUnique({ where: { id: body.pipelineId } });
     if (!pipeline) return notFound();
-    if (pipeline.createdBy !== session.email) return forbidden();
+    if (!(await esDelAlcance(pipeline.id))) return forbidden();
     const count = await prisma.pipelineColumn.count({ where: { pipelineId: body.pipelineId } });
     const column = await prisma.pipelineColumn.create({
       data: { ...body, order: count },

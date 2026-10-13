@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { unauthorized } from "@/lib/apiAuth";
+import { getScope, ownScope, ownerFields, loadPatient } from "@/lib/center";
 
 export async function GET() {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const reports = await prisma.generatedReport.findMany({
-      where: { createdBy: session.email },
+      where: ownScope(scope),
       orderBy: { createdAt: "desc" },
       include: { patient: { select: { name: true } } },
     });
@@ -18,18 +19,16 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { patientId, type, title, content } = await req.json();
     if (!title?.trim() || !content?.trim()) {
       return NextResponse.json({ error: "Título y contenido requeridos" }, { status: 400 });
     }
     if (patientId) {
-      const patient = await prisma.patient.findUnique({ where: { id: Number(patientId) } });
-      if (!patient || patient.createdBy !== session.email) {
-        return NextResponse.json({ error: "Paciente inválido" }, { status: 403 });
-      }
+      const { patient } = await loadPatient(scope, Number(patientId));
+      if (!patient) return NextResponse.json({ error: "Paciente inválido" }, { status: 403 });
     }
     const report = await prisma.generatedReport.create({
       data: {
@@ -37,7 +36,7 @@ export async function POST(req: Request) {
         type: type || "informe",
         title: title.trim(),
         content,
-        createdBy: session.email,
+        ...ownerFields(scope),
       },
       include: { patient: { select: { name: true } } },
     });

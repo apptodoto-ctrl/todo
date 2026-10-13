@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { unauthorized } from "@/lib/apiAuth";
+import { getScope, ownScope, ownerFields } from "@/lib/center";
 
 export async function GET() {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const pipelines = await prisma.pipeline.findMany({
-      where: { createdBy: session.email },
+      where: ownScope(scope),
       orderBy: { createdAt: "asc" },
       include: {
         columns: {
@@ -23,12 +24,12 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { name } = await req.json();
     const pipeline = await prisma.pipeline.create({
-      data: { name, createdBy: session.email },
+      data: { name, ...ownerFields(scope) },
       include: { columns: true },
     });
     return NextResponse.json(pipeline);

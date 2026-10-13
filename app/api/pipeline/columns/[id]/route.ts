@@ -1,25 +1,33 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, ownScope } from "@/lib/center";
 
 type Params = Promise<{ id: string }>;
 
-async function checkOwnership(id: string, email: string) {
+/** ¿Este pipeline está al alcance de quien pide? */
+async function esDelAlcance(pipelineId: string) {
+  const scope = await getScope();
+  if (!scope) return false;
+  return !!(await prisma.pipeline.findFirst({ where: { id: pipelineId, ...ownScope(scope) } }));
+}
+
+async function checkOwnership(id: string) {
   const column = await prisma.pipelineColumn.findUnique({
     where: { id },
     include: { pipeline: true },
   });
   if (!column) return notFound();
-  if (!column.pipeline || column.pipeline.createdBy !== email) return forbidden();
+  if (!column.pipeline || !(await esDelAlcance(column.pipeline.id))) return forbidden();
   return null;
 }
 
 export async function PUT(req: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { id } = await params;
-    const err = await checkOwnership(id, session.email);
+    const err = await checkOwnership(id);
     if (err) return err;
     const body = await req.json();
     delete body.id;
@@ -36,11 +44,11 @@ export async function PUT(req: Request, { params }: { params: Params }) {
 }
 
 export async function DELETE(_: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { id } = await params;
-    const err = await checkOwnership(id, session.email);
+    const err = await checkOwnership(id);
     if (err) return err;
     await prisma.pipelineColumn.delete({ where: { id } });
     return NextResponse.json({ ok: true });

@@ -3,16 +3,15 @@ import { prisma } from "@/lib/db";
 import { uploadToR2 } from "@/lib/r2";
 import { randomUUID } from "crypto";
 import path from "path";
-import { auth } from "@/auth";
+import { getScope, ownScope, ownerFields } from "@/lib/center";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  const createdBy = session?.user?.email;
-  if (!createdBy) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const scope = await getScope();
+  if (!scope) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   // ?patientId= devuelve solo los documentos de ese paciente (ficha clínica)
   const patientId = req.nextUrl.searchParams.get("patientId");
   const docs = await prisma.document.findMany({
-    where: { createdBy, ...(patientId ? { patientId: Number(patientId) } : {}) },
+    where: { ...ownScope(scope), ...(patientId ? { patientId: Number(patientId) } : {}) },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(docs);
@@ -21,9 +20,8 @@ export async function GET(req: NextRequest) {
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  const createdBy = session?.user?.email;
-  if (!createdBy) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const scope = await getScope();
+  if (!scope) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
@@ -53,7 +51,7 @@ export async function POST(req: NextRequest) {
       key,
       url,
       patientId,
-      createdBy,
+      ...ownerFields(scope),
     },
   });
 

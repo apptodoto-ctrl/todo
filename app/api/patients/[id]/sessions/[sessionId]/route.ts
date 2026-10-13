@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, loadPatient } from "@/lib/center";
 import { refreshPackageStatus } from "@/lib/sessionPackages";
 
 type Params = Promise<{ id: string; sessionId: string }>;
 
-async function checkOwnership(patientId: number, email: string) {
-  const patient = await prisma.patient.findUnique({ where: { id: patientId } });
-  if (!patient) return notFound();
-  if (patient.createdBy !== email) return forbidden();
+async function checkOwnership(patientId: number) {
+  // El acceso lo decide el alcance: cuenta individual o Centro con permisos
+  const scope = await getScope();
+  if (!scope) return unauthorized();
+  const { status } = await loadPatient(scope, patientId);
+  if (status === 404) return notFound();
+  if (status === 403) return forbidden();
   return null;
 }
 
@@ -23,7 +27,7 @@ export async function PUT(req: Request, { params }: { params: Params }) {
   if (!session) return unauthorized();
   try {
     const { id, sessionId } = await params;
-    const err = await checkOwnership(Number(id), session.email);
+    const err = await checkOwnership(Number(id));
     if (err) return err;
     const { date, notes, duration, attended, paid, confirmed, packageId, value } = await req.json();
 
@@ -76,7 +80,7 @@ export async function DELETE(_: Request, { params }: { params: Params }) {
   try {
     const { id, sessionId } = await params;
     const patientId = Number(id);
-    const err = await checkOwnership(patientId, session.email);
+    const err = await checkOwnership(patientId);
     if (err) return err;
     await prisma.sessionRecord.delete({ where: { id: Number(sessionId) } });
     const sessions = await syncSessionCount(patientId);

@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { unauthorized } from "@/lib/apiAuth";
 import { getBillingStatus, hasFullAccess } from "@/lib/billing";
+import { getScope, patientScope, ownerFields, billingEmail, can } from "@/lib/center";
 
 export async function GET() {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const patients = await prisma.patient.findMany({
-      where: { createdBy: session.email },
+      where: patientScope(scope),
       orderBy: { createdAt: "asc" },
     });
     return NextResponse.json(patients);
@@ -18,25 +19,50 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
+
+  // En un Centro, crear pacientes es un permiso que decide la Administradora
+  if (scope.centerId && !can(scope, "crearPacientes")) {
+    return NextResponse.json(
+      { error: "Tu Centro no te permite crear pacientes nuevos. Pídeselo a la Administradora." },
+      { status: 403 }
+    );
+  }
+
   try {
-    // Tope de pacientes según el escalón: bloquea crear nuevos y ofrece el siguiente.
-    // Nunca oculta ni archiva los existentes. Los admin no tienen tope.
-    if (session.role === "admin") {
-      const body = await req.json();
-      const patient = await prisma.patient.create({ data: { ...body, createdBy: session.email } });
+    const body = await req.json();
+    // La terapeuta a cargo es quien lo crea, salvo que se indique otra
+    const base = {
+      ...body,
+      ...ownerFields(scope),
+      therapistEmail: String(body.therapistEmail || scope.email),
+    };
+
+    // El equipo de TOdo no pasa por facturación
+    if (scope.platformAdmin) {
+      const patient = await prisma.patient.create({ data: base });
       return NextResponse.json(patient, { status: 201 });
     }
-    const billing = await getBillingStatus(session.email);
+
+    const billing = await getBillingStatus(billingEmail(scope));
     if (!hasFullAccess(billing.effectiveStatus)) {
       return NextResponse.json(
-        { error: "Tu período de prueba terminó. Elige un plan para crear nuevos usuarios (los existentes siguen visibles).", code: "subscription_expired" },
+        {
+          error: scope.centerId && !scope.isAdmin
+            ? "La suscripción del Centro está pendiente. Avísale a la Administradora."
+            : "Tu período de prueba terminó. Elige un plan para crear nuevos usuarios (los existentes siguen visibles).",
+          code: "subscription_expired",
+        },
         { status: 402 }
       );
     }
+
+    // El tope de pacientes se cuenta sobre todo el Centro, no por terapeuta
     if (billing.maxPatients !== null) {
-      const count = await prisma.patient.count({ where: { createdBy: session.email } });
+      const count = await prisma.patient.count({
+        where: scope.centerId ? { centerId: scope.centerId } : { createdBy: scope.email },
+      });
       if (count >= billing.maxPatients) {
         const nextTier = await prisma.planTier.findFirst({
           where: {
@@ -48,7 +74,7 @@ export async function POST(req: Request) {
         });
         return NextResponse.json(
           {
-            error: `Alcanzaste el tope de ${billing.maxPatients} pacientes de tu plan.${nextTier ? ` El siguiente escalón (${nextTier.code}) permite ${nextTier.maxPatients ?? "pacientes sin tope"} por USD ${nextTier.priceMonthly}/mes.` : ""}`,
+            error: `Alcanzaste el tope de ${billing.maxPatients} pacientes del plan.${nextTier ? ` El siguiente escalón (${nextTier.code}) permite ${nextTier.maxPatients ?? "pacientes sin tope"} por USD ${nextTier.priceMonthly}/mes.` : ""}`,
             code: "patient_limit",
             nextTier: nextTier?.code ?? null,
           },
@@ -56,12 +82,11 @@ export async function POST(req: Request) {
         );
       }
     }
-    const body = await req.json();
-    const patient = await prisma.patient.create({
-      data: { ...body, createdBy: session.email },
-    });
+
+    const patient = await prisma.patient.create({ data: base });
     return NextResponse.json(patient, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("Patient create error:", err);
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { unauthorized } from "@/lib/apiAuth";
+import { getScope, patientScope, billingEmail } from "@/lib/center";
 import { packagesFor } from "@/lib/sessionPackages";
 
 /**
@@ -9,17 +10,17 @@ import { packagesFor } from "@/lib/sessionPackages";
  * alerta de deuda del listado de usuarios.
  */
 export async function GET(req: NextRequest) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const monthParam = req.nextUrl.searchParams.get("month"); // YYYY-MM
     const now = new Date();
     const month = monthParam || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
     const [user, patients] = await Promise.all([
-      prisma.user.findUnique({ where: { email: session.email }, select: { currency: true } }),
+      prisma.user.findUnique({ where: { email: billingEmail(scope) }, select: { currency: true } }),
       prisma.patient.findMany({
-        where: { createdBy: session.email },
+        where: patientScope(scope),
         select: { id: true, name: true, sessionValue: true, status: true, initials: true, color: true },
       }),
     ]);
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
       })
       .sort((a, b) => b.unpaidAmount - a.unpaidAmount || b.amountMonth - a.amountMonth);
 
-    const packages = await packagesFor(session.email);
+    const packages = await packagesFor(scope);
     const openPackages = packages.filter((p) => p.status === "activo" || p.status === "vencido");
 
     return NextResponse.json({

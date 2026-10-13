@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, canAccessPatient } from "@/lib/center";
 import { absorbExistingSessions } from "@/lib/sessionPackages";
 
 type Params = Promise<{ id: string }>;
 
-async function checkOwnership(id: number, email: string) {
-  const pkg = await prisma.sessionPackage.findUnique({ where: { id } });
+async function checkOwnership(id: number) {
+  const scope = await getScope();
+  if (!scope) return unauthorized();
+  const pkg = await prisma.sessionPackage.findUnique({ where: { id }, include: { patient: true } });
   if (!pkg) return notFound();
-  if (pkg.createdBy !== email) return forbidden();
+  if (!canAccessPatient(scope, pkg.patient)) return forbidden();
   return null;
 }
 
 export async function PATCH(req: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { id } = await params;
-    const err = await checkOwnership(Number(id), session.email);
+    const err = await checkOwnership(Number(id));
     if (err) return err;
     const body = await req.json();
 
@@ -50,11 +53,11 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 }
 
 export async function DELETE(_: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { id } = await params;
-    const err = await checkOwnership(Number(id), session.email);
+    const err = await checkOwnership(Number(id));
     if (err) return err;
     await prisma.sessionPackage.delete({ where: { id: Number(id) } });
     return NextResponse.json({ ok: true });

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { unauthorized } from "@/lib/apiAuth";
+import { getScope, ownScope, ownerFields } from "@/lib/center";
 
 export async function GET() {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const reminders = await prisma.reminder.findMany({
-      where: { createdBy: session.email },
+      where: ownScope(scope),
       orderBy: [{ date: "asc" }, { time: "asc" }],
     });
     return NextResponse.json(reminders);
@@ -17,8 +18,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { title, description, date, time, type } = await req.json();
     if (!title?.trim()) {
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
         date: date || "",
         time: time || "",
         type: type || "general",
-        createdBy: session.email,
+        ...ownerFields(scope),
       },
     });
     return NextResponse.json(reminder, { status: 201 });

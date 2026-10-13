@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, ownScope } from "@/lib/center";
+
+/** ¿Este pipeline está al alcance de quien pide? */
+async function esDelAlcance(pipelineId: string) {
+  const scope = await getScope();
+  if (!scope) return false;
+  return !!(await prisma.pipeline.findFirst({ where: { id: pipelineId, ...ownScope(scope) } }));
+}
 
 export async function POST(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const body = await req.json();
     if (!body.columnId) {
@@ -15,7 +23,7 @@ export async function POST(req: Request) {
       include: { pipeline: true },
     });
     if (!column) return notFound();
-    if (!column.pipeline || column.pipeline.createdBy !== session.email) return forbidden();
+    if (!column.pipeline || !(await esDelAlcance(column.pipeline.id))) return forbidden();
 
     // Un usuario solo puede estar una vez en el mismo pipeline (en cualquier etapa)
     const pipelineId = column.pipelineId;

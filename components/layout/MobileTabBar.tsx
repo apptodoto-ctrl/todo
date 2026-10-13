@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import {
+  Building2,
   ClipboardList,
   LayoutDashboard,
   Calendar,
@@ -35,6 +36,7 @@ const primaryTabs = [
 const secondaryItems = [
   { href: "/dashboard/tareas", icon: CheckSquare, label: "Tareas", tint: "from-amber-500 to-orange-500" },
   { href: "/dashboard/pipeline", icon: Kanban, label: "Pipeline", tint: "from-blue-500 to-indigo-600" },
+  { href: "/dashboard/equipo", icon: Building2, label: "Mi equipo", tint: "from-indigo-500 to-violet-600" },
   { href: "/dashboard/plantillas", icon: ClipboardList, label: "Plantillas", tint: "from-cyan-500 to-blue-600" },
   { href: "/dashboard/biblioteca", icon: BookOpen, label: "Biblioteca", tint: "from-pink-500 to-rose-500" },
   { href: "/dashboard/facturacion", icon: Wallet, label: "Facturación", tint: "from-fuchsia-500 to-pink-600" },

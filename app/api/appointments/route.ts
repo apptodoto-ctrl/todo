@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { unauthorized } from "@/lib/apiAuth";
+import { getScope, agendaScope, ownerFields, patientScope } from "@/lib/center";
 import { sendAppointmentCreatedNotice } from "@/lib/appointmentReminders";
 import { randomUUID } from "crypto";
 import { seriesOccurrences } from "@/lib/appointmentSeries";
 import { findPatientByName } from "@/lib/patientMatch";
 
 export async function GET() {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const appointments = await prisma.appointment.findMany({
-      where: { createdBy: session.email },
+      where: agendaScope(scope),
       orderBy: { date: "asc" },
     });
     return NextResponse.json(appointments);
@@ -26,8 +27,8 @@ function toMinutes(time: string): number {
 }
 
 export async function POST(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { force, repeatWeeks, slots, ...body } = await req.json();
     // Valor propio de esta cita: vacío = se cobra el valor del usuario
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
     if (body.date && body.time && !force) {
       const existing = await prisma.appointment.findMany({
         where: {
-          createdBy: session.email,
+          ...agendaScope(scope),
           date: { in: occurrences.map((o) => o.date) },
           status: { not: "cancelada" },
         },
@@ -84,14 +85,14 @@ export async function POST(req: Request) {
     // de eso dependen "Próxima sesión", el historial y los cobros del paciente.
     const patientId = body.patientId
       ? Number(body.patientId)
-      : await findPatientByName(session.email, String(body.title ?? ""));
+      : await findPatientByName(patientScope(scope), String(body.title ?? ""));
 
     const seriesId = occurrences.length > 1 ? randomUUID() : "";
     const base = {
       ...body,
       duration,
       patientId,
-      createdBy: session.email,
+      ...ownerFields(scope),
       seriesId,
     };
 

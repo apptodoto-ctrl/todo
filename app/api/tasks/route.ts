@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { unauthorized } from "@/lib/apiAuth";
+import { getScope, ownScope, ownerFields } from "@/lib/center";
 
 export async function GET() {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const tasks = await prisma.task.findMany({
-      where: { createdBy: session.email },
+      where: ownScope(scope),
       orderBy: { createdAt: "asc" },
     });
     return NextResponse.json(tasks.map((t) => ({ ...t, patient: t.patientName })));
@@ -17,8 +18,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const body = await req.json();
     const { patient, patientId, ...rest } = body;
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
         ...rest,
         patientName: rest.patientName ?? patient ?? "",
         notify: rest.notify === true && !!rest.due,
-        createdBy: session.email,
+        ...ownerFields(scope),
         ...(patientId ? { patientId: Number(patientId) } : {}),
       },
     });

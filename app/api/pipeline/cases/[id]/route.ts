@@ -1,25 +1,33 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, ownScope } from "@/lib/center";
 
 type Params = Promise<{ id: string }>;
 
-async function checkOwnership(id: number, email: string) {
+/** ¿Este pipeline está al alcance de quien pide? */
+async function esDelAlcance(pipelineId: string) {
+  const scope = await getScope();
+  if (!scope) return false;
+  return !!(await prisma.pipeline.findFirst({ where: { id: pipelineId, ...ownScope(scope) } }));
+}
+
+async function checkOwnership(id: number) {
   const c = await prisma.pipelineCase.findUnique({
     where: { id },
     include: { column: { include: { pipeline: true } } },
   });
   if (!c) return notFound();
-  if (!c.column.pipeline || c.column.pipeline.createdBy !== email) return forbidden();
+  if (!c.column.pipeline || !(await esDelAlcance(c.column.pipeline.id))) return forbidden();
   return null;
 }
 
 export async function PUT(req: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { id } = await params;
-    const err = await checkOwnership(Number(id), session.email);
+    const err = await checkOwnership(Number(id));
     if (err) return err;
     const body = await req.json();
     delete body.id;
@@ -28,7 +36,7 @@ export async function PUT(req: Request, { params }: { params: Params }) {
         where: { id: body.columnId },
         include: { pipeline: true },
       });
-      if (!target || !target.pipeline || target.pipeline.createdBy !== session.email) return forbidden();
+      if (!target || !target.pipeline || !(await esDelAlcance(target.pipeline.id))) return forbidden();
     }
     const updated = await prisma.pipelineCase.update({
       where: { id: Number(id) },
@@ -41,11 +49,11 @@ export async function PUT(req: Request, { params }: { params: Params }) {
 }
 
 export async function DELETE(_: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { id } = await params;
-    const err = await checkOwnership(Number(id), session.email);
+    const err = await checkOwnership(Number(id));
     if (err) return err;
     await prisma.pipelineCase.delete({ where: { id: Number(id) } });
     return NextResponse.json({ ok: true });

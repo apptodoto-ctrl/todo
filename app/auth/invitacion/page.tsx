@@ -13,11 +13,11 @@ function Invitacion() {
   const [error, setError] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!token);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!token) { setError("Falta el enlace de la invitación."); setLoading(false); return; }
+    if (!token) return;
     fetch(`/api/center/invite?token=${encodeURIComponent(token)}`)
       .then(async (r) => {
         const d = await r.json();
@@ -62,6 +62,8 @@ function Invitacion() {
         <div className="bg-white/[0.04] backdrop-blur border border-white/[0.08] rounded-2xl p-6">
           {loading ? (
             <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-violet-400" /></div>
+          ) : !token ? (
+            <p className="text-center text-rose-300 text-sm py-6">Falta el enlace de la invitación.</p>
           ) : error && !info ? (
             <p className="text-center text-rose-300 text-sm py-6">{error}</p>
           ) : info ? (

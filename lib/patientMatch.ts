@@ -17,12 +17,15 @@ export function normalizeName(value: string): string {
  * "Vera Martínez"). Sirve para que una cita escrita a mano quede igual
  * ligada a la ficha, que es lo que alimenta "Próxima sesión".
  */
-export async function findPatientByName(createdBy: string, title: string): Promise<number | null> {
+export async function findPatientByName(
+  scopeWhere: Record<string, unknown>,
+  title: string
+): Promise<number | null> {
   const target = normalizeName(title || "");
   if (target.length < 3) return null;
 
   const patients = await prisma.patient.findMany({
-    where: { createdBy },
+    where: scopeWhere,
     select: { id: true, name: true },
   });
   if (patients.length === 0) return null;

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, loadPatient, ownerFields } from "@/lib/center";
 import { packagesFor, absorbExistingSessions, today } from "@/lib/sessionPackages";
 
 export async function GET(req: NextRequest) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const patientParam = req.nextUrl.searchParams.get("patientId");
-    const list = await packagesFor(session.email, patientParam ? Number(patientParam) : undefined);
+    const list = await packagesFor(scope, patientParam ? Number(patientParam) : undefined);
     return NextResponse.json(list);
   } catch (err) {
     console.error("Packages list error:", err);
@@ -17,8 +18,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const body = await req.json();
     const patientId = Number(body.patientId);
@@ -28,9 +29,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "El paquete debe tener entre 1 y 200 sesiones" }, { status: 400 });
     }
 
-    const patient = await prisma.patient.findUnique({ where: { id: patientId } });
-    if (!patient) return notFound();
-    if (patient.createdBy !== session.email) return forbidden();
+    const { patient, status } = await loadPatient(scope, patientId);
+    if (status === 404) return notFound();
+    if (status === 403 || !patient) return forbidden();
 
     const sessionValue = Number(body.sessionValue) || patient.sessionValue || 0;
     const totalPrice = Number(body.totalPrice) || sessionValue * totalSessions;
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
         startDate: String(body.startDate || today()),
         expiresAt: String(body.expiresAt || ""),
         notes: String(body.notes || "").slice(0, 500),
-        createdBy: session.email,
+        ...ownerFields(scope),
       },
     });
     // Las sesiones que el paciente ya tenía desde la fecha de inicio cuentan

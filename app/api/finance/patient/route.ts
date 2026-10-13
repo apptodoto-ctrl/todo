@@ -1,26 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, loadPatient } from "@/lib/center";
 
 /**
  * Detalle mensual de un paciente para emitir su boleta: cada sesión con su
  * fecha, su valor, si se pagó, y los totales del mes (N2).
  */
 export async function GET(req: NextRequest) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const patientId = Number(req.nextUrl.searchParams.get("patientId"));
     const now = new Date();
     const month = req.nextUrl.searchParams.get("month") || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     if (!patientId) return NextResponse.json({ error: "Falta el usuario" }, { status: 400 });
 
-    const patient = await prisma.patient.findUnique({ where: { id: patientId } });
-    if (!patient) return notFound();
-    if (patient.createdBy !== session.email) return forbidden();
+    const { patient, status } = await loadPatient(scope, patientId);
+    if (status === 404) return notFound();
+    if (status === 403 || !patient) return forbidden();
 
     const [user, records] = await Promise.all([
-      prisma.user.findUnique({ where: { email: session.email }, select: { currency: true, name: true, specialty: true } }),
+      prisma.user.findUnique({ where: { email: scope.email }, select: { currency: true, name: true, specialty: true } }),
       prisma.sessionRecord.findMany({
         where: { patientId, date: { startsWith: month } },
         orderBy: { date: "asc" },

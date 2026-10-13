@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { unauthorized } from "@/lib/apiAuth";
+import { getScope, ownScope, ownerFields } from "@/lib/center";
 import { sanitizeSections, FICHA_INICIO } from "@/lib/formTemplates";
 
 export async function GET(req: NextRequest) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const includeArchived = req.nextUrl.searchParams.get("archived") === "1";
     const templates = await prisma.formTemplate.findMany({
-      where: { createdBy: session.email, ...(includeArchived ? {} : { archived: false }) },
+      where: { ...ownScope(scope), ...(includeArchived ? {} : { archived: false }) },
       orderBy: [{ archived: "asc" }, { createdAt: "asc" }],
       include: { _count: { select: { responses: true } } },
     });
@@ -23,8 +24,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: Request) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const body = await req.json();
 
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
           description: FICHA_INICIO.description,
           sections: FICHA_INICIO.sections as never,
           origin: "todo",
-          createdBy: session.email,
+          ...ownerFields(scope),
         },
       });
       return NextResponse.json(created, { status: 201 });
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
         name: name.slice(0, 120),
         description: String(body.description ?? "").slice(0, 400),
         sections: sanitizeSections(body.sections) as never,
-        createdBy: session.email,
+        ...ownerFields(scope),
       },
     });
     return NextResponse.json(created, { status: 201 });

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { patientScope, type Scope } from "@/lib/center";
 
 export interface PackageSummary {
   id: number;
@@ -158,10 +159,16 @@ export function summarize(
   };
 }
 
-/** Todos los paquetes de la terapeuta, con el consumo ya calculado */
-export async function packagesFor(email: string, patientId?: number): Promise<PackageSummary[]> {
+/**
+ * Paquetes que esta persona puede ver, con el consumo ya calculado. En un
+ * Centro son los de los pacientes a los que alcanza su permiso.
+ */
+export async function packagesFor(scope: Scope, patientId?: number): Promise<PackageSummary[]> {
   const packages = await prisma.sessionPackage.findMany({
-    where: { createdBy: email, ...(patientId ? { patientId } : {}) },
+    where: {
+      patient: patientScope(scope) as never,
+      ...(patientId ? { patientId } : {}),
+    },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     include: { _count: { select: { sessions: true } }, patient: { select: { name: true } } },
   });

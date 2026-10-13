@@ -1,22 +1,26 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, ownScope } from "@/lib/center";
 
 type Params = Promise<{ id: string }>;
 
-async function checkOwnership(id: number, email: string) {
-  const task = await prisma.task.findUnique({ where: { id } });
-  if (!task) return notFound();
-  if (task.createdBy !== email) return forbidden();
-  return null;
+/** Dentro de un Centro, la Administradora alcanza lo de todo su equipo */
+async function checkOwnership(id: number) {
+  const scope = await getScope();
+  if (!scope) return unauthorized();
+  const task = await prisma.task.findFirst({ where: { id, ...ownScope(scope) } });
+  if (task) return null;
+  const existe = await prisma.task.findUnique({ where: { id } });
+  return existe ? forbidden() : notFound();
 }
 
 export async function PUT(req: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { id } = await params;
-    const err = await checkOwnership(Number(id), session.email);
+    const err = await checkOwnership(Number(id));
     if (err) return err;
     const body = await req.json();
     const { patient, patientId, ...rest } = body;
@@ -41,11 +45,11 @@ export async function PUT(req: Request, { params }: { params: Params }) {
 }
 
 export async function DELETE(_: Request, { params }: { params: Params }) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
   try {
     const { id } = await params;
-    const err = await checkOwnership(Number(id), session.email);
+    const err = await checkOwnership(Number(id));
     if (err) return err;
     await prisma.task.delete({ where: { id: Number(id) } });
     return NextResponse.json({ ok: true });

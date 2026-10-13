@@ -50,8 +50,12 @@ export interface Scope {
   role: CenterRole;
   centerId: string | null;
   centerName: string;
+  /** Correo de la Administradora: en un Centro el plan y los créditos son suyos */
+  adminEmail: string;
   permissions: CenterPermissions;
   isAdmin: boolean;
+  /** Cuenta del equipo TOdo: no pasa por facturación */
+  platformAdmin: boolean;
 }
 
 /** La Administradora puede todo dentro de su Centro */
@@ -75,7 +79,7 @@ export async function getScope(): Promise<Scope | null> {
 
   const membership = await prisma.centerMember.findFirst({
     where: { userEmail: session.email, active: true, joinedAt: { not: null } },
-    include: { center: { select: { id: true, name: true } } },
+    include: { center: { select: { id: true, name: true, adminEmail: true } } },
   });
 
   if (!membership) {
@@ -85,8 +89,10 @@ export async function getScope(): Promise<Scope | null> {
       role: "individual",
       centerId: null,
       centerName: "",
+      adminEmail: session.email,
       permissions: ADMIN_PERMISSIONS,
       isAdmin: false,
+      platformAdmin: session.role === "admin",
     };
   }
 
@@ -97,8 +103,10 @@ export async function getScope(): Promise<Scope | null> {
     role: isAdmin ? "administradora" : "terapeuta",
     centerId: membership.centerId,
     centerName: membership.center.name,
+    adminEmail: membership.center.adminEmail,
     permissions: isAdmin ? ADMIN_PERMISSIONS : parsePermissions(membership.permissions),
     isAdmin,
+    platformAdmin: session.role === "admin",
   };
 }
 
@@ -151,3 +159,38 @@ export async function seatUsage(centerId: string) {
 
 /** Tope duro: un Centro no pasa de 12 terapeutas sin que TOdo lo autorice */
 export const MAX_THERAPISTS = 12;
+
+/** ¿Puede esta persona abrir la ficha de este paciente? */
+export function canAccessPatient(
+  scope: Scope,
+  patient: { createdBy: string; centerId: string | null; therapistEmail: string }
+): boolean {
+  if (!scope.centerId) return patient.createdBy === scope.email && patient.centerId === null;
+  if (patient.centerId !== scope.centerId) return false;
+  if (scope.isAdmin || scope.permissions.verTodosPacientes) return true;
+  return patient.therapistEmail === scope.email || patient.createdBy === scope.email;
+}
+
+/**
+ * Carga un paciente comprobando el alcance. Devuelve el paciente, o el
+ * error que corresponde servir.
+ */
+export async function loadPatient(scope: Scope, patientId: number) {
+  const patient = await prisma.patient.findUnique({ where: { id: patientId } });
+  if (!patient) return { patient: null, status: 404 as const };
+  if (!canAccessPatient(scope, patient)) return { patient: null, status: 403 as const };
+  return { patient, status: 200 as const };
+}
+
+/**
+ * De quién es el plan y los créditos. En un Centro, del Centro: la bolsa
+ * es común y la paga la Administradora.
+ */
+export function billingEmail(scope: Scope): string {
+  return scope.centerId ? scope.adminEmail : scope.email;
+}
+
+/** ¿Tiene este permiso? La Administradora y las cuentas individuales, siempre */
+export function can(scope: Scope, permission: keyof CenterPermissions): boolean {
+  return scope.permissions[permission] === true;
+}

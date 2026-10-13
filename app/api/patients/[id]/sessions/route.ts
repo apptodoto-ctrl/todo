@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
+import { getScope, loadPatient } from "@/lib/center";
 import { consumeFromPackage } from "@/lib/sessionPackages";
 
 type Params = Promise<{ id: string }>;
 
-async function checkOwnership(patientId: number, email: string) {
-  const patient = await prisma.patient.findUnique({ where: { id: patientId } });
-  if (!patient) return notFound();
-  if (patient.createdBy !== email) return forbidden();
+async function checkOwnership(patientId: number) {
+  // El acceso lo decide el alcance: cuenta individual o Centro con permisos
+  const scope = await getScope();
+  if (!scope) return unauthorized();
+  const { status } = await loadPatient(scope, patientId);
+  if (status === 404) return notFound();
+  if (status === 403) return forbidden();
   return null;
 }
 
@@ -24,7 +28,7 @@ export async function GET(_: Request, { params }: { params: Params }) {
   try {
     const { id } = await params;
     const patientId = Number(id);
-    const err = await checkOwnership(patientId, session.email);
+    const err = await checkOwnership(patientId);
     if (err) return err;
     const records = await prisma.sessionRecord.findMany({
       where: { patientId },
@@ -42,7 +46,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
   try {
     const { id } = await params;
     const patientId = Number(id);
-    const err = await checkOwnership(patientId, session.email);
+    const err = await checkOwnership(patientId);
     if (err) return err;
     const { date, notes, duration, attended, paid, value } = await req.json();
     if (!date) {
