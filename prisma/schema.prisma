@@ -175,6 +175,18 @@ model Coupon {
 
 model Subscription {
   id                   Int       @id @default(autoincrement())
+  /// trial | beta | active | past_due | solo_lectura | suspendida | cancelada | comp
+  accountState         String    @default("")
+  stateReason          String    @default("")
+  stateChangedAt       DateTime?
+  /// Beta tester: grupo y hasta cuándo dura su beneficio
+  betaGroup            String    @default("")
+  betaUntil            DateTime?
+  /// Notas y etiquetas internas que el cliente nunca ve
+  internalNotes        String    @default("")
+  tags                 Json?
+  /// Cuándo entró por última vez
+  lastSeenAt           DateTime?
   userEmail            String    @unique
   tierCode             String
   status               String    @default("trialing")
@@ -551,4 +563,54 @@ model CenterRoom {
   updatedAt DateTime @updatedAt
 
   @@index([centerId, active])
+}
+
+/// Todo lo que el equipo de TOdo hace desde el panel queda anotado aquí
+model AdminAuditLog {
+  id         Int      @id @default(autoincrement())
+  /// Quién del equipo lo hizo (se elige de una lista al entrar)
+  actor      String
+  /// Correo de la cuenta afectada
+  targetEmail String  @default("")
+  action     String
+  /// Cómo estaba antes y cómo quedó
+  before     Json?
+  after      Json?
+  reason     String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([targetEmail, createdAt])
+  @@index([createdAt])
+}
+
+/// Interruptor para encender una función a todos, a un plan o a unas cuentas
+model FeatureFlag {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  description String   @default("")
+  enabled     Boolean  @default(false)
+  /// { planes: [], paises: [], cuentas: [], soloBeta: bool }
+  audience    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Consulta que un cliente manda desde el botón de ayuda
+model SupportTicket {
+  id          Int      @id @default(autoincrement())
+  userEmail   String
+  userName    String   @default("")
+  screen      String   @default("")
+  message     String
+  /// nueva | en_curso | resuelta
+  state       String   @default("nueva")
+  reply       String   @default("")
+  repliedBy   String   @default("")
+  repliedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([state, createdAt])
+  @@index([userEmail])
 }
