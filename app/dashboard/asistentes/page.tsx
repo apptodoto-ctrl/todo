@@ -9,6 +9,7 @@ import {
 import Modal from "@/components/ui/Modal";
 import VisualGuide from "@/components/activities/VisualGuide";
 import { parseActivityGuide, GUIDE_SYSTEM_PROMPT, type ActivityGuide } from "@/lib/activityGuide";
+import { templateToPrompt, type FormSection } from "@/lib/formTemplates";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
 interface SavedReport {
@@ -138,6 +139,9 @@ export default function AsistentesPage() {
   const [savedReportId, setSavedReportId] = useState<number | null>(null);
   // IA2: la actividad se puede entregar como guía visual para la familia
   const [visualMode, setVisualMode] = useState(false);
+  // Plantillas del Centro: el informe puede seguir la estructura elegida
+  const [templates, setTemplates] = useState<{ id: number; name: string; sections: FormSection[] }[]>([]);
+  const [templateId, setTemplateId] = useState<number | "">("");
   const [guide, setGuide] = useState<ActivityGuide | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [reports, setReports] = useState<SavedReport[]>([]);
@@ -175,6 +179,7 @@ export default function AsistentesPage() {
       .then((u) => { if (u?.specialty) setSpecialty(u.specialty); })
       .catch(() => {});
     loadCredits();
+    fetch("/api/forms/templates").then((r) => r.json()).then((d) => setTemplates(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   const current = assistants.find((a) => a.id === activeAssistant);
@@ -240,6 +245,9 @@ export default function AsistentesPage() {
     const fullPrompt = patientContext + input;
 
     const isVisualGuide = current?.id === "actividades" && visualMode;
+    // La plantilla del Centro manda sobre la estructura del informe
+    const plantilla = templateId === "" ? null : templates.find((t) => t.id === templateId) ?? null;
+    const estructura = plantilla ? `\n\n${templateToPrompt(plantilla.name, plantilla.sections)}` : "";
 
     try {
       const featureKeys: Record<string, string> = {
@@ -256,7 +264,7 @@ export default function AsistentesPage() {
           systemPrompt: isVisualGuide
             ? GUIDE_SYSTEM_PROMPT
             : current
-            ? systemPrompts[current.id] +
+            ? systemPrompts[current.id] + estructura +
               "\n\nFORMATO: Escribe en español latinoamericano neutro (Chile, Argentina y Colombia): trata de \"ustedes\", nunca \"vosotros\" ni modismos de España. Escribe en español correcto y completo, respetando SIEMPRE las tildes (á, é, í, ó, ú), la ñ y los signos de apertura (¿, ¡). Lo único que debes evitar es el formato markdown: nada de asteriscos, almohadillas (#), guiones bajos, viñetas especiales ni emojis. Usa texto corrido con saltos de línea normales."
             : "Responde en texto plano, sin markdown, sin asteriscos, sin almohadillas (#), sin viñetas especiales, sin emojis ni caracteres especiales de formato.",
         }),
@@ -514,6 +522,7 @@ export default function AsistentesPage() {
               setOutput(null);
               setGuide(null);
               setVisualMode(false);
+              setTemplateId("");
               setInput("");
               setSelectedPatientId("");
               setSavedReportId(null);
@@ -712,6 +721,25 @@ export default function AsistentesPage() {
                 ) : null;
               })()}
             </div>
+
+            {current.id === "informe" && templates.length > 0 && (
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Seguir una plantilla</label>
+                <select
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+                >
+                  <option value="">Sin plantilla (estructura libre)</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1.5">
+                  El informe saldrá con las secciones y el orden de esa plantilla. Lo que falte quedará como &quot;Sin información registrada&quot;, no inventado.
+                </p>
+              </div>
+            )}
 
             {current.id === "actividades" && (
               <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-3 cursor-pointer hover:border-violet-300 transition-all bg-white">

@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen, Package, Building2, Home } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen, Package, Building2, Home, Lock } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CURRENCIES, CURRENCY_LABELS } from "@/lib/currency";
@@ -160,6 +160,8 @@ export default function UsuariosPage() {
   // Equipo del Centro: quién puede quedar a cargo de cada paciente
   const [therapists, setTherapists] = useState<{ email: string; name: string; role: string }[]>([]);
   const [centerRole, setCenterRole] = useState("individual");
+  const [notes, setNotes] = useState<{ id: number; body: string; authorName: string; createdAt: string; createdBy: string }[]>([]);
+  const [newNote, setNewNote] = useState("");
   const [currencySaved, setCurrencySaved] = useState(false);
 
   // La moneda es de toda la consulta: se puede cambiar aquí mismo sin ir a Configuración
@@ -216,7 +218,7 @@ export default function UsuariosPage() {
   }, [currentUserEmail]);
 
   useEffect(() => {
-    if (!selectedPatient) { setSessionRecords([]); setObjectives([]); setPatientPackages([]); setPatientForms([]); setShowAddSession(false); setEditingSession(null); return; }
+    if (!selectedPatient) { setSessionRecords([]); setObjectives([]); setPatientPackages([]); setPatientForms([]); setNotes([]); setShowAddSession(false); setEditingSession(null); return; }
     setSessionsLoading(true);
     fetch(`/api/patients/${selectedPatient.id}/sessions`)
       .then((r) => r.json())
@@ -234,6 +236,10 @@ export default function UsuariosPage() {
       .then((r) => r.json())
       .then((data) => setPatientForms(Array.isArray(data) ? data : []))
       .catch(() => setPatientForms([]));
+    fetch(`/api/patients/${selectedPatient.id}/notes`)
+      .then((r) => r.json())
+      .then((data) => setNotes(Array.isArray(data) ? data : []))
+      .catch(() => setNotes([]));
     fetch(`/api/documents?patientId=${selectedPatient.id}`)
       .then((r) => r.json())
       .then((data) => setPatientDocs(Array.isArray(data) ? data : []))
@@ -484,6 +490,25 @@ export default function UsuariosPage() {
     if (!doc) return;
     doc.open(); doc.write(html); doc.close();
     setTimeout(() => { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); setTimeout(() => document.body.removeChild(iframe), 2000); }, 300);
+  };
+
+  const agregarNota = async () => {
+    if (!selectedPatient || !newNote.trim()) return;
+    const res = await fetch(`/api/patients/${selectedPatient.id}/notes`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: newNote }),
+    });
+    if (res.ok) {
+      const creada = await res.json();
+      setNotes((prev) => [creada, ...prev]);
+      setNewNote("");
+    }
+  };
+
+  const borrarNota = async (id: number) => {
+    if (!selectedPatient) return;
+    const res = await fetch(`/api/patients/${selectedPatient.id}/notes/${id}`, { method: "DELETE" });
+    if (res.ok) setNotes((prev) => prev.filter((n) => n.id !== id));
   };
 
   const deleteSession = async (sessionId: number) => {
@@ -1121,6 +1146,45 @@ export default function UsuariosPage() {
                     <button key={t.id} onClick={() => imprimirFicha(t.name, t.sections, null)} className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-100 transition-colors">
                       Imprimir «{t.name}» en blanco
                     </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Notas internas del equipo: nunca salen en un informe */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Lock className="w-4 h-4 text-slate-400" />
+                <h4 className="text-sm font-bold text-slate-700">Notas internas</h4>
+                <span className="text-[11px] text-slate-400">solo para el equipo</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") agregarNota(); }}
+                  placeholder="Observación de supervisión, acuerdo de equipo..."
+                  className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+                />
+                <button onClick={agregarNota} disabled={!newNote.trim()} className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40 transition-colors shrink-0">
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              {notes.length === 0 ? (
+                <p className="text-[11px] text-slate-400 mt-2">Nunca aparecen en los informes ni las ve la familia.</p>
+              ) : (
+                <div className="space-y-2 mt-2">
+                  {notes.map((n) => (
+                    <div key={n.id} className="group bg-slate-50 border border-slate-200/60 rounded-xl px-3 py-2">
+                      <p className="text-xs text-slate-700 whitespace-pre-wrap">{n.body}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-slate-400">{n.authorName} · {new Date(n.createdAt).toLocaleDateString("es-CL")}</span>
+                        <button onClick={() => borrarNota(n.id)} className="ml-auto opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

@@ -74,6 +74,7 @@ model Patient {
   updatedAt   DateTime @updatedAt
 
   tasks          Task[]
+  internalNotes  InternalNote[]
   pipelineCases  PipelineCase[]
   sessionRecords SessionRecord[]
   objectives     Objective[]
@@ -460,4 +461,19 @@ model CenterMember {
 
   @@unique([centerId, userEmail])
   @@index([userEmail, active])
+}
+
+/// Nota interna del equipo sobre un paciente: nunca sale en un informe
+model InternalNote {
+  id        Int      @id @default(autoincrement())
+  patientId Int
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  centerId  String?
+  body      String
+  authorName String  @default("")
+  createdBy String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
 }

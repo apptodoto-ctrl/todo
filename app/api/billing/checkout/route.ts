@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { getScope } from "@/lib/center";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { getOrCreateSubscription, getSetting } from "@/lib/billing";
 
@@ -9,6 +10,14 @@ const APP_URL = process.env.NEXTAUTH_URL || "https://app.todo-to.com";
 export async function POST(req: NextRequest) {
   const session = await getSessionInfo();
   if (!session) return unauthorized();
+  // En un Centro, el plan y los créditos los maneja solo la Administradora
+  const scope = await getScope();
+  if (scope?.centerId && !scope.isAdmin) {
+    return NextResponse.json(
+      { error: "El plan y los créditos del Centro los maneja la Administradora." },
+      { status: 403 }
+    );
+  }
   if (!stripeEnabled()) {
     return NextResponse.json({ error: "Los pagos aún no están habilitados. Intenta más tarde." }, { status: 503 });
   }

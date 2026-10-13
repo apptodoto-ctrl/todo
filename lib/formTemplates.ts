@@ -167,3 +167,21 @@ export const FICHA_INICIO: { name: string; description: string; sections: FormSe
     ]),
   ],
 };
+
+/**
+ * Convierte una plantilla en instrucciones para la IA, de modo que el
+ * informe salga con la estructura, las secciones y el orden que definió
+ * el Centro.
+ */
+export function templateToPrompt(name: string, sections: FormSection[]): string {
+  const cuerpo = sections
+    .map((sec) => {
+      const campos = sec.fields.map((f) => `   - ${f.label}`).join("\n");
+      return ` ${sec.title}\n${campos}`;
+    })
+    .join("\n");
+  return `ESTRUCTURA OBLIGATORIA DEL INFORME (plantilla "${name}" del Centro).
+Respeta estas secciones, en este orden, con estos títulos exactos. Bajo cada título desarrolla los puntos indicados en prosa clínica; si falta información para alguno, escríbelo como "Sin información registrada" en vez de inventarlo.
+
+${cuerpo}`;
+}

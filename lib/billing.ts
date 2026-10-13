@@ -112,7 +112,17 @@ export async function featureAllowed(tierCode: string, isTrial: boolean, feature
 }
 
 // Descuenta créditos: primero los incluidos del ciclo, después los comprados.
-export async function consumeCredits(userEmail: string, featureKey: string, cost: number): Promise<boolean> {
+/**
+ * Descuenta créditos de la suscripción indicada. En un Centro la bolsa es
+ * del Centro, pero el movimiento se anota a nombre de quien la usó, para
+ * que la Administradora vea el consumo de cada terapeuta.
+ */
+export async function consumeCredits(
+  userEmail: string,
+  featureKey: string,
+  cost: number,
+  actorEmail?: string
+): Promise<boolean> {
   const status = await getBillingStatus(userEmail);
   if (status.totalRemaining < cost) return false;
   const fromIncluded = Math.min(status.includedRemaining, cost);
@@ -125,13 +135,13 @@ export async function consumeCredits(userEmail: string, featureKey: string, cost
     },
   });
   await prisma.creditLedger.create({
-    data: { userEmail, featureKey, amount: -cost, reason: "consume" },
+    data: { userEmail: actorEmail ?? userEmail, featureKey, amount: -cost, reason: "consume" },
   });
   return true;
 }
 
 // Si la generación falla, los créditos vuelven solos.
-export async function refundCredits(userEmail: string, featureKey: string, cost: number) {
+export async function refundCredits(userEmail: string, featureKey: string, cost: number, actorEmail?: string) {
   const sub = await prisma.subscription.findUnique({ where: { userEmail } });
   if (!sub) return;
   const refundToIncluded = Math.min(sub.includedCreditsUsed, cost);
@@ -144,7 +154,7 @@ export async function refundCredits(userEmail: string, featureKey: string, cost:
     },
   });
   await prisma.creditLedger.create({
-    data: { userEmail, featureKey, amount: cost, reason: "refund_failure" },
+    data: { userEmail: actorEmail ?? userEmail, featureKey, amount: cost, reason: "refund_failure" },
   });
 }
 

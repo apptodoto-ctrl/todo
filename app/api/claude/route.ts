@@ -1,24 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { askClaude } from "@/lib/claude";
-import { getSessionInfo, unauthorized } from "@/lib/apiAuth";
+import { unauthorized } from "@/lib/apiAuth";
+import { getScope, billingEmail } from "@/lib/center";
+import { checkCreditAlert } from "@/lib/creditAlerts";
 import { getBillingStatus, hasFullAccess, featureAllowed, consumeCredits, refundCredits } from "@/lib/billing";
 
 export async function POST(req: NextRequest) {
-  const session = await getSessionInfo();
-  if (!session) return unauthorized();
+  const scope = await getScope();
+  if (!scope) return unauthorized();
+  const bolsa = billingEmail(scope);
   try {
     const { prompt, systemPrompt, featureKey } = await req.json();
 
     // Facturación: acceso por plan y saldo de créditos (los admin no pagan)
     const key = featureKey || "ai_ideas_actividades";
-    if (session.role === "admin") {
+    if (scope.platformAdmin) {
       const text = await askClaude(prompt, { systemPrompt, maxTokens: 2048 });
       return NextResponse.json({ text, creditsUsed: 0 });
     }
-    const billing = await getBillingStatus(session.email);
+    const billing = await getBillingStatus(bolsa);
     if (!hasFullAccess(billing.effectiveStatus)) {
       return NextResponse.json(
-        { error: "Tu período de prueba terminó. Elige un plan para seguir usando la IA.", code: "subscription_expired" },
+        {
+          error: scope.centerId && !scope.isAdmin
+            ? "La suscripción del Centro está pendiente. Avísale a la Administradora."
+            : "Tu período de prueba terminó. Elige un plan para seguir usando la IA.",
+          code: "subscription_expired",
+        },
         { status: 402 }
       );
     }
@@ -29,10 +37,15 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
-    const ok = await consumeCredits(session.email, key, feature.cost);
+    const ok = await consumeCredits(bolsa, key, feature.cost, scope.email);
     if (!ok) {
       return NextResponse.json(
-        { error: "No te quedan créditos de IA este ciclo. Puedes comprar una recarga o esperar la renovación.", code: "no_credits" },
+        {
+          error: scope.centerId && !scope.isAdmin
+            ? "Al Centro no le quedan créditos de IA este ciclo. Avísale a la Administradora para que recargue."
+            : "No te quedan créditos de IA este ciclo. Puedes comprar una recarga o esperar la renovación.",
+          code: "no_credits",
+        },
         { status: 402 }
       );
     }
@@ -42,10 +55,12 @@ export async function POST(req: NextRequest) {
         systemPrompt,
         maxTokens: 2048,
       });
+      // Aviso del 20 % y del agotamiento: a la terapeuta, o a la Administradora
+      checkCreditAlert(bolsa).catch((err) => console.error("[credits] aviso falló:", err));
       return NextResponse.json({ text, creditsUsed: feature.cost });
     } catch (error) {
       // Si la generación falla, los créditos vuelven solos
-      await refundCredits(session.email, key, feature.cost);
+      await refundCredits(bolsa, key, feature.cost, scope.email);
       throw error;
     }
   } catch (error) {
