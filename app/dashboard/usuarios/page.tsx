@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen, Package } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen, Package, Building2, Home } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CURRENCIES, CURRENCY_LABELS } from "@/lib/currency";
@@ -20,6 +20,9 @@ interface Patient {
   guardianEmail: string;
   prevision: string;
   coverageEntity: string;
+  therapistEmail: string;
+  attendanceMode: string;
+  homeAddress: string;
   school: string;
   consultReason: string;
   sessionValue: number;
@@ -114,8 +117,9 @@ export default function UsuariosPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
+  const [therapistFilter, setTherapistFilter] = useState("todas");
   const [showNewPatient, setShowNewPatient] = useState(false);
-  const [newPatient, setNewPatient] = useState({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", coverageEntity: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
+  const [newPatient, setNewPatient] = useState({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", coverageEntity: "", therapistEmail: "", attendanceMode: "centro", homeAddress: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
@@ -153,6 +157,9 @@ export default function UsuariosPage() {
   const [selfContact, setSelfContact] = useState(false);
   const [currency, setCurrency] = useState("CLP");
   const [country, setCountry] = useState(DEFAULT_COUNTRY);
+  // Equipo del Centro: quién puede quedar a cargo de cada paciente
+  const [therapists, setTherapists] = useState<{ email: string; name: string; role: string }[]>([]);
+  const [centerRole, setCenterRole] = useState("individual");
   const [currencySaved, setCurrencySaved] = useState(false);
 
   // La moneda es de toda la consulta: se puede cambiar aquí mismo sin ir a Configuración
@@ -181,6 +188,8 @@ export default function UsuariosPage() {
   useEffect(() => {
     fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.currency) setCurrency(u.currency); if (u?.country) setCountry(u.country); }).catch(() => {});
     fetch("/api/forms/templates").then((r) => r.json()).then((d) => setTemplates(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch("/api/center/therapists").then((r) => r.json()).then((d) => setTherapists(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch("/api/center").then((r) => r.json()).then((d) => { if (d?.role) setCenterRole(d.role); }).catch(() => {});
     // Las citas agendadas alimentan "Próxima sesión" y "Próximas sesiones" del perfil
     fetch("/api/appointments").then((r) => r.json()).then((d) => setAppointments(Array.isArray(d) ? d : [])).catch(() => {});
     // Deuda por paciente para la alerta del listado y del perfil
@@ -512,7 +521,7 @@ export default function UsuariosPage() {
     if (res.ok) {
       const patient = await res.json();
       setPatients((prev) => [...prev, patient]);
-      setNewPatient({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", coverageEntity: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
+      setNewPatient({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", coverageEntity: "", therapistEmail: "", attendanceMode: "centro", homeAddress: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
       setShowNewPatient(false);
       setFilter("todos");
     } else {
@@ -531,7 +540,7 @@ export default function UsuariosPage() {
   };
 
   const openEdit = (p: Patient) => {
-    setEditForm({ name: p.name, age: p.age, birthDate: p.birthDate, guardian: p.guardian, guardianPhone: p.guardianPhone, guardianEmail: p.guardianEmail, prevision: p.prevision, coverageEntity: p.coverageEntity, consultReason: p.consultReason, sessionValue: p.sessionValue, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, nextSessionTime: p.nextSessionTime, phone: p.phone, email: p.email, rut: p.rut });
+    setEditForm({ name: p.name, age: p.age, birthDate: p.birthDate, guardian: p.guardian, guardianPhone: p.guardianPhone, guardianEmail: p.guardianEmail, prevision: p.prevision, coverageEntity: p.coverageEntity, consultReason: p.consultReason, sessionValue: p.sessionValue, therapistEmail: p.therapistEmail, attendanceMode: p.attendanceMode, homeAddress: p.homeAddress, diagnosis: p.diagnosis, status: p.status, nextSession: p.nextSession, nextSessionTime: p.nextSessionTime, phone: p.phone, email: p.email, rut: p.rut });
     setEditPatient(p);
     setMenuOpenId(null);
   };
@@ -557,13 +566,31 @@ export default function UsuariosPage() {
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.diagnosis.toLowerCase().includes(search.toLowerCase());
       const matchFilter = filter === "todos" || p.status === filter;
-      return matchSearch && matchFilter;
+      const matchTherapist = therapistFilter === "todas" || p.therapistEmail === therapistFilter;
+      return matchSearch && matchFilter && matchTherapist;
     })
     // Orden alfabético: es como las terapeutas buscan a sus usuarios
     .sort((a, b) => a.name.trim().localeCompare(b.name.trim(), "es", { sensitivity: "base" }));
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
+      {centerRole === "administradora" && therapists.length > 1 && (
+        <div className="flex items-center gap-2 bg-white border border-slate-200/60 rounded-xl px-3 py-2">
+          <Building2 className="w-4 h-4 text-violet-500 shrink-0" />
+          <span className="text-xs font-semibold text-slate-600 shrink-0">Terapeuta</span>
+          <select
+            value={therapistFilter}
+            onChange={(e) => setTherapistFilter(e.target.value)}
+            className="flex-1 min-w-0 text-sm text-slate-700 bg-transparent focus:outline-none"
+          >
+            <option value="todas">Todas del Centro</option>
+            {therapists.map((t) => (
+              <option key={t.email} value={t.email}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -681,6 +708,14 @@ export default function UsuariosPage() {
                 <div className="flex items-center gap-2 text-xs text-slate-600">
                   <Calendar className="w-3.5 h-3.5 text-slate-400" />
                   <span>Próxima: {(() => { const n = upcomingFor(p.id, appointments)[0]; return n ? `${n.date.split("-").reverse().join("-")} ${n.time}` : "sin agendar"; })()}</span>
+                  {p.attendanceMode === "domicilio" && (
+                    <span className="flex items-center gap-1 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md" title={p.homeAddress || "A domicilio"}>
+                      <Home className="w-3 h-3" /> Domicilio
+                    </span>
+                  )}
+                  {centerRole === "administradora" && therapists.length > 1 && (
+                    <span className="text-[11px] text-slate-400">· {therapists.find((t) => t.email === p.therapistEmail)?.name ?? "sin terapeuta"}</span>
+                  )}
                 </div>
               </div>
 
@@ -751,6 +786,41 @@ export default function UsuariosPage() {
             </div>
           )}
           <div>
+            {centerRole === "administradora" && (
+              <div className="mb-4">
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Terapeuta a cargo</label>
+                <select
+                  value={editForm.therapistEmail || ""}
+                  onChange={(e) => setEditForm({ ...editForm, therapistEmail: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+                >
+                  {therapists.map((t) => (
+                    <option key={t.email} value={t.email}>{t.name}{t.role === "administradora" ? " (Administradora)" : ""}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1.5">Al cambiarla, todo el historial del paciente se va con él.</p>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Dónde se atiende</label>
+                <select
+                  value={editForm.attendanceMode || "centro"}
+                  onChange={(e) => setEditForm({ ...editForm, attendanceMode: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+                >
+                  <option value="centro">En la consulta</option>
+                  <option value="domicilio">A domicilio</option>
+                  <option value="ambos">De las dos formas</option>
+                </select>
+              </div>
+              {(editForm.attendanceMode === "domicilio" || editForm.attendanceMode === "ambos") && (
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Dirección</label>
+                  <input type="text" value={editForm.homeAddress || ""} onChange={(e) => setEditForm({ ...editForm, homeAddress: e.target.value })} placeholder="Dónde se hacen las sesiones" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                </div>
+              )}
+            </div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">{countryConfig(country).documentLabel}</label>
             <input type="text" value={editForm.rut || ""} onChange={(e) => setEditForm({ ...editForm, rut: formatDocument(e.target.value, country) })} placeholder={countryConfig(country).documentPlaceholder} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             {countryConfig(country).documentHint && <p className="text-[11px] text-slate-400 mt-1.5">{countryConfig(country).documentHint}</p>}
@@ -987,6 +1057,20 @@ export default function UsuariosPage() {
                 </div>
               )}
             </div>
+
+            {(selectedPatient.attendanceMode === "domicilio" || selectedPatient.attendanceMode === "ambos") && selectedPatient.homeAddress && (
+              <div className="bg-amber-50/70 border border-amber-200 rounded-xl px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <Home className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-amber-900">
+                      {selectedPatient.attendanceMode === "ambos" ? "También se atiende a domicilio" : "Se atiende a domicilio"}
+                    </p>
+                    <p className="text-xs text-amber-800 truncate">{selectedPatient.homeAddress}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Fichas: información base del usuario, separada de los documentos */}
             <div>
@@ -1327,6 +1411,41 @@ export default function UsuariosPage() {
             </div>
           </div>
           <div>
+            {centerRole === "administradora" && therapists.length > 1 && (
+              <div className="mb-4">
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Terapeuta a cargo</label>
+                <select
+                  value={newPatient.therapistEmail}
+                  onChange={(e) => setNewPatient({ ...newPatient, therapistEmail: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+                >
+                  <option value="">Yo</option>
+                  {therapists.filter((t) => t.role !== "administradora").map((t) => (
+                    <option key={t.email} value={t.email}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Dónde se atiende</label>
+                <select
+                  value={newPatient.attendanceMode}
+                  onChange={(e) => setNewPatient({ ...newPatient, attendanceMode: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+                >
+                  <option value="centro">En la consulta</option>
+                  <option value="domicilio">A domicilio</option>
+                  <option value="ambos">De las dos formas</option>
+                </select>
+              </div>
+              {(newPatient.attendanceMode === "domicilio" || newPatient.attendanceMode === "ambos") && (
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 block mb-1.5">Dirección</label>
+                  <input type="text" value={newPatient.homeAddress} onChange={(e) => setNewPatient({ ...newPatient, homeAddress: e.target.value })} placeholder="Dónde se hacen las sesiones" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
+                </div>
+              )}
+            </div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">{countryConfig(country).documentLabel}</label>
             <input type="text" value={newPatient.rut} onChange={(e) => setNewPatient({ ...newPatient, rut: formatDocument(e.target.value, country) })} placeholder={countryConfig(country).documentPlaceholder} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
             {countryConfig(country).documentHint && <p className="text-[11px] text-slate-400 mt-1.5">{countryConfig(country).documentHint}</p>}

@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, CheckSquare, Bell, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, CheckSquare, Bell, Pencil, Trash2, Building2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -22,6 +22,7 @@ interface CalEvent {
   duration: number;
   status: string;
   patientId: number | null;
+  createdBy?: string;
 }
 
 const statusBadges: Record<string, { label: string; cls: string }> = {
@@ -86,10 +87,16 @@ export default function CalendarioPage() {
   // Vista del calendario: mes (por defecto), semana o día
   const [view, setView] = useState<"mes" | "semana" | "dia">("mes");
   const [currency, setCurrency] = useState("CLP");
+  // Agenda del Centro: la Administradora puede mirar la de cada terapeuta
+  const [therapists, setTherapists] = useState<{ email: string; name: string; role: string }[]>([]);
+  const [centerRole, setCenterRole] = useState("individual");
+  const [therapistFilter, setTherapistFilter] = useState("todas");
   const { email: currentUserEmail } = useCurrentUser();
 
   useEffect(() => {
     fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.currency) setCurrency(u.currency); }).catch(() => {});
+    fetch("/api/center/therapists").then((r) => r.json()).then((d) => setTherapists(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch("/api/center").then((r) => r.json()).then((d) => { if (d?.role) setCenterRole(d.role); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -112,12 +119,12 @@ export default function CalendarioPage() {
     if (!currentUserEmail) return;
     fetch(`/api/appointments?createdBy=${encodeURIComponent(currentUserEmail)}`)
       .then((r) => r.json())
-      .then((data: { id: number; date: string; title: string; time: string; type: string; location: string; duration?: number; status?: string; patientId?: number | null }[]) => {
+      .then((data: { id: number; date: string; title: string; time: string; type: string; location: string; duration?: number; status?: string; patientId?: number | null; createdBy?: string }[]) => {
         const list = Array.isArray(data) ? data : [];
         setLocalEvents(
           list.map((a) => {
             const [y, m, d] = a.date.split("-").map(Number);
-            return { id: a.id, date: new Date(y, m - 1, d), title: a.title, time: a.time, type: a.type, location: a.location, duration: a.duration ?? 45, status: a.status ?? "agendada", patientId: a.patientId ?? null };
+            return { id: a.id, date: new Date(y, m - 1, d), title: a.title, time: a.time, type: a.type, location: a.location, duration: a.duration ?? 45, status: a.status ?? "agendada", patientId: a.patientId ?? null, createdBy: a.createdBy };
           })
         );
       })
@@ -136,6 +143,11 @@ export default function CalendarioPage() {
         : [...prev, { weekday, time: newEvent.time }]
     );
   };
+
+  // La Administradora puede mirar la agenda de una terapeuta en concreto
+  const visibleEvents = therapistFilter === "todas"
+    ? localEvents
+    : localEvents.filter((e) => e.createdBy === therapistFilter);
 
   const openNewEvent = (type = "sesion") => {
     const defaultDate = selected
@@ -293,7 +305,7 @@ export default function CalendarioPage() {
   const paddedDays = [...Array(startDay).fill(null), ...days];
 
   const selectedEvents = selected
-    ? localEvents.filter((e) => isSameDay(e.date, selected))
+    ? visibleEvents.filter((e) => isSameDay(e.date, selected))
     : [];
 
   const selectedTasks = selected
@@ -328,6 +340,21 @@ export default function CalendarioPage() {
             <ChevronRight className="w-5 h-5 sm:w-4 sm:h-4 text-slate-600" />
           </button>
         </div>
+        {centerRole === "administradora" && therapists.length > 1 && (
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 self-start">
+            <Building2 className="w-4 h-4 text-violet-500 shrink-0" />
+            <select
+              value={therapistFilter}
+              onChange={(e) => setTherapistFilter(e.target.value)}
+              className="text-sm text-slate-700 bg-transparent focus:outline-none"
+            >
+              <option value="todas">Agenda de todo el Centro</option>
+              {therapists.map((t) => (
+                <option key={t.email} value={t.email}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex bg-white border border-slate-200 rounded-xl p-1 gap-1 self-start">
           {([
             { key: "mes" as const, label: "Mes" },
@@ -369,7 +396,7 @@ export default function CalendarioPage() {
           {view !== "mes" ? (
             <TimeGrid
               days={view === "semana" ? weekDays : [current]}
-              events={localEvents}
+              events={visibleEvents}
               onSelectSlot={(d, time) => {
                 setSelected(d);
                 setNewEvent({ title: "", date: format(d, "yyyy-MM-dd"), time, type: "sesion", location: "", duration: 45, patientId: null, value: "" });
@@ -399,7 +426,7 @@ export default function CalendarioPage() {
               if (!day) return <div key={`empty-${i}`} className="h-[4.5rem] sm:h-24 border-r border-b border-slate-50" />;
               const isToday = isSameDay(day, new Date());
               const isSelected = selected && isSameDay(day, selected);
-              const dayEvents = localEvents.filter((e) => isSameDay(e.date, day));
+              const dayEvents = visibleEvents.filter((e) => isSameDay(e.date, day));
               const dayTasks = tasks.filter((t) => t.due && isSameDay(new Date(t.due + "T00:00:00"), day));
               const inMonth = isSameMonth(day, current);
 
