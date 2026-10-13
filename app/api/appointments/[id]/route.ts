@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
 import { getScope, agendaScope, patientScope } from "@/lib/center";
 import { findPatientByName } from "@/lib/patientMatch";
+import { notifyTherapistOfAppointment } from "@/lib/appointmentReminders";
 
 type Params = Promise<{ id: string }>;
 
@@ -46,6 +47,16 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
         ...(body.value !== undefined ? { value: body.value === "" || body.value === null ? null : Number(body.value) } : {}),
       },
     });
+    // Si la Administradora tocó la agenda de otra, se le avisa
+    if (appointment!.createdBy !== scope.email) {
+      const movio = body.date !== undefined || body.time !== undefined;
+      const cancelo = body.status === "cancelada";
+      if (movio || cancelo) {
+        notifyTherapistOfAppointment(updated.id, appointment!.createdBy, scope.name, cancelo ? "canceló" : "movió")
+          .catch((err) => console.error("[appointments] aviso a la terapeuta falló:", err));
+      }
+    }
+
     return NextResponse.json(updated);
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });

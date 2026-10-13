@@ -304,3 +304,35 @@ export async function processAppointmentReminders(): Promise<{ sent: number; che
 
   return { sent, checked: appointments.length };
 }
+
+/**
+ * Avisa a una terapeuta que la Administradora tocó su agenda: creó, movió
+ * o canceló una sesión suya.
+ */
+export async function notifyTherapistOfAppointment(
+  appointmentId: number,
+  therapistEmailAddress: string,
+  adminName: string,
+  verbo: "agendó" | "movió" | "canceló"
+): Promise<void> {
+  const apt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+  if (!apt || !therapistEmailAddress) return;
+
+  const when = appointmentDate(apt.date, apt.time);
+  const fecha = when
+    ? when.toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })
+    : apt.date;
+
+  await sendEmail(
+    therapistEmailAddress,
+    `${adminName} ${verbo} una sesión de tu agenda`,
+    emailShell(
+      `Cambio en tu agenda`,
+      `<p style="color:#1e293b;margin:0 0 8px;">Hola,</p>
+       <p style="color:#475569;margin:0 0 12px;"><strong>${adminName}</strong> ${verbo} esta sesión:</p>
+       <p style="color:#1e293b;margin:0 0 4px;font-size:15px;"><strong>${apt.title}</strong></p>
+       <p style="color:#475569;margin:0 0 12px;">${fecha} a las ${apt.time}${apt.location ? ` · ${apt.location}` : ""}</p>
+       <p style="color:#94a3b8;font-size:12px;margin:16px 0 0;">Puedes verla en tu agenda de TOdo.</p>`
+    )
+  );
+}

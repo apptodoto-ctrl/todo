@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
-import { getScope, ownScope } from "@/lib/center";
+import { getScope, taskScope } from "@/lib/center";
 
 type Params = Promise<{ id: string }>;
 
@@ -9,7 +9,7 @@ type Params = Promise<{ id: string }>;
 async function checkOwnership(id: number) {
   const scope = await getScope();
   if (!scope) return unauthorized();
-  const task = await prisma.task.findFirst({ where: { id, ...ownScope(scope) } });
+  const task = await prisma.task.findFirst({ where: { id, ...taskScope(scope) } });
   if (task) return null;
   const existe = await prisma.task.findUnique({ where: { id } });
   return existe ? forbidden() : notFound();
@@ -27,6 +27,9 @@ export async function PUT(req: Request, { params }: { params: Params }) {
     delete rest.createdBy;
     delete rest.id;
     delete rest.notifiedAt;
+    delete rest.centerId;
+    // Reasignar una tarea pasa por su propia comprobación, no por aquí
+    delete rest.assignedTo;
     // Si cambia la fecha, la hora o se reactiva el aviso, vuelve a quedar pendiente de notificar
     const reschedules = rest.due !== undefined || rest.time !== undefined || rest.notify !== undefined;
     const task = await prisma.task.update({

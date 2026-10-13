@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { unauthorized, forbidden } from "@/lib/apiAuth";
 import { getScope, seatUsage, parsePermissions, DEFAULT_PERMISSIONS, MAX_THERAPISTS } from "@/lib/center";
+import { parseSchedule } from "@/lib/schedule";
 import { sendEmail } from "@/lib/email";
 import { randomBytes } from "crypto";
 
@@ -32,6 +33,7 @@ export async function GET() {
       role: m.role,
       active: m.active,
       permissions: parsePermissions(m.permissions),
+      schedule: parseSchedule(m.schedule),
       pending: m.joinedAt === null,
       invitedAt: m.invitedAt,
       joinedAt: m.joinedAt,

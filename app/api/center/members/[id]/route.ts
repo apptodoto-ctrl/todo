@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
 import { getScope, parsePermissions, seatUsage } from "@/lib/center";
+import { parseSchedule } from "@/lib/schedule";
 
 type Params = Promise<{ id: string }>;
 
@@ -61,6 +62,7 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
         ...(body.name !== undefined ? { name: String(body.name).slice(0, 120) } : {}),
         ...(body.active !== undefined ? { active: body.active === true } : {}),
         ...(body.permissions !== undefined ? { permissions: parsePermissions(body.permissions) as never } : {}),
+        ...(body.schedule !== undefined ? { schedule: parseSchedule(body.schedule) as never } : {}),
       },
     });
 

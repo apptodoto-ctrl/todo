@@ -142,6 +142,19 @@ export function ownScope(scope: Scope) {
   return { centerId: scope.centerId, createdBy: scope.email };
 }
 
+/**
+ * Tareas: la Administradora ve las del Centro; cada terapeuta ve las
+ * suyas y las que le asignaron.
+ */
+export function taskScope(scope: Scope) {
+  if (!scope.centerId) return { createdBy: scope.email };
+  if (scope.isAdmin) return { centerId: scope.centerId };
+  return {
+    centerId: scope.centerId,
+    OR: [{ assignedTo: scope.email }, { AND: [{ createdBy: scope.email }, { assignedTo: "" }] }],
+  };
+}
+
 /** Campos que hay que grabar al crear algo, para que quede en el Centro */
 export function ownerFields(scope: Scope) {
   return { createdBy: scope.email, ...(scope.centerId ? { centerId: scope.centerId } : {}) };

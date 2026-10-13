@@ -20,6 +20,9 @@ interface Task {
   notify: boolean;
   patient?: string;
   category: string;
+  assignedTo: string;
+  comment: string;
+  createdBy?: string;
 }
 
 const priorityConfig: Record<Priority, { label: string; badge: string }> = {
@@ -38,8 +41,11 @@ export default function TareasPage() {
   const [sortAsc, setSortAsc] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
-  const [newTask, setNewTask] = useState({ title: "", description: "", priority: "media" as Priority, due: "", time: "", notify: false, patient: "", category: "Clínico" });
+  const [newTask, setNewTask] = useState({ title: "", description: "", priority: "media" as Priority, due: "", time: "", notify: false, patient: "", category: "Clínico", assignedTo: "" });
   const { email: currentUserEmail } = useCurrentUser();
+  // Equipo del Centro: la Administradora asigna tareas a sus terapeutas
+  const [therapists, setTherapists] = useState<{ email: string; name: string; role: string }[]>([]);
+  const [centerRole, setCenterRole] = useState("individual");
 
   useEffect(() => {
     if (!currentUserEmail) return;
@@ -54,6 +60,8 @@ export default function TareasPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    fetch("/api/center/therapists").then((r) => r.json()).then((d) => setTherapists(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch("/api/center").then((r) => r.json()).then((d) => { if (d?.role) setCenterRole(d.role); }).catch(() => {});
   }, [currentUserEmail]);
 
   const addTask = async () => {
@@ -66,7 +74,7 @@ export default function TareasPage() {
     if (res.ok) {
       const task = await res.json();
       setTasks((prev) => [...prev, task]);
-      setNewTask({ title: "", description: "", priority: "media", due: "", time: "", notify: false, patient: "", category: "Clínico" });
+      setNewTask({ title: "", description: "", priority: "media", due: "", time: "", notify: false, patient: "", category: "Clínico", assignedTo: "" });
       setShowNewTask(false);
       setFilter("todas");
     }
@@ -243,6 +251,30 @@ export default function TareasPage() {
                       </div>
                     </div>
                     <p className="text-xs text-slate-600 mt-0.5 line-clamp-1">{task.description}</p>
+                    {(task.assignedTo || task.comment) && (
+                      <div className="mt-2">
+                        {task.comment && task.assignedTo !== currentUserEmail ? (
+                          <p className="text-xs text-slate-600 bg-indigo-50/70 border border-indigo-100 rounded-lg px-2.5 py-1.5">
+                            <span className="font-semibold text-indigo-700">Comentario: </span>{task.comment}
+                          </p>
+                        ) : task.assignedTo === currentUserEmail ? (
+                          <input
+                            type="text"
+                            defaultValue={task.comment}
+                            placeholder="Dejar un comentario para la Administradora..."
+                            onBlur={async (e) => {
+                              if (e.target.value === task.comment) return;
+                              setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, comment: e.target.value } : t)));
+                              await fetch(`/api/tasks/${task.id}`, {
+                                method: "PUT", headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ comment: e.target.value }),
+                              });
+                            }}
+                            className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+                          />
+                        ) : null}
+                      </div>
+                    )}
                     <div className="flex flex-wrap items-center gap-2 mt-3">
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${pConf.badge}`}>
                         {pConf.label}
@@ -250,6 +282,16 @@ export default function TareasPage() {
                       <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">{task.category}</span>
                       {task.patient && (
                         <span className="text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-lg">{task.patient}</span>
+                      )}
+                      {task.assignedTo && task.assignedTo !== currentUserEmail && (
+                        <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg">
+                          Para {therapists.find((t) => t.email === task.assignedTo)?.name ?? task.assignedTo}
+                        </span>
+                      )}
+                      {task.assignedTo === currentUserEmail && task.createdBy !== currentUserEmail && (
+                        <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg">
+                          Te la asignaron
+                        </span>
                       )}
                       {task.notify && (
                         <span className="flex items-center gap-1 text-[11px] font-semibold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-lg" title="Te avisamos por correo">
@@ -379,6 +421,22 @@ export default function TareasPage() {
               </select>
             </div>
           </div>
+          {centerRole === "administradora" && therapists.length > 1 && (
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Para quién</label>
+              <select
+                value={newTask.assignedTo}
+                onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white"
+              >
+                <option value="">Para mí</option>
+                {therapists.filter((t) => t.role !== "administradora").map((t) => (
+                  <option key={t.email} value={t.email}>{t.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-400 mt-1.5">La verá al entrar a TOdo y podrá dejarte un comentario al resolverla.</p>
+            </div>
+          )}
           <label className={`flex items-start gap-3 rounded-xl border p-3 transition-all ${newTask.due ? "border-slate-200 bg-white cursor-pointer hover:border-violet-300" : "border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed"}`}>
             <input
               type="checkbox"

@@ -242,6 +242,10 @@ model SessionRecord {
 
 model Task {
   centerId  String?
+  /// A quién se la asignó la Administradora; vacío = es suya
+  assignedTo String  @default("")
+  /// Comentario que deja la terapeuta al resolverla
+  comment    String  @default("")
   center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id          Int      @id @default(autoincrement())
   title       String
@@ -265,6 +269,8 @@ model Task {
 
 model Appointment {
   centerId  String?
+  /// Quién la agendó cuando no fue la propia terapeuta
+  scheduledBy String @default("")
   center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id        Int      @id @default(autoincrement())
   title     String
@@ -434,6 +440,8 @@ model Center {
 /// Cada persona del Centro, con sus permisos
 model CenterMember {
   id          String    @id @default(cuid())
+  /// Horario de atención: { lun: [{desde,hasta}], mar: [...] }
+  schedule    Json?
   centerId    String
   center      Center    @relation(fields: [centerId], references: [id], onDelete: Cascade)
   userEmail   String

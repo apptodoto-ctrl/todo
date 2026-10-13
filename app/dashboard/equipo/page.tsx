@@ -2,14 +2,16 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Users, Mail, Shield, UserX, UserCheck, Trash2, Loader2, Building2 } from "lucide-react";
+import { Plus, Users, Shield, UserX, UserCheck, Trash2, Building2, Clock } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { PERMISSION_LABELS, DEFAULT_PERMISSIONS, type CenterPermissions } from "@/lib/center";
+import { DAY_KEYS, DAY_LABELS, type WeekSchedule } from "@/lib/schedule";
 
 interface Member {
   id: string; email: string; name: string; role: string; active: boolean;
   permissions: CenterPermissions; pending: boolean; patients: number;
   joinedAt: string | null; lastSeenAt: string | null;
+  schedule: WeekSchedule | null;
 }
 interface CenterInfo {
   center: { id: string; name: string; attendanceMode: string } | null;
@@ -30,6 +32,8 @@ export default function EquipoPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [permisosDe, setPermisosDe] = useState<Member | null>(null);
+  const [horarioDe, setHorarioDe] = useState<Member | null>(null);
+  const [horario, setHorario] = useState<WeekSchedule>({});
 
   const load = useCallback(async () => {
     try {
@@ -100,6 +104,23 @@ export default function EquipoPage() {
         if (!r2.ok) { const e = await r2.json().catch(() => null); alert(e?.error ?? "No se pudo desactivar."); return; }
       } else { alert(d?.error ?? "No se pudo cambiar."); return; }
     }
+    await load();
+  };
+
+  const abrirHorario = (m: Member) => {
+    const base: WeekSchedule = {};
+    for (const d of DAY_KEYS) base[d] = m.schedule?.[d] ?? [];
+    setHorario(base);
+    setHorarioDe(m);
+  };
+
+  const guardarHorario = async () => {
+    if (!horarioDe) return;
+    await fetch(`/api/center/members/${horarioDe.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ schedule: horario }),
+    });
+    setHorarioDe(null);
     await load();
   };
 
@@ -210,6 +231,9 @@ export default function EquipoPage() {
                 <button onClick={() => setPermisosDe(m)} className="flex items-center gap-1.5 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-lg hover:bg-violet-100 transition-colors">
                   <Shield className="w-3 h-3" /> Permisos
                 </button>
+                <button onClick={() => abrirHorario(m)} className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-100 transition-colors">
+                  <Clock className="w-3 h-3" /> Horario
+                </button>
                 <button onClick={() => cambiarEstado(m)} className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-colors">
                   {m.active ? <><UserX className="w-3 h-3" /> Desactivar</> : <><UserCheck className="w-3 h-3" /> Reactivar</>}
                 </button>
@@ -245,6 +269,43 @@ export default function EquipoPage() {
             </div>
             <p className="text-[11px] text-slate-400 mt-2">Siempre podrá atender a sus pacientes y ver su propia agenda. Nunca ve la agenda del Centro completo.</p>
           </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!horarioDe} onClose={() => setHorarioDe(null)} title={`Horario de ${horarioDe?.name || horarioDe?.email || ""}`}
+        footer={<button onClick={guardarHorario} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl transition-all">Guardar horario</button>}>
+        <div className="space-y-2.5">
+          <p className="text-xs text-slate-500">
+            TOdo no deja agendarle sesiones fuera de este horario. Si lo dejas vacío, puede atender a cualquier hora.
+          </p>
+          {DAY_KEYS.map((d) => {
+            const tramos = horario[d] ?? [];
+            return (
+              <div key={d} className="flex items-start gap-2">
+                <span className="text-xs font-semibold text-slate-600 w-20 shrink-0 pt-2">{DAY_LABELS[d]}</span>
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  {tramos.length === 0 && <p className="text-xs text-slate-300 py-2">No atiende</p>}
+                  {tramos.map((t, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <input type="time" value={t.from}
+                        onChange={(e) => setHorario({ ...horario, [d]: tramos.map((x, j) => j === i ? { ...x, from: e.target.value } : x) })}
+                        className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30" />
+                      <span className="text-slate-400 text-xs">a</span>
+                      <input type="time" value={t.to}
+                        onChange={(e) => setHorario({ ...horario, [d]: tramos.map((x, j) => j === i ? { ...x, to: e.target.value } : x) })}
+                        className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30" />
+                      <button onClick={() => setHorario({ ...horario, [d]: tramos.filter((_, j) => j !== i) })} className="text-slate-300 hover:text-rose-500 text-sm px-1">✕</button>
+                    </div>
+                  ))}
+                  {tramos.length < 4 && (
+                    <button onClick={() => setHorario({ ...horario, [d]: [...tramos, { from: "09:00", to: "18:00" }] })} className="text-xs font-semibold text-violet-600 hover:text-violet-700">
+                      + Agregar tramo
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </Modal>
 

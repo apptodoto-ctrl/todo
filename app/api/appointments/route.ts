@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { unauthorized } from "@/lib/apiAuth";
 import { getScope, agendaScope, ownerFields, patientScope } from "@/lib/center";
-import { sendAppointmentCreatedNotice } from "@/lib/appointmentReminders";
+import { sendAppointmentCreatedNotice, notifyTherapistOfAppointment } from "@/lib/appointmentReminders";
 import { randomUUID } from "crypto";
 import { seriesOccurrences } from "@/lib/appointmentSeries";
 import { findPatientByName } from "@/lib/patientMatch";
+import { parseSchedule, fitsSchedule } from "@/lib/schedule";
 
 export async function GET() {
   const scope = await getScope();
@@ -87,12 +88,46 @@ export async function POST(req: Request) {
       ? Number(body.patientId)
       : await findPatientByName(patientScope(scope), String(body.title ?? ""));
 
+    // En un Centro, la Administradora puede agendar para otra terapeuta
+    let owner = scope.email;
+    if (scope.centerId && body.therapistEmail && body.therapistEmail !== scope.email) {
+      if (!scope.isAdmin) {
+        return NextResponse.json({ error: "Solo la Administradora agenda en la agenda de otra terapeuta" }, { status: 403 });
+      }
+      const miembro = await prisma.centerMember.findFirst({
+        where: { centerId: scope.centerId, userEmail: String(body.therapistEmail), active: true },
+      });
+      if (!miembro) return NextResponse.json({ error: "Esa terapeuta no está activa en el Centro" }, { status: 400 });
+      owner = miembro.userEmail;
+    }
+    delete body.therapistEmail;
+
+    // Horario de atención: no se agenda fuera de él
+    if (scope.centerId && !force) {
+      const miembro = await prisma.centerMember.findFirst({
+        where: { centerId: scope.centerId, userEmail: owner },
+        select: { schedule: true, name: true },
+      });
+      const horario = parseSchedule(miembro?.schedule);
+      for (const occ of occurrences) {
+        const cabe = fitsSchedule(horario, occ.date, occ.time, duration);
+        if (!cabe.ok) {
+          return NextResponse.json(
+            { error: `${miembro?.name || "La terapeuta"} no atiende en ese horario. ${cabe.reason}.`, outsideSchedule: true },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     const seriesId = occurrences.length > 1 ? randomUUID() : "";
     const base = {
       ...body,
       duration,
       patientId,
       ...ownerFields(scope),
+      createdBy: owner,
+      scheduledBy: owner === scope.email ? "" : scope.email,
       seriesId,
     };
 
@@ -110,6 +145,13 @@ export async function POST(req: Request) {
     sendAppointmentCreatedNotice(appointment.id).catch((err) =>
       console.error("[appointments] aviso de creación falló:", err)
     );
+
+    // Si la agendó la Administradora, la terapeuta recibe el aviso
+    if (owner !== scope.email) {
+      notifyTherapistOfAppointment(appointment.id, owner, scope.name, "agendó").catch((err) =>
+        console.error("[appointments] aviso a la terapeuta falló:", err)
+      );
+    }
 
     return NextResponse.json({ ...appointment, series: [appointment, ...extra] }, { status: 201 });
   } catch {
