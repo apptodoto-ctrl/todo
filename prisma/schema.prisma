@@ -28,6 +28,8 @@ model User {
 }
 
 model Pipeline {
+  centerId  String?
+  center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id        String           @id @default(cuid())
   name      String
   createdBy String           @default("")
@@ -37,6 +39,14 @@ model Pipeline {
 
 model Patient {
   id            Int      @id @default(autoincrement())
+  centerId      String?
+  center        Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  /// Terapeuta a cargo del caso dentro del Centro
+  therapistEmail String  @default("")
+  /// centro | domicilio | ambos
+  attendanceMode String  @default("centro")
+  /// Dirección donde se atiende cuando es a domicilio
+  homeAddress   String   @default("")
   name          String
   age           Int
   birthDate     String   @default("")
@@ -87,6 +97,8 @@ model Objective {
 }
 
 model GeneratedReport {
+  centerId  String?
+  center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id        Int      @id @default(autoincrement())
   patientId Int?
   patient   Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -192,6 +204,8 @@ model PricingSetting {
 }
 
 model Reminder {
+  centerId  String?
+  center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id          Int      @id @default(autoincrement())
   title       String
   description String   @default("")
@@ -227,6 +241,8 @@ model SessionRecord {
 }
 
 model Task {
+  centerId  String?
+  center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id          Int      @id @default(autoincrement())
   title       String
   description String   @default("")
@@ -248,6 +264,8 @@ model Task {
 }
 
 model Appointment {
+  centerId  String?
+  center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id        Int      @id @default(autoincrement())
   title     String
   date      String
@@ -299,6 +317,8 @@ model PipelineCase {
 }
 
 model Document {
+  centerId  String?
+  center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id        Int      @id @default(autoincrement())
   name      String
   category  String   @default("Sin categoría")
@@ -315,6 +335,8 @@ model Document {
 }
 
 model SessionPackage {
+  centerId  String?
+  center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id            Int      @id @default(autoincrement())
   patientId     Int
   patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -339,6 +361,8 @@ model SessionPackage {
 
 /// Formulario propio de la terapeuta: ficha de admisión, entrevista, pauta
 model FormTemplate {
+  centerId  String?
+  center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id          Int      @id @default(autoincrement())
   name        String
   description String   @default("")
@@ -371,4 +395,61 @@ model FormResponse {
 
   @@index([patientId])
   @@index([templateId])
+}
+
+/// Un centro de terapia: una Administradora y hasta N terapeutas
+model Center {
+  id             String   @id @default(cuid())
+  name           String
+  logoUrl        String   @default("")
+  address        String   @default("")
+  taxId          String   @default("")
+  phone          String   @default("")
+  /// centro | domicilio | ambos
+  attendanceMode String   @default("ambos")
+  country        String   @default("CL")
+  currency       String   @default("CLP")
+  /// Cupos incluidos en el plan y cupos extra comprados
+  seats          Int      @default(5)
+  extraSeats     Int      @default(0)
+  /// Correo de la Administradora: hay una sola por Centro
+  adminEmail     String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  members     CenterMember[]
+  patients    Patient[]
+  appointments Appointment[]
+  tasks       Task[]
+  documents   Document[]
+  reports     GeneratedReport[]
+  packages    SessionPackage[]
+  templates   FormTemplate[]
+  reminders   Reminder[]
+  pipelines   Pipeline[]
+
+  @@index([adminEmail])
+}
+
+/// Cada persona del Centro, con sus permisos
+model CenterMember {
+  id          String    @id @default(cuid())
+  centerId    String
+  center      Center    @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  userEmail   String
+  name        String    @default("")
+  /// administradora | terapeuta
+  role        String    @default("terapeuta")
+  active      Boolean   @default(true)
+  /// { verTodosPacientes, crearPacientes, enviarInformes, registrarPagos, descargarDatos, crearPlantillas }
+  permissions Json
+  inviteToken String?   @unique
+  invitedAt   DateTime  @default(now())
+  joinedAt    DateTime?
+  lastSeenAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([centerId, userEmail])
+  @@index([userEmail, active])
 }
