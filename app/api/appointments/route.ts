@@ -102,6 +102,50 @@ export async function POST(req: Request) {
     }
     delete body.therapistEmail;
 
+    // Licencia: no se agenda a quien está pausada
+    if (scope.centerId) {
+      const miembro = await prisma.centerMember.findFirst({
+        where: { centerId: scope.centerId, userEmail: owner },
+        select: { pausedUntil: true, pausedReason: true, name: true },
+      });
+      if (miembro?.pausedUntil && miembro.pausedUntil > new Date()) {
+        const hasta = miembro.pausedUntil.toLocaleDateString("es-CL");
+        return NextResponse.json(
+          { error: `${miembro.name || "La terapeuta"} está con licencia hasta el ${hasta}${miembro.pausedReason ? ` (${miembro.pausedReason})` : ""}.`, onLeave: true },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Sala ocupada: dos sesiones no caben en el mismo box a la misma hora
+    if (scope.centerId && body.roomId && !force) {
+      const mismasFechas = await prisma.appointment.findMany({
+        where: {
+          centerId: scope.centerId,
+          roomId: String(body.roomId),
+          date: { in: occurrences.map((o) => o.date) },
+          status: { not: "cancelada" },
+        },
+        select: { date: true, time: true, duration: true, title: true },
+      });
+      for (const occ of occurrences) {
+        const start = toMinutes(occ.time);
+        const end = start + duration;
+        const choque = mismasFechas.find((a) => {
+          if (a.date !== occ.date) return false;
+          const aStart = toMinutes(a.time);
+          return start < aStart + (a.duration || 45) && aStart < end;
+        });
+        if (choque) {
+          const sala = await prisma.centerRoom.findUnique({ where: { id: String(body.roomId) }, select: { name: true } });
+          return NextResponse.json(
+            { error: `La sala ${sala?.name ?? ""} ya está ocupada el ${choque.date} a las ${choque.time} con "${choque.title}".`, roomBusy: true },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     // Horario de atención: no se agenda fuera de él
     if (scope.centerId && !force) {
       const miembro = await prisma.centerMember.findFirst({

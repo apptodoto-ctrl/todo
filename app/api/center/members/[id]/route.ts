@@ -65,6 +65,14 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
         ...(body.schedule !== undefined ? { schedule: parseSchedule(body.schedule) as never } : {}),
         ...(["porcentaje", "fijo_sesion", "sueldo"].includes(body.payMode) ? { payMode: body.payMode } : {}),
         ...(body.payValue !== undefined ? { payValue: Math.max(0, Number(body.payValue) || 0) } : {}),
+        // Licencia: pausa sin perder el cupo
+        ...(body.pausedUntil !== undefined
+          ? { pausedUntil: body.pausedUntil ? new Date(String(body.pausedUntil)) : null, pausedReason: String(body.pausedReason ?? "").slice(0, 120) }
+          : {}),
+        // Perfil profesional que sale en los informes
+        ...(body.title !== undefined ? { title: String(body.title).slice(0, 120) } : {}),
+        ...(body.registryId !== undefined ? { registryId: String(body.registryId).slice(0, 60) } : {}),
+        ...(body.specialty !== undefined ? { specialty: String(body.specialty).slice(0, 120) } : {}),
       },
     });
 

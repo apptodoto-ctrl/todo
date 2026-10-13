@@ -99,6 +99,10 @@ model Objective {
 
 model GeneratedReport {
   centerId  String?
+  /// borrador | en_revision | aprobado | enviado
+  reviewState String @default("borrador")
+  reviewNote  String @default("")
+  reviewedBy  String @default("")
   center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id        Int      @id @default(autoincrement())
   patientId Int?
@@ -276,6 +280,7 @@ model Appointment {
   centerId  String?
   /// Quién la agendó cuando no fue la propia terapeuta
   scheduledBy String @default("")
+  roomId      String?
   center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
   id        Int      @id @default(autoincrement())
   title     String
@@ -440,6 +445,7 @@ model Center {
   pipelines   Pipeline[]
   sessionTypes CenterSessionType[]
   announcements CenterAnnouncement[]
+  rooms       CenterRoom[]
 
   @@index([adminEmail])
 }
@@ -449,6 +455,14 @@ model CenterMember {
   id          String    @id @default(cuid())
   /// Horario de atención: { lun: [{desde,hasta}], mar: [...] }
   schedule    Json?
+  /// Pausa temporal: licencia médica, pre y postnatal, vacaciones
+  pausedUntil DateTime?
+  pausedReason String   @default("")
+  /// Perfil profesional que sale en los informes
+  title       String    @default("")
+  registryId  String    @default("")
+  specialty   String    @default("")
+  signatureUrl String   @default("")
   /// porcentaje | fijo_sesion | sueldo
   payMode     String    @default("porcentaje")
   /// % de cada sesión, monto fijo por sesión o sueldo mensual, según payMode
@@ -523,4 +537,18 @@ model CenterAnnouncement {
   updatedAt DateTime @updatedAt
 
   @@index([centerId, createdAt])
+}
+
+/// Sala o box del Centro, para no agendar dos sesiones en el mismo lugar
+model CenterRoom {
+  id        String   @id @default(cuid())
+  centerId  String
+  center    Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  name      String
+  notes     String   @default("")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([centerId, active])
 }

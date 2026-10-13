@@ -33,6 +33,28 @@ export const PERMISSION_LABELS: Record<keyof CenterPermissions, string> = {
   crearPlantillas: "Crear sus propias plantillas",
 };
 
+/** Perfiles de permisos listos para aplicar de un clic */
+export const PERMISSION_PRESETS: { key: string; label: string; description: string; permissions: CenterPermissions }[] = [
+  {
+    key: "practica",
+    label: "Terapeuta en práctica",
+    description: "Atiende a sus pacientes, sin tocar pagos ni informes a familias",
+    permissions: { verTodosPacientes: false, crearPacientes: false, enviarInformes: false, registrarPagos: false, descargarDatos: false, crearPlantillas: false },
+  },
+  {
+    key: "estandar",
+    label: "Terapeuta",
+    description: "Crea sus pacientes y trabaja de forma autónoma",
+    permissions: { verTodosPacientes: false, crearPacientes: true, enviarInformes: true, registrarPagos: false, descargarDatos: true, crearPlantillas: false },
+  },
+  {
+    key: "experiencia",
+    label: "Terapeuta con experiencia",
+    description: "Ve todo el Centro y maneja cobros y plantillas",
+    permissions: { verTodosPacientes: true, crearPacientes: true, enviarInformes: true, registrarPagos: true, descargarDatos: true, crearPlantillas: true },
+  },
+];
+
 export function parsePermissions(raw: unknown): CenterPermissions {
   const value = (raw ?? {}) as Record<string, unknown>;
   const out = { ...DEFAULT_PERMISSIONS };
