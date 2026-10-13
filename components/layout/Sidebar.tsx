@@ -47,6 +47,14 @@ export default function Sidebar() {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const { data: session } = useSession();
+  // "Mi equipo" solo tiene sentido en un Centro, o en una cuenta que puede serlo
+  const [mostrarEquipo, setMostrarEquipo] = useState(false);
+  useEffect(() => {
+    fetch("/api/center")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setMostrarEquipo(!!d && (!!d.center || d.canOwnCenter === true)))
+      .catch(() => {});
+  }, []);
 
   const displayName = session?.user?.name ?? "Usuario";
   const displayRole = (session?.user as { role?: string })?.role ?? "Terapeuta";
@@ -82,7 +90,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
+        {navItems.filter((i) => i.href !== "/dashboard/equipo" || mostrarEquipo).map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link key={item.href} href={item.href}>

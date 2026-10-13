@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Users, Shield, UserX, UserCheck, Trash2, Building2, Clock, Wallet, Megaphone } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { PERMISSION_LABELS, DEFAULT_PERMISSIONS, type CenterPermissions } from "@/lib/center";
@@ -18,12 +19,15 @@ interface Member {
 interface CenterInfo {
   center: { id: string; name: string; attendanceMode: string } | null;
   role: string;
+  canOwnCenter?: boolean;
+  plan?: string;
   seats?: { total: number; used: number; free: number };
 }
 
 const inputCls = "w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all";
 
 export default function EquipoPage() {
+  const router = useRouter();
   const [info, setInfo] = useState<CenterInfo | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,15 +168,33 @@ export default function EquipoPage() {
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 animate-pulse" /></div>;
 
-  // Cuenta individual: ofrecer convertirla en Centro
+  // Cuenta individual: solo los planes Centro pueden armar equipo
   if (!info?.center) {
+    if (!info?.canOwnCenter) {
+      return (
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-8 text-center">
+            <Building2 className="w-12 h-12 mx-auto mb-4 text-slate-200" />
+            <h2 className="text-lg font-bold text-slate-800">
+              {info?.plan ? `Tu plan ${info.plan} trabaja con una sola terapeuta` : "Tu cuenta trabaja con una sola terapeuta"}
+            </h2>
+            <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
+              Para armar un equipo —varias terapeutas, cada una con su acceso, y los pacientes del Centro— necesitas el plan Centro.
+            </p>
+            <button onClick={() => router.push("/dashboard/plan")} className="mt-5 inline-flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-5 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
+              Ver el plan Centro
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-2xl border border-slate-200/60 p-8 text-center">
           <Building2 className="w-12 h-12 mx-auto mb-4 text-violet-200" />
-          <h2 className="text-lg font-bold text-slate-800">Tu cuenta es individual</h2>
+          <h2 className="text-lg font-bold text-slate-800">Arma tu Centro</h2>
           <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
-            Si trabajas con un equipo, puedes convertirla en un Centro: tú quedas como Administradora, cada terapeuta entra con su propio acceso y toda la información pasa a ser del Centro.
+            Tú quedas como Administradora, cada terapeuta entra con su propio acceso y toda la información pasa a ser del Centro.
           </p>
           <button onClick={() => { setError(""); setShowCreate(true); }} className="mt-5 inline-flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-5 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
             <Plus className="w-4 h-4" /> Crear mi Centro

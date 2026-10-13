@@ -192,6 +192,18 @@ export async function seatUsage(centerId: string) {
   return { total, used, free: Math.max(0, total - used) };
 }
 
+/**
+ * ¿Esta cuenta puede tener un Centro? Solo los planes Centro. Una cuenta
+ * Profesional o Esencial trabaja sola, por mucho que sea de cortesía.
+ */
+export async function canOwnCenter(email: string): Promise<{ ok: boolean; plan: string; tierCode: string }> {
+  const sub = await prisma.subscription.findUnique({ where: { userEmail: email }, select: { tierCode: true } });
+  if (!sub) return { ok: false, plan: "", tierCode: "" };
+  const tier = await prisma.planTier.findUnique({ where: { code: sub.tierCode }, select: { plan: true } });
+  const plan = tier?.plan ?? "";
+  return { ok: plan.toLowerCase() === "centro", plan, tierCode: sub.tierCode };
+}
+
 /** Tope duro: un Centro no pasa de 12 terapeutas sin que TOdo lo autorice */
 export const MAX_THERAPISTS = 12;
 

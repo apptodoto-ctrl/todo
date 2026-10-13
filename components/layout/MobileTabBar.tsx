@@ -49,6 +49,14 @@ export default function MobileTabBar() {
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const { data: session } = useSession();
+  // "Mi equipo" solo tiene sentido en un Centro, o en una cuenta que puede serlo
+  const [mostrarEquipo, setMostrarEquipo] = useState(false);
+  useEffect(() => {
+    fetch("/api/center")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setMostrarEquipo(!!d && (!!d.center || d.canOwnCenter === true)))
+      .catch(() => {});
+  }, []);
 
   const displayName = session?.user?.name ?? "Usuario";
   const role = (session?.user as { role?: string })?.role ?? "Terapeuta";
@@ -71,7 +79,7 @@ export default function MobileTabBar() {
   useEffect(() => { setSheetOpen(false); }, [pathname]);
 
   const sheetItems = [
-    ...secondaryItems,
+    ...secondaryItems.filter((i) => i.href !== "/dashboard/equipo" || mostrarEquipo),
     ...(isAdmin ? [{ href: "/dashboard/admin", icon: ShieldAlert, label: "Admin", tint: "from-violet-600 to-fuchsia-600" }] : []),
   ];
 

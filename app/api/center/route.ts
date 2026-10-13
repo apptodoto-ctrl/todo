@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized, forbidden } from "@/lib/apiAuth";
-import { getScope, seatUsage, DEFAULT_PERMISSIONS, parsePermissions } from "@/lib/center";
+import { getScope, seatUsage, DEFAULT_PERMISSIONS, parsePermissions, canOwnCenter } from "@/lib/center";
 import { countryConfig } from "@/lib/countries";
 
 /** Datos del Centro de quien pregunta, o null si tiene cuenta individual */
 export async function GET() {
   const scope = await getScope();
   if (!scope) return unauthorized();
-  if (!scope.centerId) return NextResponse.json({ center: null, role: "individual" });
+  if (!scope.centerId) {
+    const permiso = await canOwnCenter(scope.email);
+    return NextResponse.json({ center: null, role: "individual", canOwnCenter: permiso.ok, plan: permiso.plan });
+  }
 
   const center = await prisma.center.findUnique({ where: { id: scope.centerId } });
   const seats = await seatUsage(scope.centerId);
@@ -28,6 +31,21 @@ export async function POST(req: Request) {
     const existing = await prisma.centerMember.findFirst({ where: { userEmail: session.email, active: true } });
     if (existing) {
       return NextResponse.json({ error: "Esta cuenta ya pertenece a un Centro" }, { status: 409 });
+    }
+
+    // Un Centro necesita un plan Centro: una cuenta Profesional trabaja sola
+    const permiso = await canOwnCenter(session.email);
+    if (!permiso.ok) {
+      return NextResponse.json(
+        {
+          error: permiso.plan
+            ? `Tu plan es ${permiso.plan} y trabaja con una sola terapeuta. Para armar un equipo necesitas el plan Centro.`
+            : "Necesitas un plan Centro para armar un equipo.",
+          code: "needs_center_plan",
+          currentPlan: permiso.plan,
+        },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
