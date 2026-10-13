@@ -439,6 +439,7 @@ model Center {
   reminders   Reminder[]
   pipelines   Pipeline[]
   sessionTypes CenterSessionType[]
+  announcements CenterAnnouncement[]
 
   @@index([adminEmail])
 }
@@ -503,4 +504,23 @@ model CenterSessionType {
   updatedAt DateTime @updatedAt
 
   @@index([centerId, active])
+}
+
+/// Aviso que la Administradora manda al equipo
+model CenterAnnouncement {
+  id        String   @id @default(cuid())
+  centerId  String
+  center    Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  title     String
+  body      String   @default("")
+  /// Vacío = para todo el equipo; si no, lista de correos
+  audience  Json?
+  authorName String  @default("")
+  createdBy String   @default("")
+  /// Quiénes ya lo leyeron
+  readBy    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([centerId, createdAt])
 }

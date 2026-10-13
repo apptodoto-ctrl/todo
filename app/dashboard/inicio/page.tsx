@@ -3,12 +3,30 @@
 import { motion } from "framer-motion";
 import {
   Users, Calendar, CheckSquare, Bell, Clock, ArrowUpRight,
-  Activity, Wallet,
+  Activity, Wallet, Megaphone,
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+
+interface CenterHome {
+  role: string;
+  centerName: string;
+  today: { id: number; title: string; time: string; type: string; therapistEmail: string; aDomicilio: boolean; direccion: string }[];
+  overdueTasks: { id: number; title: string; due: string; assignedTo: string }[];
+  withoutSessions: { id: number; name: string; therapistEmail: string; last: string }[];
+  withoutSessionsCount: number;
+  credits?: { disponibles: number; incluidos: number };
+  pendingAmount?: number;
+  pendingSessions?: number;
+  packagesEnding?: number;
+}
+
+interface Aviso {
+  id: string; title: string; body: string; authorName: string;
+  createdAt: string; read: boolean; readCount: number;
+}
 
 const container = {
   hidden: {},
@@ -64,6 +82,9 @@ export default function InicioPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  // Centro: pulso del día y avisos de la Administradora
+  const [home, setHome] = useState<CenterHome | null>(null);
+  const [avisos, setAvisos] = useState<Aviso[]>([]);
 
   useEffect(() => {
     if (!email) return;
@@ -92,7 +113,14 @@ export default function InicioPage() {
       if (d?.currency) setFinance({ invoicedMonth: d.invoicedMonth, pendingTotal: d.pendingTotal, currency: d.currency });
       if (Array.isArray(d?.byPatient)) setSessionsMonth(d.byPatient.reduce((acc: number, p: { sessionsMonth: number }) => acc + p.sessionsMonth, 0));
     }).catch(() => {});
+    fetch("/api/center/home").then((r) => (r.ok ? r.json() : null)).then((d) => setHome(d)).catch(() => {});
+    fetch("/api/center/announcements").then((r) => (r.ok ? r.json() : [])).then((d) => setAvisos(Array.isArray(d) ? d : [])).catch(() => {});
   }, [email]);
+
+  const marcarLeido = async (id: string) => {
+    setAvisos((prev) => prev.map((a) => (a.id === id ? { ...a, read: true } : a)));
+    await fetch(`/api/center/announcements/${id}`, { method: "POST" });
+  };
 
   // Prioriza el nombre guardado en el perfil sobre el de la sesión
   const displayName = profileName || name;
@@ -152,6 +180,71 @@ export default function InicioPage() {
       animate="show"
       className="space-y-6 max-w-7xl mx-auto"
     >
+      {/* Avisos del Centro sin leer */}
+      {avisos.filter((a) => !a.read).length > 0 && (
+        <motion.div variants={item} className="space-y-2">
+          {avisos.filter((a) => !a.read).map((a) => (
+            <div key={a.id} className="bg-violet-50 border border-violet-200 rounded-2xl px-4 py-3 flex items-start gap-3">
+              <Megaphone className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-violet-900">{a.title}</p>
+                {a.body && <p className="text-xs text-violet-800 mt-0.5 whitespace-pre-wrap">{a.body}</p>}
+                <p className="text-[11px] text-violet-500 mt-1">{a.authorName}</p>
+              </div>
+              <button onClick={() => marcarLeido(a.id)} className="text-[11px] font-semibold text-violet-700 bg-white border border-violet-200 px-2.5 py-1 rounded-lg hover:bg-violet-100 transition-colors shrink-0">
+                Entendido
+              </button>
+            </div>
+          ))}
+        </motion.div>
+      )}
+
+      {/* Pulso del Centro */}
+      {home && home.role !== "individual" && (
+        <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: home.role === "administradora" ? "Sesiones hoy en el Centro" : "Tus sesiones de hoy", value: String(home.today.length), tone: "text-violet-700", bg: "bg-violet-50", icon: Calendar },
+            { label: "Tareas atrasadas", value: String(home.overdueTasks.length), tone: "text-amber-700", bg: "bg-amber-50", icon: CheckSquare },
+            { label: "Sin sesión en 2 semanas", value: String(home.withoutSessionsCount), tone: "text-rose-700", bg: "bg-rose-50", icon: Users },
+            home.role === "administradora"
+              ? { label: "Créditos de IA", value: `${home.credits?.disponibles ?? 0}`, tone: "text-emerald-700", bg: "bg-emerald-50", icon: Activity }
+              : { label: "Pacientes a tu cargo", value: String(patients.length), tone: "text-emerald-700", bg: "bg-emerald-50", icon: Users },
+          ].map((c) => (
+            <div key={c.label} className="bg-white rounded-2xl border border-slate-200/60 p-4">
+              <div className={`w-9 h-9 ${c.bg} rounded-xl flex items-center justify-center mb-2.5`}>
+                <c.icon className={`w-4 h-4 ${c.tone}`} />
+              </div>
+              <p className={`text-2xl font-bold ${c.tone}`}>{c.value}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5 leading-tight">{c.label}</p>
+            </div>
+          ))}
+        </motion.div>
+      )}
+
+      {/* Agenda de hoy, con las de domicilio marcadas */}
+      {home && home.today.length > 0 && (
+        <motion.div variants={item} className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-violet-500" />
+            <h3 className="text-sm font-bold text-slate-800">Hoy</h3>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {home.today.map((c) => (
+              <div key={c.id} className="px-4 py-2.5 flex items-center gap-3">
+                <span className="text-sm font-bold text-slate-700 w-12 shrink-0">{c.time}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-slate-700 truncate">{c.title}</p>
+                  {c.aDomicilio && c.direccion && (
+                    <p className="text-[11px] text-amber-600 truncate">A domicilio · {c.direccion}</p>
+                  )}
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 shrink-0">{c.type}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
       {/* Welcome */}
       <motion.div variants={item} className="flex items-center justify-between">
         <div>

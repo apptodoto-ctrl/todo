@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Users, Shield, UserX, UserCheck, Trash2, Building2, Clock, Wallet } from "lucide-react";
+import { Plus, Users, Shield, UserX, UserCheck, Trash2, Building2, Clock, Wallet, Megaphone } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { PERMISSION_LABELS, DEFAULT_PERMISSIONS, type CenterPermissions } from "@/lib/center";
 import { DAY_KEYS, DAY_LABELS, type WeekSchedule } from "@/lib/schedule";
@@ -37,6 +37,8 @@ export default function EquipoPage() {
   const [horarioDe, setHorarioDe] = useState<Member | null>(null);
   const [horario, setHorario] = useState<WeekSchedule>({});
   const [pagoDe, setPagoDe] = useState<Member | null>(null);
+  const [showAviso, setShowAviso] = useState(false);
+  const [aviso, setAviso] = useState({ title: "", body: "", audience: [] as string[] });
 
   const load = useCallback(async () => {
     try {
@@ -136,6 +138,24 @@ export default function EquipoPage() {
     });
   };
 
+  const enviarAviso = async () => {
+    if (!aviso.title.trim()) return;
+    setSaving(true);
+    const res = await fetch("/api/center/announcements", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(aviso),
+    });
+    setSaving(false);
+    if (res.ok) {
+      const d = await res.json();
+      setShowAviso(false);
+      setAviso({ title: "", body: "", audience: [] });
+      alert(`Aviso enviado a ${d.enviados} ${d.enviados === 1 ? "terapeuta" : "terapeutas"}. Lo verán al entrar y les llegó por correo.`);
+    } else {
+      setError("No se pudo enviar el aviso.");
+    }
+  };
+
   const borrarInvitacion = async (m: Member) => {
     if (!confirm(`¿Quitar la invitación de ${m.name || m.email}?`)) return;
     await fetch(`/api/center/members/${m.id}`, { method: "DELETE" });
@@ -210,9 +230,14 @@ export default function EquipoPage() {
             {seats.free > 0 ? ` · quedan ${seats.free}` : " · sin cupos libres"}
           </p>
         </div>
-        <button onClick={() => { setError(""); setShowInvite(true); }} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
-          <Plus className="w-4 h-4" /> Invitar terapeuta
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => { setError(""); setShowAviso(true); }} className="flex items-center gap-2 bg-white border border-violet-200 text-violet-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-violet-50 transition-all">
+            <Megaphone className="w-4 h-4" /> Avisar al equipo
+          </button>
+          <button onClick={() => { setError(""); setShowInvite(true); }} className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
+            <Plus className="w-4 h-4" /> Invitar terapeuta
+          </button>
+        </div>
       </motion.div>
 
       <div className="space-y-3">
@@ -283,6 +308,44 @@ export default function EquipoPage() {
               ))}
             </div>
             <p className="text-[11px] text-slate-400 mt-2">Siempre podrá atender a sus pacientes y ver su propia agenda. Nunca ve la agenda del Centro completo.</p>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={showAviso} onClose={() => setShowAviso(false)} title="Avisar al equipo"
+        footer={<button onClick={enviarAviso} disabled={saving || !aviso.title.trim()} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50 transition-all">{saving ? "Enviando..." : "Enviar aviso"}</button>}>
+        <div className="space-y-4">
+          {error && <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl px-3 py-2.5">{error}</div>}
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Aviso *</label>
+            <input type="text" value={aviso.title} onChange={(e) => setAviso({ ...aviso, title: e.target.value })} placeholder="Ej. Reunión clínica el viernes a las 18:00" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Detalle</label>
+            <textarea rows={3} value={aviso.body} onChange={(e) => setAviso({ ...aviso, body: e.target.value })} className={`${inputCls} resize-none`} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-700 mb-2">Para quién</p>
+            <div className="space-y-1.5">
+              {members.filter((m) => m.role === "terapeuta" && m.active && !m.pending).map((m) => (
+                <label key={m.id} className="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={aviso.audience.includes(m.email)}
+                    onChange={(e) => setAviso({
+                      ...aviso,
+                      audience: e.target.checked ? [...aviso.audience, m.email] : aviso.audience.filter((x) => x !== m.email),
+                    })}
+                    className="w-4 h-4 accent-violet-600"
+                  />
+                  {m.name || m.email}
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-2">
+              {aviso.audience.length === 0 ? "Sin marcar a nadie, va para todo el equipo." : `Solo a ${aviso.audience.length} ${aviso.audience.length === 1 ? "terapeuta" : "terapeutas"}.`}
+              {" "}Lo verán al entrar a TOdo y les llegará por correo.
+            </p>
           </div>
         </div>
       </Modal>
