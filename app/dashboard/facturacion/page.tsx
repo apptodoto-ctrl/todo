@@ -11,6 +11,11 @@ interface PatientRow {
   sessionValue: number; sessionsMonth: number; amountMonth: number;
   unpaidCount: number; unpaidAmount: number;
 }
+interface Payroll {
+  month: string; currency: string; isAdmin: boolean;
+  therapists: { email: string; name: string; payMode: string; payValue: number; sessions: number; generated: number; owed: number }[];
+  totalGenerated: number; totalOwed: number;
+}
 interface PatientMonth {
   month: string; currency: string;
   therapist: { name: string; specialty: string };
@@ -65,6 +70,7 @@ export default function FacturacionPage() {
   const [savingPackage, setSavingPackage] = useState(false);
   const [detail, setDetail] = useState<PatientMonth | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [payroll, setPayroll] = useState<Payroll | null>(null);
 
   const load = useCallback(async (m: string) => {
     setLoading(true);
@@ -77,6 +83,13 @@ export default function FacturacionPage() {
   }, []);
 
   useEffect(() => { load(month); }, [month, load]);
+
+  useEffect(() => {
+    fetch(`/api/center/payroll?month=${month}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setPayroll(d))
+      .catch(() => setPayroll(null));
+  }, [month]);
 
   const createPackage = async () => {
     setPackageError("");
@@ -279,6 +292,41 @@ export default function FacturacionPage() {
             Definirlo ahora
           </button>
         </div>
+      )}
+
+      {payroll && payroll.therapists.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+            <Users className="w-4 h-4 text-violet-600 shrink-0" />
+            <h3 className="font-bold text-slate-800 text-sm flex-1">
+              {payroll.isAdmin ? "Lo que se le paga al equipo" : "Lo que te corresponde este mes"}
+            </h3>
+            {payroll.isAdmin && (
+              <span className="text-xs font-bold text-slate-700">{money(payroll.totalOwed, payroll.currency)}</span>
+            )}
+          </div>
+          <div className="divide-y divide-slate-100">
+            {payroll.therapists.map((t) => (
+              <div key={t.email} className="px-4 py-3 flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-700 truncate">{t.name}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {t.sessions} {t.sessions === 1 ? "sesión" : "sesiones"} · generó {money(t.generated, payroll.currency)} ·{" "}
+                    {t.payMode === "porcentaje" ? `${t.payValue}% de cada sesión`
+                      : t.payMode === "fijo_sesion" ? `${money(t.payValue, payroll.currency)} por sesión`
+                      : "sueldo fijo"}
+                  </p>
+                </div>
+                <p className="text-sm font-bold text-emerald-600 shrink-0">{money(t.owed, payroll.currency)}</p>
+              </div>
+            ))}
+          </div>
+          {payroll.isAdmin && (
+            <p className="px-4 py-2.5 text-[11px] text-slate-400 border-t border-slate-100">
+              Se calcula con las sesiones realizadas del mes. Cada terapeuta ve solo su propia fila, nunca la de sus compañeras.
+            </p>
+          )}
+        </motion.div>
       )}
 
       {/* Paquetes de sesiones */}

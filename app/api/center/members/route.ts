@@ -34,6 +34,8 @@ export async function GET() {
       active: m.active,
       permissions: parsePermissions(m.permissions),
       schedule: parseSchedule(m.schedule),
+      payMode: m.payMode,
+      payValue: m.payValue,
       pending: m.joinedAt === null,
       invitedAt: m.invitedAt,
       joinedAt: m.joinedAt,

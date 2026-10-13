@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
-import { getScope, loadPatient } from "@/lib/center";
+import { getScope, loadPatient, can } from "@/lib/center";
 import { refreshPackageStatus } from "@/lib/sessionPackages";
 
 type Params = Promise<{ id: string; sessionId: string }>;
@@ -29,7 +29,16 @@ export async function PUT(req: Request, { params }: { params: Params }) {
     const { id, sessionId } = await params;
     const err = await checkOwnership(Number(id));
     if (err) return err;
-    const { date, notes, duration, attended, paid, confirmed, packageId, value } = await req.json();
+    const { date, notes, duration, attended, paid, confirmed, packageId, value, paymentMethod } = await req.json();
+
+    // En un Centro, registrar pagos es un permiso que decide la Administradora
+    const scopeAhora = await getScope();
+    if (paid !== undefined && scopeAhora?.centerId && !can(scopeAhora, "registrarPagos")) {
+      return NextResponse.json(
+        { error: "Tu Centro no te permite registrar pagos. Pídeselo a la Administradora." },
+        { status: 403 }
+      );
+    }
 
     // Asignar la sesión a un paquete a mano (o soltarla) desde la ficha
     const current = await prisma.sessionRecord.findUnique({ where: { id: Number(sessionId) }, select: { packageId: true } });
@@ -55,7 +64,14 @@ export async function PUT(req: Request, { params }: { params: Params }) {
         ...(notes !== undefined ? { notes } : {}),
         ...(duration !== undefined ? { duration: Number(duration) } : {}),
         ...(attended !== undefined ? { attended: attended === true } : {}),
-        ...(paid !== undefined ? { paid: paid === true } : {}),
+        ...(paid !== undefined
+          ? {
+              paid: paid === true,
+              ...(paid === true
+                ? { paidAt: new Date(), paidBy: scopeAhora?.email ?? "", ...(paymentMethod ? { paymentMethod: String(paymentMethod).slice(0, 30) } : {}) }
+                : { paidAt: null, paidBy: "", paymentMethod: "" }),
+            }
+          : {}),
         ...(value !== undefined ? { value: value === "" || value === null ? null : Number(value) } : {}),
         // Cualquier edición de la terapeuta da por confirmada la sesión automática
         ...(confirmed !== undefined ? { confirmed: confirmed === true } : { confirmed: true }),

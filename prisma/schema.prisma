@@ -221,6 +221,10 @@ model Reminder {
 
 model SessionRecord {
   id        Int      @id @default(autoincrement())
+  /// transferencia | efectivo | tarjeta | otro
+  paymentMethod String @default("")
+  paidAt    DateTime?
+  paidBy    String   @default("")
   patientId Int
   patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   date      String
@@ -434,6 +438,7 @@ model Center {
   templates   FormTemplate[]
   reminders   Reminder[]
   pipelines   Pipeline[]
+  sessionTypes CenterSessionType[]
 
   @@index([adminEmail])
 }
@@ -443,6 +448,10 @@ model CenterMember {
   id          String    @id @default(cuid())
   /// Horario de atención: { lun: [{desde,hasta}], mar: [...] }
   schedule    Json?
+  /// porcentaje | fijo_sesion | sueldo
+  payMode     String    @default("porcentaje")
+  /// % de cada sesión, monto fijo por sesión o sueldo mensual, según payMode
+  payValue    Int       @default(0)
   centerId    String
   center      Center    @relation(fields: [centerId], references: [id], onDelete: Cascade)
   userEmail   String
@@ -476,4 +485,22 @@ model InternalNote {
   updatedAt DateTime @updatedAt
 
   @@index([patientId])
+}
+
+/// Tipo de sesión del Centro: su duración y su valor
+model CenterSessionType {
+  id        String   @id @default(cuid())
+  centerId  String
+  center    Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  name      String
+  duration  Int      @default(45)
+  value     Int      @default(0)
+  /// centro | domicilio | ambos
+  place     String   @default("ambos")
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([centerId, active])
 }

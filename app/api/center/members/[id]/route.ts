@@ -63,6 +63,8 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
         ...(body.active !== undefined ? { active: body.active === true } : {}),
         ...(body.permissions !== undefined ? { permissions: parsePermissions(body.permissions) as never } : {}),
         ...(body.schedule !== undefined ? { schedule: parseSchedule(body.schedule) as never } : {}),
+        ...(["porcentaje", "fijo_sesion", "sueldo"].includes(body.payMode) ? { payMode: body.payMode } : {}),
+        ...(body.payValue !== undefined ? { payValue: Math.max(0, Number(body.payValue) || 0) } : {}),
       },
     });
 

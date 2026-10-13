@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Users, Shield, UserX, UserCheck, Trash2, Building2, Clock } from "lucide-react";
+import { Plus, Users, Shield, UserX, UserCheck, Trash2, Building2, Clock, Wallet } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { PERMISSION_LABELS, DEFAULT_PERMISSIONS, type CenterPermissions } from "@/lib/center";
 import { DAY_KEYS, DAY_LABELS, type WeekSchedule } from "@/lib/schedule";
@@ -12,6 +12,8 @@ interface Member {
   permissions: CenterPermissions; pending: boolean; patients: number;
   joinedAt: string | null; lastSeenAt: string | null;
   schedule: WeekSchedule | null;
+  payMode: string;
+  payValue: number;
 }
 interface CenterInfo {
   center: { id: string; name: string; attendanceMode: string } | null;
@@ -34,6 +36,7 @@ export default function EquipoPage() {
   const [permisosDe, setPermisosDe] = useState<Member | null>(null);
   const [horarioDe, setHorarioDe] = useState<Member | null>(null);
   const [horario, setHorario] = useState<WeekSchedule>({});
+  const [pagoDe, setPagoDe] = useState<Member | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -122,6 +125,15 @@ export default function EquipoPage() {
     });
     setHorarioDe(null);
     await load();
+  };
+
+  const guardarPago = async (m: Member, payMode: string, payValue: number) => {
+    setMembers((prev) => prev.map((x) => (x.id === m.id ? { ...x, payMode, payValue } : x)));
+    setPagoDe((prev) => (prev && prev.id === m.id ? { ...prev, payMode, payValue } : prev));
+    await fetch(`/api/center/members/${m.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payMode, payValue }),
+    });
   };
 
   const borrarInvitacion = async (m: Member) => {
@@ -234,6 +246,9 @@ export default function EquipoPage() {
                 <button onClick={() => abrirHorario(m)} className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-100 transition-colors">
                   <Clock className="w-3 h-3" /> Horario
                 </button>
+                <button onClick={() => setPagoDe(m)} className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg hover:bg-emerald-100 transition-colors">
+                  <Wallet className="w-3 h-3" /> Pago
+                </button>
                 <button onClick={() => cambiarEstado(m)} className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-colors">
                   {m.active ? <><UserX className="w-3 h-3" /> Desactivar</> : <><UserCheck className="w-3 h-3" /> Reactivar</>}
                 </button>
@@ -270,6 +285,48 @@ export default function EquipoPage() {
             <p className="text-[11px] text-slate-400 mt-2">Siempre podrá atender a sus pacientes y ver su propia agenda. Nunca ve la agenda del Centro completo.</p>
           </div>
         </div>
+      </Modal>
+
+      <Modal open={!!pagoDe} onClose={() => setPagoDe(null)} title={`Pago de ${pagoDe?.name || pagoDe?.email || ""}`}
+        footer={<button onClick={() => setPagoDe(null)} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl transition-all">Listo</button>}>
+        {pagoDe && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Cómo se le paga</label>
+              <select
+                value={pagoDe.payMode}
+                onChange={(e) => guardarPago(pagoDe, e.target.value, pagoDe.payValue)}
+                className={`${inputCls} bg-white`}
+              >
+                <option value="porcentaje">Porcentaje de cada sesión</option>
+                <option value="fijo_sesion">Monto fijo por sesión</option>
+                <option value="sueldo">Sueldo mensual fijo</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">
+                {pagoDe.payMode === "porcentaje" ? "Porcentaje" : pagoDe.payMode === "fijo_sesion" ? "Monto por sesión" : "Sueldo mensual"}
+              </label>
+              <input
+                type="number"
+                min={0}
+                defaultValue={pagoDe.payValue}
+                onBlur={(e) => guardarPago(pagoDe, pagoDe.payMode, Number(e.target.value) || 0)}
+                className={inputCls}
+              />
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                {pagoDe.payMode === "porcentaje"
+                  ? "Se calcula sobre lo que generan sus sesiones realizadas en el mes."
+                  : pagoDe.payMode === "fijo_sesion"
+                    ? "Se multiplica por sus sesiones realizadas en el mes."
+                    : "Se paga completo, sin importar cuántas sesiones haga."}
+              </p>
+            </div>
+            <p className="text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2.5">
+              El resumen aparece en Facturación. Cada terapeuta ve solo lo suyo, nunca lo de sus compañeras ni las finanzas del Centro.
+            </p>
+          </div>
+        )}
       </Modal>
 
       <Modal open={!!horarioDe} onClose={() => setHorarioDe(null)} title={`Horario de ${horarioDe?.name || horarioDe?.email || ""}`}
