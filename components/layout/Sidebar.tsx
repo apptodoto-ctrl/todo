@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  ClipboardList,
   Brain,
   LayoutDashboard,
   Calendar,
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/dashboard/tareas", icon: CheckSquare, label: "Tareas y avisos" },
   { href: "/dashboard/asistentes", icon: Bot, label: "Asistentes IA" },
   { href: "/dashboard/pipeline", icon: Kanban, label: "Pipeline" },
+  { href: "/dashboard/plantillas", icon: ClipboardList, label: "Plantillas" },
   { href: "/dashboard/biblioteca", icon: BookOpen, label: "Biblioteca" },
   { href: "/dashboard/facturacion", icon: Wallet, label: "Facturación" },
   { href: "/dashboard/plan", icon: Crown, label: "Mi plan" },

@@ -11,6 +11,14 @@ interface PatientRow {
   sessionValue: number; sessionsMonth: number; amountMonth: number;
   unpaidCount: number; unpaidAmount: number;
 }
+interface PatientMonth {
+  month: string; currency: string;
+  therapist: { name: string; specialty: string };
+  patient: { id: number; name: string; rut: string; guardian: string; sessionValue: number };
+  sessions: { id: number; date: string; duration: number; attended: boolean; paid: boolean; inPackage: boolean; value: number }[];
+  attendedCount: number; missedCount: number; withoutValue: number;
+  total: number; paid: number; pending: number;
+}
 interface SessionPackage {
   id: number; patientId: number; patientName: string; name: string;
   totalSessions: number; usedSessions: number; remaining: number;
@@ -55,6 +63,8 @@ export default function FacturacionPage() {
   const [packageForm, setPackageForm] = useState({ patientId: "", totalSessions: "10", totalPrice: "", startDate: "", expiresAt: "", paid: false, notes: "" });
   const [packageError, setPackageError] = useState("");
   const [savingPackage, setSavingPackage] = useState(false);
+  const [detail, setDetail] = useState<PatientMonth | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const load = useCallback(async (m: string) => {
     setLoading(true);
@@ -115,6 +125,81 @@ export default function FacturacionPage() {
     if (!confirm("¿Eliminar este paquete? Las sesiones ya realizadas se mantienen.")) return;
     const res = await fetch(`/api/packages/${id}`, { method: "DELETE" });
     if (res.ok) await load(month);
+  };
+
+  const abrirResumen = async (patientId: number) => {
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/finance/patient?patientId=${patientId}&month=${month}`);
+      if (res.ok) setDetail(await res.json());
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  /** Hoja mensual lista para adjuntar a la boleta de la familia */
+  const imprimirResumen = () => {
+    if (!detail) return;
+    const filas = detail.sessions.map((s) => `
+      <tr>
+        <td>${s.date.split("-").reverse().join("-")}</td>
+        <td>${s.duration} min</td>
+        <td>${s.attended ? "Realizada" : "No asistió"}${s.inPackage ? " · paquete" : ""}</td>
+        <td class="num">${s.attended ? money(s.value, detail.currency) : "—"}</td>
+        <td>${s.attended ? (s.paid ? "Pagada" : "Pendiente") : "—"}</td>
+      </tr>`).join("");
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Resumen ${detail.patient.name}</title><style>
+      body{font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:30px auto;padding:0 22px;color:#1e293b}
+      .letterhead{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #7c3aed;padding-bottom:12px;margin-bottom:16px}
+      .brand{font-size:20px;font-weight:bold;color:#7c3aed}
+      .quien{text-align:right;font-size:11px;color:#475569}
+      h1{font-size:17px;margin:0 0 4px}
+      .meta{font-size:12px;color:#64748b;margin-bottom:20px}
+      table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:18px}
+      th{text-align:left;background:#f8fafc;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.03em;padding:7px 8px;border-bottom:2px solid #e2e8f0}
+      td{padding:7px 8px;border-bottom:1px solid #f1f5f9}
+      .num{text-align:right}
+      .totales{margin-left:auto;width:280px;font-size:13px}
+      .totales div{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f5f9}
+      .totales .grande{font-weight:bold;font-size:15px;border-bottom:none;border-top:2px solid #7c3aed;padding-top:8px}
+      @media print{body{margin:12px auto}}
+    </style></head><body>
+      <div class="letterhead"><div class="brand">TOdo Therapy</div><div class="quien"><strong>${detail.therapist.name}</strong><br/>${detail.therapist.specialty}</div></div>
+      <h1>Resumen de sesiones · ${monthLabel(detail.month)}</h1>
+      <div class="meta">${detail.patient.name}${detail.patient.rut ? ` · ${detail.patient.rut}` : ""}${detail.patient.guardian ? ` · Tutor: ${detail.patient.guardian}` : ""}</div>
+      <table><thead><tr><th>Fecha</th><th>Duración</th><th>Estado</th><th class="num">Valor</th><th>Cobro</th></tr></thead><tbody>${filas}</tbody></table>
+      <div class="totales">
+        <div><span>Sesiones realizadas</span><span>${detail.attendedCount}</span></div>
+        ${detail.missedCount > 0 ? `<div><span>Inasistencias</span><span>${detail.missedCount}</span></div>` : ""}
+        <div><span>Pagado</span><span>${money(detail.paid, detail.currency)}</span></div>
+        <div><span>Pendiente</span><span>${money(detail.pending, detail.currency)}</span></div>
+        <div class="grande"><span>Total del mes</span><span>${money(detail.total, detail.currency)}</span></div>
+      </div>
+    </body></html>`;
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+    doc.open(); doc.write(html); doc.close();
+    setTimeout(() => { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); setTimeout(() => document.body.removeChild(iframe), 2000); }, 300);
+  };
+
+  const copiarResumen = async () => {
+    if (!detail) return;
+    const lineas = [
+      `Resumen de sesiones · ${monthLabel(detail.month)}`,
+      detail.patient.name,
+      "",
+      ...detail.sessions.map((s) => `${s.date.split("-").reverse().join("-")} · ${s.attended ? "realizada" : "no asistió"}${s.attended ? ` · ${money(s.value, detail.currency)} · ${s.paid ? "pagada" : "pendiente"}` : ""}`),
+      "",
+      `Sesiones realizadas: ${detail.attendedCount}`,
+      `Total: ${money(detail.total, detail.currency)}`,
+      `Pagado: ${money(detail.paid, detail.currency)}`,
+      `Pendiente: ${money(detail.pending, detail.currency)}`,
+    ].join("\n");
+    try { await navigator.clipboard.writeText(lineas); alert("Resumen copiado. Ya puedes pegarlo donde lo necesites."); }
+    catch { alert("No se pudo copiar automáticamente."); }
   };
 
   const exportCSV = () => {
@@ -318,7 +403,7 @@ export default function FacturacionPage() {
         ) : (
           <div className="divide-y divide-slate-100">
             {rows.map((p) => (
-              <button key={p.id} onClick={() => router.push("/dashboard/usuarios")} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50/50 transition-colors text-left">
+              <button key={p.id} onClick={() => abrirResumen(p.id)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50/50 transition-colors text-left">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0 ${p.color.startsWith("#") ? "" : `bg-gradient-to-br ${p.color}`}`} style={p.color.startsWith("#") ? { background: p.color } : {}}>
                   {p.initials}
                 </div>
@@ -350,6 +435,71 @@ export default function FacturacionPage() {
           </div>
         )}
       </motion.div>
+
+      {/* Resumen mensual de un usuario, para la boleta */}
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail ? `Resumen · ${detail.patient.name}` : ""}
+        subtitle={detail ? monthLabel(detail.month) : ""}
+        maxWidth="max-w-xl"
+        footer={
+          <div className="flex gap-2">
+            <button onClick={copiarResumen} className="flex-1 bg-white border border-slate-200 text-slate-700 font-semibold py-3 rounded-xl hover:border-violet-300 hover:text-violet-700 transition-all">
+              Copiar
+            </button>
+            <button onClick={imprimirResumen} className="flex-1 bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/30">
+              Imprimir / PDF
+            </button>
+          </div>
+        }
+      >
+        {detail && (
+          <div className="space-y-4">
+            {detail.sessions.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-8">Sin sesiones registradas en {monthLabel(detail.month)}.</p>
+            ) : (
+              <>
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  {detail.sessions.map((s) => (
+                    <div key={s.id} className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 last:border-b-0 text-sm">
+                      <span className="font-semibold text-slate-600 w-20 shrink-0">{s.date.split("-").reverse().join("-")}</span>
+                      <span className="text-xs text-slate-400 w-14 shrink-0">{s.duration} min</span>
+                      <span className="flex-1 min-w-0 text-xs">
+                        {s.attended ? (
+                          <span className="text-slate-500">{s.inPackage ? "Del paquete" : "Realizada"}</span>
+                        ) : (
+                          <span className="text-rose-500">No asistió</span>
+                        )}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-700 shrink-0">{s.attended ? money(s.value, detail.currency) : "—"}</span>
+                      {s.attended && (
+                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${s.paid ? "text-emerald-600 bg-emerald-50" : "text-amber-600 bg-amber-50"}`}>
+                          {s.paid ? "Pagada" : "Pendiente"}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {detail.withoutValue > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800">
+                    {detail.withoutValue} {detail.withoutValue === 1 ? "sesión aparece" : "sesiones aparecen"} en 0 porque no tienen valor definido. Puedes ponerlo en la ficha del usuario o en cada cita.
+                  </div>
+                )}
+
+                <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-slate-500">Sesiones realizadas</span><span className="font-semibold text-slate-700">{detail.attendedCount}</span></div>
+                  {detail.missedCount > 0 && <div className="flex justify-between"><span className="text-slate-500">Inasistencias</span><span className="font-semibold text-slate-700">{detail.missedCount}</span></div>}
+                  <div className="flex justify-between"><span className="text-slate-500">Pagado</span><span className="font-semibold text-emerald-600">{money(detail.paid, detail.currency)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Pendiente</span><span className="font-semibold text-amber-600">{money(detail.pending, detail.currency)}</span></div>
+                  <div className="flex justify-between pt-2 border-t border-slate-200"><span className="font-bold text-slate-700">Total del mes</span><span className="font-bold text-slate-900">{money(detail.total, detail.currency)}</span></div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Vender paquete */}
       <Modal

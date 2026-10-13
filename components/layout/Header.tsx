@@ -12,6 +12,7 @@ const pageLabels: Record<string, { title: string; subtitle: string }> = {
   "/dashboard/tareas": { title: "Tareas y recordatorios", subtitle: "Pendientes y avisos por correo" },
   "/dashboard/asistentes": { title: "Asistentes Virtuales", subtitle: "Herramientas de inteligencia artificial" },
   "/dashboard/pipeline": { title: "Pipeline de Casos", subtitle: "Vista Kanban del proceso clínico" },
+  "/dashboard/plantillas": { title: "Plantillas", subtitle: "Tus fichas, entrevistas y pautas" },
   "/dashboard/biblioteca": { title: "Biblioteca de Recursos", subtitle: "Documentos y materiales terapéuticos" },
   "/dashboard/plan": { title: "Mi plan", subtitle: "Suscripción y créditos de IA" },
   "/dashboard/facturacion": { title: "Facturación", subtitle: "Ingresos del mes y cobros pendientes" },

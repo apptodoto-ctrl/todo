@@ -7,6 +7,8 @@ import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CURRENCIES, CURRENCY_LABELS } from "@/lib/currency";
 import { DEFAULT_COUNTRY, countryConfig, formatDocument } from "@/lib/countries";
+import FormFiller, { type Answers } from "@/components/forms/FormFiller";
+import type { FormSection } from "@/lib/formTemplates";
 
 interface Patient {
   id: number;
@@ -119,6 +121,12 @@ export default function UsuariosPage() {
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
   const [editForm, setEditForm] = useState<Partial<Patient>>({});
   const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([]);
+  const [templates, setTemplates] = useState<{ id: number; name: string; description: string; sections: FormSection[] }[]>([]);
+  const [patientForms, setPatientForms] = useState<{ id: number; title: string; templateId: number; answers: Answers; updatedAt: string; template: { name: string; sections: FormSection[] } }[]>([]);
+  const [fillingTemplate, setFillingTemplate] = useState<{ id: number; name: string; sections: FormSection[] } | null>(null);
+  const [fillingResponse, setFillingResponse] = useState<{ id: number; title: string; answers: Answers; template: { name: string; sections: FormSection[] } } | null>(null);
+  const [formAnswers, setFormAnswers] = useState<Answers>({});
+  const [savingForm, setSavingForm] = useState(false);
   const [patientPackages, setPatientPackages] = useState<{ id: number; name: string; totalSessions: number; usedSessions: number; remaining: number; expiresAt: string; paid: boolean; status: string; expired: boolean; endingSoon: boolean }[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [showAddSession, setShowAddSession] = useState(false);
@@ -172,6 +180,7 @@ export default function UsuariosPage() {
   // Moneda configurada en la cuenta (CLP / ARS / USD / COP)
   useEffect(() => {
     fetch("/api/users/me").then((r) => r.json()).then((u) => { if (u?.currency) setCurrency(u.currency); if (u?.country) setCountry(u.country); }).catch(() => {});
+    fetch("/api/forms/templates").then((r) => r.json()).then((d) => setTemplates(Array.isArray(d) ? d : [])).catch(() => {});
     // Las citas agendadas alimentan "Próxima sesión" y "Próximas sesiones" del perfil
     fetch("/api/appointments").then((r) => r.json()).then((d) => setAppointments(Array.isArray(d) ? d : [])).catch(() => {});
     // Deuda por paciente para la alerta del listado y del perfil
@@ -198,7 +207,7 @@ export default function UsuariosPage() {
   }, [currentUserEmail]);
 
   useEffect(() => {
-    if (!selectedPatient) { setSessionRecords([]); setObjectives([]); setPatientPackages([]); setShowAddSession(false); setEditingSession(null); return; }
+    if (!selectedPatient) { setSessionRecords([]); setObjectives([]); setPatientPackages([]); setPatientForms([]); setShowAddSession(false); setEditingSession(null); return; }
     setSessionsLoading(true);
     fetch(`/api/patients/${selectedPatient.id}/sessions`)
       .then((r) => r.json())
@@ -212,6 +221,10 @@ export default function UsuariosPage() {
       .then((r) => r.json())
       .then((data) => setPatientPackages(Array.isArray(data) ? data : []))
       .catch(() => setPatientPackages([]));
+    fetch(`/api/forms/responses?patientId=${selectedPatient.id}`)
+      .then((r) => r.json())
+      .then((data) => setPatientForms(Array.isArray(data) ? data : []))
+      .catch(() => setPatientForms([]));
     fetch(`/api/documents?patientId=${selectedPatient.id}`)
       .then((r) => r.json())
       .then((data) => setPatientDocs(Array.isArray(data) ? data : []))
@@ -369,6 +382,99 @@ export default function UsuariosPage() {
     a.download = `pacientes-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const abrirFichaNueva = (t: { id: number; name: string; sections: FormSection[] }) => {
+    setFillingResponse(null);
+    setFormAnswers({});
+    setFillingTemplate(t);
+  };
+
+  const abrirFichaGuardada = (r: typeof patientForms[number]) => {
+    setFillingTemplate(null);
+    setFormAnswers(r.answers ?? {});
+    setFillingResponse(r);
+  };
+
+  const guardarFicha = async () => {
+    if (!selectedPatient) return;
+    setSavingForm(true);
+    try {
+      if (fillingResponse) {
+        const res = await fetch(`/api/forms/responses/${fillingResponse.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers: formAnswers }),
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          setPatientForms((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
+          setFillingResponse(null);
+        }
+      } else if (fillingTemplate) {
+        const res = await fetch("/api/forms/responses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ patientId: selectedPatient.id, templateId: fillingTemplate.id, answers: formAnswers }),
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          setPatientForms((prev) => [saved, ...prev]);
+          setFillingTemplate(null);
+        }
+      }
+    } finally {
+      setSavingForm(false);
+    }
+  };
+
+  const borrarFicha = async (id: number) => {
+    if (!confirm("¿Borrar esta ficha llenada?")) return;
+    const res = await fetch(`/api/forms/responses/${id}`, { method: "DELETE" });
+    if (res.ok) setPatientForms((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  /** Imprime la ficha: llenada, o en blanco para completarla a mano */
+  const imprimirFicha = (titulo: string, sections: FormSection[], answers: Answers | null) => {
+    if (!selectedPatient) return;
+    const valor = (f: FormSection["fields"][number]) => {
+      if (!answers) return "____________________";
+      const v = answers[f.id];
+      if (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0)) return "—";
+      if (f.type === "si_no") return v === true ? "Sí" : "No";
+      return Array.isArray(v) ? v.join(", ") : String(v);
+    };
+    const cuerpo = sections.map((sec) => `
+      <section>
+        <h2>${sec.title}</h2>
+        ${sec.fields.map((f) => `<p class="campo"><span class="etiqueta">${f.label}:</span> <span class="valor">${valor(f)}</span></p>`).join("")}
+      </section>`).join("");
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${titulo}</title><style>
+      body{font-family:Arial,Helvetica,sans-serif;max-width:760px;margin:30px auto;padding:0 22px;color:#1e293b;line-height:1.6}
+      .letterhead{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #7c3aed;padding-bottom:12px;margin-bottom:14px}
+      .brand{font-size:20px;font-weight:bold;color:#7c3aed}
+      .quien{text-align:right;font-size:11px;color:#475569}
+      h1{font-size:17px;margin:14px 0 2px}
+      .meta{font-size:12px;color:#64748b;margin-bottom:18px}
+      h2{font-size:13px;color:#7c3aed;margin:18px 0 6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px}
+      .campo{margin:3px 0;font-size:12.5px;page-break-inside:avoid}
+      .etiqueta{font-weight:bold;color:#475569}
+      .valor{color:#1e293b}
+      section{page-break-inside:avoid}
+      @media print{body{margin:12px auto}}
+    </style></head><body>
+      <div class="letterhead"><div class="brand">TOdo Therapy</div><div class="quien"><strong>${selectedPatient.therapist}</strong></div></div>
+      <h1>${titulo}</h1>
+      <div class="meta">${selectedPatient.name} · ${displayAge(selectedPatient)} años${selectedPatient.rut ? ` · ${selectedPatient.rut}` : ""} &nbsp;·&nbsp; ${new Date().toLocaleDateString("es-CL")}</div>
+      ${cuerpo}
+    </body></html>`;
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+    doc.open(); doc.write(html); doc.close();
+    setTimeout(() => { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); setTimeout(() => document.body.removeChild(iframe), 2000); }, 300);
   };
 
   const deleteSession = async (sessionId: number) => {
@@ -882,6 +988,60 @@ export default function UsuariosPage() {
               )}
             </div>
 
+            {/* Fichas: información base del usuario, separada de los documentos */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ClipboardList className="w-4 h-4 text-violet-500" />
+                <h4 className="text-sm font-bold text-slate-700">Fichas</h4>
+                {templates.length > 0 && (
+                  <select
+                    value=""
+                    onChange={(e) => { const t = templates.find((x) => String(x.id) === e.target.value); if (t) abrirFichaNueva(t); }}
+                    className="ml-auto text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                  >
+                    <option value="">+ Llenar una ficha...</option>
+                    {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                )}
+              </div>
+
+              {templates.length === 0 ? (
+                <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-3 py-2.5">
+                  Crea tus formularios en <strong>Plantillas</strong> y podrás llenarlos aquí para cada usuario.
+                </p>
+              ) : patientForms.length === 0 ? (
+                <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-3 py-2.5">
+                  Sin fichas llenadas. Elige una plantilla arriba para completarla, o imprímela en blanco.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {patientForms.map((r) => (
+                    <div key={r.id} className="border border-violet-100 bg-violet-50/50 rounded-xl px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold text-slate-700 truncate flex-1">{r.title || r.template.name}</p>
+                        <span className="text-[10px] text-slate-400">{new Date(r.updatedAt).toLocaleDateString("es-CL")}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <button onClick={() => abrirFichaGuardada(r)} className="text-[11px] font-semibold text-violet-700 bg-white border border-violet-200 px-2 py-0.5 rounded-lg hover:bg-violet-100 transition-colors">Ver / editar</button>
+                        <button onClick={() => imprimirFicha(r.title || r.template.name, r.template.sections, r.answers)} className="text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-100 transition-colors">Imprimir</button>
+                        <button onClick={() => borrarFicha(r.id)} className="text-[11px] font-semibold text-rose-600 bg-white border border-rose-200 px-2 py-0.5 rounded-lg hover:bg-rose-50 transition-colors ml-auto">Borrar</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {templates.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {templates.map((t) => (
+                    <button key={t.id} onClick={() => imprimirFicha(t.name, t.sections, null)} className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-100 transition-colors">
+                      Imprimir «{t.name}» en blanco
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Paquete de sesiones vigente */}
             {patientPackages.filter((pk) => pk.status !== "cerrado").length > 0 && (
               <div>
@@ -1247,6 +1407,26 @@ export default function UsuariosPage() {
             </select>
           </div>
         </div>
+      </Modal>
+
+      {/* Llenar o ver una ficha */}
+      <Modal
+        open={!!(fillingTemplate || fillingResponse)}
+        onClose={() => { setFillingTemplate(null); setFillingResponse(null); }}
+        title={fillingResponse ? (fillingResponse.title || fillingResponse.template.name) : fillingTemplate?.name ?? ""}
+        subtitle={selectedPatient?.name}
+        maxWidth="max-w-2xl"
+        footer={
+          <button onClick={guardarFicha} disabled={savingForm} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 transition-all shadow-lg shadow-violet-500/30">
+            {savingForm ? "Guardando..." : "Guardar ficha"}
+          </button>
+        }
+      >
+        <FormFiller
+          sections={fillingResponse ? fillingResponse.template.sections : fillingTemplate?.sections ?? []}
+          answers={formAnswers}
+          onChange={(id, value) => setFormAnswers((prev) => ({ ...prev, [id]: value }))}
+        />
       </Modal>
     </div>
   );

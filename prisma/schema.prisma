@@ -70,6 +70,7 @@ model Patient {
   reports        GeneratedReport[]
   documents      Document[]
   packages       SessionPackage[]
+  formResponses  FormResponse[]
 }
 
 model Objective {
@@ -334,4 +335,40 @@ model SessionPackage {
 
   @@index([createdBy, status])
   @@index([patientId])
+}
+
+/// Formulario propio de la terapeuta: ficha de admisión, entrevista, pauta
+model FormTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String   @default("")
+  /// [{ id, title, fields: [{ id, label, type, options, required }] }]
+  sections    Json
+  origin      String   @default("propia")
+  archived    Boolean  @default(false)
+  createdBy   String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  responses FormResponse[]
+
+  @@index([createdBy, archived])
+}
+
+/// Una plantilla llenada para un paciente
+model FormResponse {
+  id         Int          @id @default(autoincrement())
+  templateId Int
+  template   FormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  patientId  Int
+  patient    Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  title      String       @default("")
+  /// { fieldId: valor }
+  answers    Json
+  createdBy  String       @default("")
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([patientId])
+  @@index([templateId])
 }
