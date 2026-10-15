@@ -14,7 +14,7 @@ export async function GET() {
   try {
     const appointments = await prisma.appointment.findMany({
       where: agendaScope(scope),
-      orderBy: { date: "asc" },
+      orderBy: [{ date: "asc" }, { time: "asc" }],
     });
     return NextResponse.json(appointments);
   } catch {

@@ -145,9 +145,13 @@ export default function CalendarioPage() {
   };
 
   // La Administradora puede mirar la agenda de una terapeuta en concreto
-  const visibleEvents = therapistFilter === "todas"
+  // Siempre por horario, también la cita recién creada
+  const byTime = (a: { date: Date; time: string }, b: { date: Date; time: string }) =>
+    a.date.getTime() - b.date.getTime() || a.time.localeCompare(b.time);
+  const visibleEvents = (therapistFilter === "todas"
     ? localEvents
-    : localEvents.filter((e) => e.createdBy === therapistFilter);
+    : localEvents.filter((e) => e.createdBy === therapistFilter)
+  ).slice().sort(byTime);
 
   const openNewEvent = (type = "sesion") => {
     const defaultDate = selected
