@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
-import { getScope, loadPatient, can } from "@/lib/center";
+import { getScope, loadPatient, canManageMoney } from "@/lib/center";
 import { refreshPackageStatus } from "@/lib/sessionPackages";
 
 type Params = Promise<{ id: string; sessionId: string }>;
@@ -31,11 +31,12 @@ export async function PUT(req: Request, { params }: { params: Params }) {
     if (err) return err;
     const { date, notes, duration, attended, paid, confirmed, packageId, value, paymentMethod } = await req.json();
 
-    // En un Centro, registrar pagos es un permiso que decide la Administradora
+    // En un Centro, pagos, valores y paquetes los toca solo la Administradora
     const scopeAhora = await getScope();
-    if (paid !== undefined && scopeAhora?.centerId && !can(scopeAhora, "registrarPagos")) {
+    const tocaDinero = paid !== undefined || value !== undefined || packageId !== undefined;
+    if (tocaDinero && scopeAhora && !canManageMoney(scopeAhora)) {
       return NextResponse.json(
-        { error: "Tu Centro no te permite registrar pagos. Pídeselo a la Administradora." },
+        { error: "En el Centro, los pagos y los valores los registra la Administradora." },
         { status: 403 }
       );
     }

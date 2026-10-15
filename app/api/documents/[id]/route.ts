@@ -32,7 +32,7 @@ export async function GET(_req: NextRequest, { params }: { params: Params }) {
   }
 }
 
-const CATEGORIES = ["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios", "Factura / Boleta", "Historia clínica externa"];
+const CATEGORIES = ["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios", "Factura / Boleta", "Historia clínica externa", "Consentimientos"];
 
 // Cambiar la categoría (o el nombre) de un documento ya subido
 export async function PUT(req: NextRequest, { params }: { params: Params }) {

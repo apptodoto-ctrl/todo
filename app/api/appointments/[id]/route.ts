@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
-import { getScope, agendaScope, patientScope } from "@/lib/center";
+import { getScope, agendaScope, patientScope, canManageMoney } from "@/lib/center";
 import { findPatientByName } from "@/lib/patientMatch";
 import { notifyTherapistOfAppointment } from "@/lib/appointmentReminders";
 
@@ -26,6 +26,7 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
     const { error, appointment } = await loadOwned(Number(id), scope);
     if (error) return error;
     const body = await req.json();
+    if (!canManageMoney(scope)) { delete body.value; delete body.paid; }
     // Solo se intenta ligar a una ficha si la cita todavía no tiene paciente:
     // renombrar una cita ya ligada nunca debe moverla a otro paciente.
     const relinked =

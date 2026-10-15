@@ -71,6 +71,13 @@ export default function FacturacionPage() {
   const [detail, setDetail] = useState<PatientMonth | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [payroll, setPayroll] = useState<Payroll | null>(null);
+  // En un Centro, los paquetes y los pagos los maneja solo la Administradora
+  const [centerRole, setCenterRole] = useState("individual");
+  const puedeDinero = centerRole !== "terapeuta";
+
+  useEffect(() => {
+    fetch("/api/center").then((r) => r.json()).then((d) => { if (d?.role) setCenterRole(d.role); }).catch(() => {});
+  }, []);
 
   const load = useCallback(async (m: string) => {
     setLoading(true);
@@ -334,12 +341,16 @@ export default function FacturacionPage() {
         <div className="p-4 border-b border-slate-100 flex items-center gap-2">
           <Package className="w-4 h-4 text-violet-600 shrink-0" />
           <h3 className="font-bold text-slate-800 text-sm flex-1">Paquetes de sesiones</h3>
-          <button
-            onClick={() => { setPackageError(""); setShowNewPackage(true); }}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-3 py-1.5 rounded-lg font-semibold text-xs hover:from-violet-400 hover:to-purple-500 transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" /> Vender paquete
-          </button>
+          {puedeDinero ? (
+            <button
+              onClick={() => { setPackageError(""); setShowNewPackage(true); }}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-3 py-1.5 rounded-lg font-semibold text-xs hover:from-violet-400 hover:to-purple-500 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" /> Vender paquete
+            </button>
+          ) : (
+            <span className="text-[11px] text-slate-400">Los maneja la Administradora</span>
+          )}
         </div>
 
         {(data.packagesEndingSoon > 0 || data.packagesExpired > 0 || data.packagesUnpaid > 0) && (
@@ -403,7 +414,7 @@ export default function FacturacionPage() {
                     </p>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  {puedeDinero && <div className="mt-3 flex flex-wrap gap-2">
                     {!pkg.paid && (
                       <button onClick={() => updatePackage(pkg.id, { paid: true })} className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg hover:bg-emerald-100 transition-colors">
                         Marcar como pagado
@@ -428,7 +439,7 @@ export default function FacturacionPage() {
                     <button onClick={() => removePackage(pkg.id)} className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg hover:bg-rose-100 transition-colors ml-auto">
                       Eliminar
                     </button>
-                  </div>
+                  </div>}
                 </div>
               );
             })}

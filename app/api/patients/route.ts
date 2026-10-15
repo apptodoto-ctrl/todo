@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { unauthorized } from "@/lib/apiAuth";
 import { getBillingStatus, hasFullAccess } from "@/lib/billing";
-import { getScope, patientScope, ownerFields, billingEmail, can } from "@/lib/center";
+import { getScope, patientScope, ownerFields, billingEmail, can, canManageMoney } from "@/lib/center";
 
 export async function GET() {
   const scope = await getScope();
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     // La terapeuta a cargo es quien lo crea, salvo que se indique otra
+    if (!canManageMoney(scope)) delete body.sessionValue;
     const base = {
       ...body,
       ...ownerFields(scope),

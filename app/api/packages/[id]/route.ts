@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
 import { getScope, canAccessPatient } from "@/lib/center";
+import { canManageMoney } from "@/lib/center";
 import { absorbExistingSessions } from "@/lib/sessionPackages";
 
 type Params = Promise<{ id: string }>;
@@ -18,6 +19,7 @@ async function checkOwnership(id: number) {
 export async function PATCH(req: Request, { params }: { params: Params }) {
   const scope = await getScope();
   if (!scope) return unauthorized();
+  if (!canManageMoney(scope)) return NextResponse.json({ error: "En el Centro, los paquetes los maneja la Administradora." }, { status: 403 });
   try {
     const { id } = await params;
     const err = await checkOwnership(Number(id));
@@ -55,6 +57,7 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 export async function DELETE(_: Request, { params }: { params: Params }) {
   const scope = await getScope();
   if (!scope) return unauthorized();
+  if (!canManageMoney(scope)) return NextResponse.json({ error: "En el Centro, los paquetes los maneja la Administradora." }, { status: 403 });
   try {
     const { id } = await params;
     const err = await checkOwnership(Number(id));

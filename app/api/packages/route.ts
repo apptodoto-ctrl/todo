@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
 import { getScope, loadPatient, ownerFields } from "@/lib/center";
+import { canManageMoney } from "@/lib/center";
 import { packagesFor, absorbExistingSessions, today } from "@/lib/sessionPackages";
 
 export async function GET(req: NextRequest) {
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: Request) {
   const scope = await getScope();
   if (!scope) return unauthorized();
+  if (!canManageMoney(scope)) return NextResponse.json({ error: "En el Centro, los paquetes los maneja la Administradora." }, { status: 403 });
   try {
     const body = await req.json();
     const patientId = Number(body.patientId);

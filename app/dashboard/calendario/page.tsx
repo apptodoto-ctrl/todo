@@ -773,7 +773,7 @@ export default function CalendarioPage() {
               <option value={90}>1 hora 30</option>
             </select>
           </div>
-          <div>
+          {centerRole !== "terapeuta" && <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">
               Valor de esta sesión <span className="font-normal text-slate-400">({currency})</span>
             </label>
@@ -792,7 +792,7 @@ export default function CalendarioPage() {
             ) : (
               <p className="text-[11px] text-slate-400 mt-1.5">Solo para esta cita; no cambia el valor del usuario.</p>
             )}
-          </div>
+          </div>}
           <div>
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Repetir cada semana</label>
             <select value={repeatWeeks} onChange={(e) => setRepeatWeeks(Number(e.target.value))} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">

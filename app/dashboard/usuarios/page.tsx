@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen, Package, Building2, Home, Lock } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen, Package, Building2, Home, Lock, FileSignature, Send, CheckCircle2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CURRENCIES, CURRENCY_LABELS } from "@/lib/currency";
@@ -160,6 +160,13 @@ export default function UsuariosPage() {
   // Equipo del Centro: quién puede quedar a cargo de cada paciente
   const [therapists, setTherapists] = useState<{ email: string; name: string; role: string }[]>([]);
   const [centerRole, setCenterRole] = useState("individual");
+  // En un Centro, el dinero (valores, pagos, paquetes) lo maneja solo la Administradora
+  const puedeDinero = centerRole !== "terapeuta";
+  // Documentos que la familia acepta en línea
+  const [consentTemplates, setConsentTemplates] = useState<{ id: number; name: string; body: string }[]>([]);
+  const [consents, setConsents] = useState<{ id: number; title: string; sentTo: string; sentAt: string; acceptedAt: string | null; acceptedName: string; documentId: number | null }[]>([]);
+  const [sendingConsent, setSendingConsent] = useState(false);
+  const [pendingTemplateId, setPendingTemplateId] = useState<number | null>(null);
   const [notes, setNotes] = useState<{ id: number; body: string; authorName: string; createdAt: string; createdBy: string }[]>([]);
   const [newNote, setNewNote] = useState("");
   const [currencySaved, setCurrencySaved] = useState(false);
@@ -192,6 +199,7 @@ export default function UsuariosPage() {
     fetch("/api/forms/templates").then((r) => r.json()).then((d) => setTemplates(Array.isArray(d) ? d : [])).catch(() => {});
     fetch("/api/center/therapists").then((r) => r.json()).then((d) => setTherapists(Array.isArray(d) ? d : [])).catch(() => {});
     fetch("/api/center").then((r) => r.json()).then((d) => { if (d?.role) setCenterRole(d.role); }).catch(() => {});
+    fetch("/api/consents/templates").then((r) => r.json()).then((d) => setConsentTemplates(Array.isArray(d) ? d : [])).catch(() => {});
     // Las citas agendadas alimentan "Próxima sesión" y "Próximas sesiones" del perfil
     fetch("/api/appointments").then((r) => r.json()).then((d) => setAppointments(Array.isArray(d) ? d : [])).catch(() => {});
     // Deuda por paciente para la alerta del listado y del perfil
@@ -213,13 +221,64 @@ export default function UsuariosPage() {
     if (!currentUserEmail) return;
     fetch(`/api/patients?createdBy=${encodeURIComponent(currentUserEmail)}`)
       .then((r) => r.json())
-      .then((data) => { setPatients(Array.isArray(data) ? data : []); setLoading(false); })
+      .then((data) => {
+        const list: Patient[] = Array.isArray(data) ? data : [];
+        setPatients(list); setLoading(false);
+        // Llegada desde Plantillas: ?paciente=ID&plantilla=ID abre la ficha y el formulario
+        const sp = new URLSearchParams(window.location.search);
+        const pid = Number(sp.get("paciente"));
+        const found = pid ? list.find((p) => p.id === pid) : null;
+        if (found) {
+          setSelectedPatient(found);
+          const tid = Number(sp.get("plantilla"));
+          if (tid) setPendingTemplateId(tid);
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+      })
       .catch(() => setLoading(false));
   }, [currentUserEmail]);
 
   useEffect(() => {
-    if (!selectedPatient) { setSessionRecords([]); setObjectives([]); setPatientPackages([]); setPatientForms([]); setNotes([]); setShowAddSession(false); setEditingSession(null); return; }
+    if (!pendingTemplateId || !selectedPatient || templates.length === 0) return;
+    const t = templates.find((x) => x.id === pendingTemplateId);
+    const timer = setTimeout(() => { if (t) abrirFichaNueva(t); setPendingTemplateId(null); }, 0);
+    return () => clearTimeout(timer);
+  }, [pendingTemplateId, selectedPatient, templates]);
+
+  const cargarConsents = (patientId: number) => {
+    fetch(`/api/consents/requests?patientId=${patientId}`).then((r) => r.json()).then((d) => setConsents(Array.isArray(d) ? d : [])).catch(() => setConsents([]));
+  };
+
+  const enviarConsent = async (templateId: number) => {
+    if (!selectedPatient) return;
+    let email: string | undefined = selectedPatient.guardianEmail || selectedPatient.email || undefined;
+    if (!email) {
+      const e = prompt("Este usuario no tiene correo del tutor. ¿A qué correo lo enviamos?");
+      if (!e) return;
+      email = e.trim();
+    }
+    setSendingConsent(true);
+    const res = await fetch("/api/consents/requests", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patientId: selectedPatient.id, templateId, email }),
+    });
+    const d = await res.json().catch(() => null);
+    setSendingConsent(false);
+    if (!res.ok) { alert(d?.error ?? "No se pudo enviar."); return; }
+    cargarConsents(selectedPatient.id);
+  };
+
+  const retirarConsent = async (id: number) => {
+    if (!selectedPatient || !confirm("¿Retirar este documento? El enlace dejará de funcionar.")) return;
+    const res = await fetch(`/api/consents/requests/${id}`, { method: "DELETE" });
+    if (!res.ok) { const d = await res.json().catch(() => null); alert(d?.error ?? "No se pudo retirar."); return; }
+    cargarConsents(selectedPatient.id);
+  };
+
+  useEffect(() => {
+    if (!selectedPatient) { setSessionRecords([]); setObjectives([]); setPatientPackages([]); setPatientForms([]); setNotes([]); setConsents([]); setShowAddSession(false); setEditingSession(null); return; }
     setSessionsLoading(true);
+    cargarConsents(selectedPatient.id);
     fetch(`/api/patients/${selectedPatient.id}/sessions`)
       .then((r) => r.json())
       .then((data) => { setSessionRecords(Array.isArray(data) ? data : []); setSessionsLoading(false); })
@@ -904,8 +963,8 @@ export default function UsuariosPage() {
                   </select>
                 </div>
               </div>
-              <input type="number" min={0} value={editForm.sessionValue || ""} onChange={(e) => setEditForm({ ...editForm, sessionValue: parseInt(e.target.value) || 0 })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-              <p className="text-[11px] text-slate-400 mt-1.5">{CURRENCY_LABELS[currency]} · es la moneda de toda tu consulta</p>
+              <input type="number" min={0} value={editForm.sessionValue || ""} disabled={!puedeDinero} onChange={(e) => setEditForm({ ...editForm, sessionValue: parseInt(e.target.value) || 0 })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all disabled:bg-slate-50 disabled:text-slate-400" />
+              <p className="text-[11px] text-slate-400 mt-1.5">{puedeDinero ? `${CURRENCY_LABELS[currency]} · es la moneda de toda tu consulta` : "El valor lo define la Administradora del Centro"}</p>
             </div>
           </div>
           <div>
@@ -1151,6 +1210,57 @@ export default function UsuariosPage() {
               )}
             </div>
 
+            {/* Documentos que la familia aceptó en línea: consentimiento, compromiso, políticas */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <FileSignature className="w-4 h-4 text-violet-500" />
+                <h4 className="text-sm font-bold text-slate-700">Acuerdos con la familia</h4>
+                {consentTemplates.length > 0 && (
+                  <select
+                    value=""
+                    disabled={sendingConsent}
+                    onChange={(e) => { if (e.target.value) enviarConsent(Number(e.target.value)); }}
+                    className="ml-auto text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30 disabled:opacity-50"
+                  >
+                    <option value="">{sendingConsent ? "Enviando..." : "+ Enviar documento..."}</option>
+                    {consentTemplates.filter((t) => t.body.trim()).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                )}
+              </div>
+              {consentTemplates.length === 0 ? (
+                <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-3 py-2.5">
+                  Crea tus documentos (consentimiento, compromiso, políticas) en <strong>Plantillas</strong> y envíalos desde aquí para que la familia los acepte en línea.
+                </p>
+              ) : consents.length === 0 ? (
+                <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-3 py-2.5">
+                  Nada enviado todavía. Elige un documento arriba: la familia recibe un correo, lo lee y lo acepta con un clic.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {consents.map((c) => (
+                    <div key={c.id} className={`border rounded-xl px-3 py-2.5 ${c.acceptedAt ? "border-emerald-100 bg-emerald-50/50" : "border-amber-100 bg-amber-50/40"}`}>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold text-slate-700 truncate flex-1">{c.title}</p>
+                        {c.acceptedAt ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Aceptado</span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 flex items-center gap-1"><Send className="w-3 h-3" /> Pendiente</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {c.acceptedAt
+                          ? `${c.acceptedName} lo aceptó el ${new Date(c.acceptedAt).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}${c.documentId ? " · guardado en Documentos" : ""}`
+                          : `Enviado a ${c.sentTo} el ${new Date(c.sentAt).toLocaleDateString("es-CL")}`}
+                      </p>
+                      {!c.acceptedAt && (
+                        <button onClick={() => retirarConsent(c.id)} className="text-[11px] font-semibold text-rose-600 mt-1.5 hover:underline">Retirar</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Notas internas del equipo: nunca salen en un informe */}
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -1298,9 +1408,11 @@ export default function UsuariosPage() {
                     <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
                       <input type="checkbox" checked={newSession.attended} onChange={(e) => setNewSession({ ...newSession, attended: e.target.checked })} className="accent-violet-500" /> Asistió
                     </label>
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-                      <input type="checkbox" checked={newSession.paid} onChange={(e) => setNewSession({ ...newSession, paid: e.target.checked })} className="accent-emerald-500" /> Pagada
-                    </label>
+                    {puedeDinero && (
+                      <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                        <input type="checkbox" checked={newSession.paid} onChange={(e) => setNewSession({ ...newSession, paid: e.target.checked })} className="accent-emerald-500" /> Pagada
+                      </label>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button onClick={addSession} disabled={savingSession || !newSession.date} className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold py-2 rounded-lg hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 transition-all">
@@ -1334,9 +1446,11 @@ export default function UsuariosPage() {
                           <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
                             <input type="checkbox" checked={editingSession.attended} onChange={(e) => setEditingSession({ ...editingSession, attended: e.target.checked })} className="accent-violet-500" /> Asistió
                           </label>
-                          <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
-                            <input type="checkbox" checked={editingSession.paid} onChange={(e) => setEditingSession({ ...editingSession, paid: e.target.checked })} className="accent-emerald-500" /> Pagada
-                          </label>
+                          {puedeDinero && (
+                            <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
+                              <input type="checkbox" checked={editingSession.paid} onChange={(e) => setEditingSession({ ...editingSession, paid: e.target.checked })} className="accent-emerald-500" /> Pagada
+                            </label>
+                          )}
                           <div className="flex-1" />
                           <button onClick={saveEditSession} className="text-[11px] font-semibold px-2 py-1 rounded-md bg-violet-500 text-white hover:bg-violet-600 transition-colors">Guardar</button>
                           <button onClick={() => setEditingSession(null)} className="text-[11px] font-medium px-2 py-1 rounded-md text-slate-500 bg-white border border-slate-200 hover:text-slate-700 transition-colors">Cancelar</button>
@@ -1354,7 +1468,7 @@ export default function UsuariosPage() {
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {s.attended && (
-                            <button onClick={() => toggleSessionPaid(s)} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md transition-colors flex items-center gap-0.5 ${s.paid ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600 hover:bg-amber-200"}`} title={s.paid ? "Marcar como no pagada" : "Marcar como pagada"}>
+                            <button onClick={() => { if (puedeDinero) toggleSessionPaid(s); }} disabled={!puedeDinero} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md transition-colors flex items-center gap-0.5 disabled:cursor-default ${s.paid ? "bg-emerald-100 text-emerald-600" : `bg-amber-100 text-amber-600 ${puedeDinero ? "hover:bg-amber-200" : ""}`}`} title={!puedeDinero ? "Los pagos los registra la Administradora" : s.paid ? "Marcar como no pagada" : "Marcar como pagada"}>
                               <DollarSign className="w-2.5 h-2.5" /> {s.paid ? "Pagada" : "Pendiente"}
                             </button>
                           )}
@@ -1576,8 +1690,8 @@ export default function UsuariosPage() {
                   </select>
                 </div>
               </div>
-              <input type="number" min={0} value={newPatient.sessionValue || ""} onChange={(e) => setNewPatient({ ...newPatient, sessionValue: parseInt(e.target.value) || 0 })} placeholder="Ej. 35000" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all" />
-              <p className="text-[11px] text-slate-400 mt-1.5">{CURRENCY_LABELS[currency]} · es la moneda de toda tu consulta</p>
+              <input type="number" min={0} value={newPatient.sessionValue || ""} disabled={!puedeDinero} onChange={(e) => setNewPatient({ ...newPatient, sessionValue: parseInt(e.target.value) || 0 })} placeholder={puedeDinero ? "Ej. 35000" : "Lo define la Administradora"} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all disabled:bg-slate-50 disabled:text-slate-400" />
+              <p className="text-[11px] text-slate-400 mt-1.5">{puedeDinero ? `${CURRENCY_LABELS[currency]} · es la moneda de toda tu consulta` : "El valor lo define la Administradora del Centro"}</p>
             </div>
           </div>
           <div>

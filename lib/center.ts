@@ -10,7 +10,6 @@ export interface CenterPermissions {
   verTodosPacientes: boolean;
   crearPacientes: boolean;
   enviarInformes: boolean;
-  registrarPagos: boolean;
   descargarDatos: boolean;
   crearPlantillas: boolean;
 }
@@ -19,7 +18,6 @@ export const DEFAULT_PERMISSIONS: CenterPermissions = {
   verTodosPacientes: false,
   crearPacientes: true,
   enviarInformes: false,
-  registrarPagos: false,
   descargarDatos: false,
   crearPlantillas: false,
 };
@@ -28,7 +26,6 @@ export const PERMISSION_LABELS: Record<keyof CenterPermissions, string> = {
   verTodosPacientes: "Ver todos los pacientes del Centro",
   crearPacientes: "Crear pacientes nuevos",
   enviarInformes: "Enviar informes a las familias",
-  registrarPagos: "Registrar pagos de las familias",
   descargarDatos: "Descargar información de sus pacientes",
   crearPlantillas: "Crear sus propias plantillas",
 };
@@ -39,19 +36,19 @@ export const PERMISSION_PRESETS: { key: string; label: string; description: stri
     key: "practica",
     label: "Terapeuta en práctica",
     description: "Atiende a sus pacientes, sin tocar pagos ni informes a familias",
-    permissions: { verTodosPacientes: false, crearPacientes: false, enviarInformes: false, registrarPagos: false, descargarDatos: false, crearPlantillas: false },
+    permissions: { verTodosPacientes: false, crearPacientes: false, enviarInformes: false, descargarDatos: false, crearPlantillas: false },
   },
   {
     key: "estandar",
     label: "Terapeuta",
     description: "Crea sus pacientes y trabaja de forma autónoma",
-    permissions: { verTodosPacientes: false, crearPacientes: true, enviarInformes: true, registrarPagos: false, descargarDatos: true, crearPlantillas: false },
+    permissions: { verTodosPacientes: false, crearPacientes: true, enviarInformes: true, descargarDatos: true, crearPlantillas: false },
   },
   {
     key: "experiencia",
     label: "Terapeuta con experiencia",
     description: "Ve todo el Centro y maneja cobros y plantillas",
-    permissions: { verTodosPacientes: true, crearPacientes: true, enviarInformes: true, registrarPagos: true, descargarDatos: true, crearPlantillas: true },
+    permissions: { verTodosPacientes: true, crearPacientes: true, enviarInformes: true, descargarDatos: true, crearPlantillas: true },
   },
 ];
 
@@ -85,7 +82,6 @@ const ADMIN_PERMISSIONS: CenterPermissions = {
   verTodosPacientes: true,
   crearPacientes: true,
   enviarInformes: true,
-  registrarPagos: true,
   descargarDatos: true,
   crearPlantillas: true,
 };
@@ -165,6 +161,14 @@ export function ownScope(scope: Scope) {
 }
 
 /**
+ * Lo que es de todo el Centro (políticas, consentimientos): la
+ * Administradora y cada terapeuta ven lo mismo.
+ */
+export function centerScope(scope: Scope) {
+  return scope.centerId ? { centerId: scope.centerId } : { createdBy: scope.email };
+}
+
+/**
  * Tareas: la Administradora ve las del Centro; cada terapeuta ve las
  * suyas y las que le asignaron.
  */
@@ -235,6 +239,14 @@ export async function loadPatient(scope: Scope, patientId: number) {
  */
 export function billingEmail(scope: Scope): string {
   return scope.centerId ? scope.adminEmail : scope.email;
+}
+
+/**
+ * El dinero del Centro lo maneja solo la Administradora: marcar pagos,
+ * valores de sesión y paquetes. Una cuenta individual se maneja sola.
+ */
+export function canManageMoney(scope: Scope): boolean {
+  return !scope.centerId || scope.isAdmin;
 }
 
 /** ¿Tiene este permiso? La Administradora y las cuentas individuales, siempre */

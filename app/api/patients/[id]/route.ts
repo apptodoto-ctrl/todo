@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
-import { getScope, loadPatient } from "@/lib/center";
+import { getScope, loadPatient, canManageMoney } from "@/lib/center";
 
 type Params = Promise<{ id: string }>;
 
@@ -18,6 +18,8 @@ export async function PUT(req: Request, { params }: { params: Params }) {
     delete body.createdBy;
     delete body.centerId;
     delete body.id;
+    // El valor de sesión lo fija la Administradora del Centro
+    if (!canManageMoney(scope)) delete body.sessionValue;
 
     // Cambiar la terapeuta a cargo es cosa de la Administradora
     if (body.therapistEmail !== undefined && scope.centerId && !scope.isAdmin) {

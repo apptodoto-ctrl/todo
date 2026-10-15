@@ -75,6 +75,7 @@ model Patient {
 
   tasks          Task[]
   internalNotes  InternalNote[]
+  consentRequests ConsentRequest[]
   pipelineCases  PipelineCase[]
   sessionRecords SessionRecord[]
   objectives     Objective[]
@@ -458,6 +459,8 @@ model Center {
   sessionTypes CenterSessionType[]
   announcements CenterAnnouncement[]
   rooms       CenterRoom[]
+  consentTemplates ConsentTemplate[]
+  consentRequests  ConsentRequest[]
 
   @@index([adminEmail])
 }
@@ -625,4 +628,49 @@ model AdminAccessCode {
   createdAt DateTime @default(now())
 
   @@index([email, createdAt])
+}
+
+/// Documento que la familia lee y acepta en línea: consentimiento, compromiso, políticas
+model ConsentTemplate {
+  id        Int      @id @default(autoincrement())
+  centerId  String?
+  center    Center?  @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  name      String
+  /// consentimiento | compromiso | cancelacion | terminos | devolucion | otro
+  kind      String   @default("otro")
+  body      String
+  active    Boolean  @default(true)
+  createdBy String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  requests ConsentRequest[]
+
+  @@index([createdBy, active])
+}
+
+/// Envío de un documento a una familia, con su aceptación
+model ConsentRequest {
+  id          Int             @id @default(autoincrement())
+  centerId    String?
+  center      Center?         @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  templateId  Int
+  template    ConsentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  patientId   Int
+  patient     Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  token       String          @unique
+  title       String
+  /// Texto tal como se envió, por si la plantilla cambia después
+  body        String
+  sentTo      String
+  sentAt      DateTime        @default(now())
+  acceptedAt  DateTime?
+  acceptedName String         @default("")
+  acceptedEmail String        @default("")
+  documentId  Int?
+  createdBy   String          @default("")
+  createdAt   DateTime        @default(now())
+
+  @@index([patientId])
+  @@index([createdBy, acceptedAt])
 }

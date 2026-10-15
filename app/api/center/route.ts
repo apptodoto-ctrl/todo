@@ -91,6 +91,9 @@ export async function POST(req: Request) {
       prisma.formTemplate.updateMany({ where, data: { centerId: center.id } }),
       prisma.reminder.updateMany({ where, data: { centerId: center.id } }),
       prisma.pipeline.updateMany({ where, data: { centerId: center.id } }),
+      prisma.internalNote.updateMany({ where, data: { centerId: center.id } }),
+      prisma.consentTemplate.updateMany({ where, data: { centerId: center.id } }),
+      prisma.consentRequest.updateMany({ where, data: { centerId: center.id } }),
     ]);
 
     return NextResponse.json(center, { status: 201 });

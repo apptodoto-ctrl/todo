@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Upload, Search, FileText, File, Image, Archive, Download, Trash2, Eye, FolderOpen, Loader2 } from "lucide-react";
 
-const categories = ["Todas", "Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios", "Factura / Boleta", "Historia clínica externa"];
-const UPLOAD_CATEGORIES = ["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios", "Factura / Boleta", "Historia clínica externa"];
+const categories = ["Todas", "Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios", "Factura / Boleta", "Historia clínica externa", "Consentimientos"];
+const UPLOAD_CATEGORIES = ["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios", "Factura / Boleta", "Historia clínica externa", "Consentimientos"];
 
 interface Doc {
   id: number;

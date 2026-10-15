@@ -50,6 +50,12 @@ export default function CuentasPage() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [actor, setActor] = useState("");
   const [saving, setSaving] = useState(false);
+  const [tiers, setTiers] = useState<{ code: string; plan: string; therapists: number; isAddon: boolean }[]>([]);
+
+  useEffect(() => {
+    if (role !== "admin") return;
+    fetch("/api/admin/pricing").then((r) => r.json()).then((d) => setTiers(Array.isArray(d?.tiers) ? d.tiers.filter((t: { isAddon: boolean }) => !t.isAddon) : [])).catch(() => {});
+  }, [role]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -202,6 +208,19 @@ export default function CuentasPage() {
                   >
                     {ACCOUNT_STATES.map((s) => <option key={s} value={s}>{STATE_LABELS[s]}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Plan</label>
+                  <select
+                    value={detail.subscription.tierCode}
+                    onChange={(e) => { if (e.target.value && e.target.value !== detail.subscription?.tierCode) aplicar("cambiar_plan", { tierCode: e.target.value }, true); }}
+                    disabled={saving}
+                    className={`${inputCls} bg-white`}
+                  >
+                    {!tiers.some((t) => t.code === detail.subscription?.tierCode) && <option value={detail.subscription.tierCode}>{detail.subscription.tierCode}</option>}
+                    {tiers.map((t) => <option key={t.code} value={t.code}>{t.plan}{t.therapists > 1 ? ` · hasta ${t.therapists} terapeutas` : ""} ({t.code})</option>)}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1">Cambiar a un plan Centro habilita «Mi equipo» en esa cuenta. No toca el cobro en Stripe.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => { const m = prompt("¿Cuántos meses de regalo?", "1"); if (m) aplicar("regalar_meses", { months: Number(m) }, true); }} className="text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-1.5 rounded-lg hover:bg-violet-100">

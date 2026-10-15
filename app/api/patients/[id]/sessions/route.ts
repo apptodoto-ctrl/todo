@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionInfo, unauthorized, forbidden, notFound } from "@/lib/apiAuth";
-import { getScope, loadPatient } from "@/lib/center";
+import { getScope, loadPatient, canManageMoney } from "@/lib/center";
 import { consumeFromPackage } from "@/lib/sessionPackages";
 
 type Params = Promise<{ id: string }>;
@@ -48,7 +48,13 @@ export async function POST(req: Request, { params }: { params: Params }) {
     const patientId = Number(id);
     const err = await checkOwnership(patientId);
     if (err) return err;
-    const { date, notes, duration, attended, paid, value } = await req.json();
+    const body = await req.json();
+    const { date, notes, duration, attended } = body;
+    // Una terapeuta del Centro registra la sesión; lo cobrado lo pone la Administradora
+    const scopeAhora = await getScope();
+    const dinero = scopeAhora && canManageMoney(scopeAhora);
+    const paid = dinero ? body.paid : undefined;
+    const value = dinero ? body.value : undefined;
     if (!date) {
       return NextResponse.json({ error: "La fecha es requerida" }, { status: 400 });
     }
