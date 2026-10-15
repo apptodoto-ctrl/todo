@@ -1394,6 +1394,7 @@ export default function UsuariosPage() {
                       <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Duración</label>
                       <select value={newSession.duration} onChange={(e) => setNewSession({ ...newSession, duration: Number(e.target.value) })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all">
                         <option value={30}>30 min</option>
+                        <option value={40}>40 min</option>
                         <option value={45}>45 min</option>
                         <option value={60}>60 min</option>
                         <option value={90}>90 min</option>
@@ -1436,6 +1437,7 @@ export default function UsuariosPage() {
                           <input type="date" value={editingSession.date} onChange={(e) => setEditingSession({ ...editingSession, date: e.target.value })} className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30" />
                           <select value={editingSession.duration} onChange={(e) => setEditingSession({ ...editingSession, duration: Number(e.target.value) })} className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30">
                             <option value={30}>30 min</option>
+                            <option value={40}>40 min</option>
                             <option value={45}>45 min</option>
                             <option value={60}>60 min</option>
                             <option value={90}>90 min</option>

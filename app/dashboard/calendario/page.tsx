@@ -680,6 +680,7 @@ export default function CalendarioPage() {
               <label className="text-sm font-semibold text-slate-700 block mb-1.5">Duración</label>
               <select value={editEventForm.duration} onChange={(e) => setEditEventForm({ ...editEventForm, duration: Number(e.target.value) })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
                 <option value={30}>30 minutos</option>
+                <option value={40}>40 minutos</option>
                 <option value={45}>45 minutos</option>
                 <option value={60}>1 hora</option>
                 <option value={90}>1 hora 30</option>
@@ -772,6 +773,7 @@ export default function CalendarioPage() {
             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Duración</label>
             <select value={newEvent.duration} onChange={(e) => setNewEvent({ ...newEvent, duration: Number(e.target.value) })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all bg-white">
               <option value={30}>30 minutos</option>
+              <option value={40}>40 minutos</option>
               <option value={45}>45 minutos</option>
               <option value={60}>1 hora</option>
               <option value={90}>1 hora 30</option>
