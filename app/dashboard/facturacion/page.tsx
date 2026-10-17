@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Wallet, AlertTriangle, CheckCircle2, Users, ChevronLeft, ChevronRight, Loader2, Download, Package, Plus, X } from "lucide-react";
+import { Wallet, AlertTriangle, CheckCircle2, Users, ChevronLeft, ChevronRight, Loader2, Download, Package, Plus, X, Receipt, Trash2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 
 interface PatientRow {
@@ -74,6 +74,65 @@ export default function FacturacionPage() {
   // En un Centro, los paquetes y los pagos los maneja solo la Administradora
   const [centerRole, setCenterRole] = useState("individual");
   const puedeDinero = centerRole !== "terapeuta";
+
+  // Gastos del Centro: solo la Administradora los ve y los registra
+  const [gastos, setGastos] = useState<{ expenses: { id: number; date: string; category: string; description: string; amount: number }[]; total: number; porCategoria: Record<string, number>; categorias: Record<string, string> } | null>(null);
+  const [showGasto, setShowGasto] = useState(false);
+  const [gastoForm, setGastoForm] = useState({ date: new Date().toISOString().slice(0, 10), category: "arriendo", description: "", amount: "" });
+  const [gastoError, setGastoError] = useState("");
+  const [savingGasto, setSavingGasto] = useState(false);
+
+  const loadGastos = useCallback(async (m: string) => {
+    const res = await fetch(`/api/center/expenses?month=${m}`);
+    setGastos(res.ok ? await res.json() : null);
+  }, []);
+
+  useEffect(() => {
+    if (centerRole === "administradora") void loadGastos(month);
+  }, [centerRole, month, loadGastos]);
+
+  const crearGasto = async () => {
+    setGastoError("");
+    const amount = Number(gastoForm.amount);
+    if (!amount) { setGastoError("Indica el monto."); return; }
+    setSavingGasto(true);
+    const res = await fetch("/api/center/expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...gastoForm, amount }) });
+    setSavingGasto(false);
+    if (!res.ok) { const d = await res.json().catch(() => null); setGastoError(d?.error ?? "No se pudo guardar."); return; }
+    setShowGasto(false);
+    setGastoForm({ date: new Date().toISOString().slice(0, 10), category: "arriendo", description: "", amount: "" });
+    await loadGastos(month);
+  };
+
+  const borrarGasto = async (id: number) => {
+    if (!confirm("¿Eliminar este gasto?")) return;
+    await fetch(`/api/center/expenses/${id}`, { method: "DELETE" });
+    await loadGastos(month);
+  };
+
+  const descargarResumen = () => {
+    if (!data || !gastos) return;
+    const cur = data.currency;
+    const equipo = payroll?.totalOwed ?? 0;
+    const filas: string[][] = [
+      ["Resumen del Centro", monthLabel(month)],
+      [],
+      ["Concepto", `Monto (${cur})`],
+      ["Facturado (sesiones realizadas)", String(data.invoicedMonth)],
+      ["Cobrado", String(data.paidMonth)],
+      ["Pendiente de cobro", String(data.pendingMonth)],
+      ["Pago al equipo", String(equipo)],
+      ["Gastos del Centro", String(gastos.total)],
+      ["Utilidad (cobrado − equipo − gastos)", String(data.paidMonth - equipo - gastos.total)],
+      [],
+      ["Gastos del mes"],
+      ["Fecha", "Categoría", "Detalle", `Monto (${cur})`],
+      ...gastos.expenses.map((e) => [e.date, gastos.categorias[e.category] ?? e.category, e.description, String(e.amount)]),
+    ];
+    const csv = "\uFEFF" + filas.map((f) => f.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a"); a.href = url; a.download = `resumen-centro-${month}.csv`; a.click(); URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     fetch("/api/center").then((r) => r.json()).then((d) => { if (d?.role) setCenterRole(d.role); }).catch(() => {});
@@ -336,6 +395,55 @@ export default function FacturacionPage() {
         </motion.div>
       )}
 
+      {/* Gastos del Centro y utilidad del mes: solo la Administradora */}
+      {centerRole === "administradora" && gastos && data && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+            <Receipt className="w-4 h-4 text-violet-600 shrink-0" />
+            <h3 className="font-bold text-slate-800 text-sm flex-1">Gastos del Centro</h3>
+            <button onClick={descargarResumen} className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+              <Download className="w-3.5 h-3.5" /> Descargar
+            </button>
+            <button onClick={() => { setGastoError(""); setShowGasto(true); }} className="flex items-center gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-3 py-1.5 rounded-lg font-semibold text-xs hover:from-violet-400 hover:to-purple-500 transition-all">
+              <Plus className="w-3.5 h-3.5" /> Agregar gasto
+            </button>
+          </div>
+
+          {(() => {
+            const equipo = payroll?.totalOwed ?? 0;
+            const utilidad = data.paidMonth - equipo - gastos.total;
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100 border-b border-slate-100">
+                <div className="p-3"><p className="text-[11px] text-slate-500">Cobrado</p><p className="text-sm font-bold text-slate-800">{money(data.paidMonth, data.currency)}</p></div>
+                <div className="p-3"><p className="text-[11px] text-slate-500">Pago al equipo</p><p className="text-sm font-bold text-slate-800">− {money(equipo, data.currency)}</p></div>
+                <div className="p-3"><p className="text-[11px] text-slate-500">Gastos</p><p className="text-sm font-bold text-slate-800">− {money(gastos.total, data.currency)}</p></div>
+                <div className={`p-3 ${utilidad >= 0 ? "bg-emerald-50/60" : "bg-rose-50/60"}`}><p className="text-[11px] text-slate-500">Utilidad del mes</p><p className={`text-sm font-bold ${utilidad >= 0 ? "text-emerald-700" : "text-rose-700"}`}>{money(utilidad, data.currency)}</p></div>
+              </div>
+            );
+          })()}
+
+          {gastos.expenses.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-slate-400 text-center">Sin gastos registrados en {monthLabel(month)}. Anota arriendo, insumos, servicios o sueldos para ver la utilidad real.</p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {gastos.expenses.map((e) => (
+                <div key={e.id} className="px-4 py-2.5 flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-slate-700 truncate">{e.description || gastos.categorias[e.category] || e.category}</p>
+                    <p className="text-[11px] text-slate-400">{new Date(e.date + "T00:00:00").toLocaleDateString("es-CL")} · {gastos.categorias[e.category] ?? e.category}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800 shrink-0">{money(e.amount, data.currency)}</p>
+                  <button onClick={() => borrarGasto(e.id)} className="text-slate-300 hover:text-rose-500 transition-colors" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="px-4 py-2.5 text-[11px] text-slate-400 border-t border-slate-100">
+            La utilidad se calcula con lo cobrado del mes. Las terapeutas no ven esta sección.
+          </p>
+        </motion.div>
+      )}
+
       {/* Paquetes de sesiones */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center gap-2">
@@ -558,6 +666,34 @@ export default function FacturacionPage() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Agregar gasto */}
+      <Modal open={showGasto} onClose={() => setShowGasto(false)} title="Agregar gasto del Centro"
+        footer={<button onClick={crearGasto} disabled={savingGasto} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 transition-all">{savingGasto ? "Guardando..." : "Guardar gasto"}</button>}>
+        <div className="space-y-3">
+          {gastoError && <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl px-3 py-2.5">{gastoError}</div>}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Fecha</label>
+              <input type="date" value={gastoForm.date} onChange={(e) => setGastoForm({ ...gastoForm, date: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Monto ({data?.currency ?? ""})</label>
+              <input type="number" min={0} value={gastoForm.amount} onChange={(e) => setGastoForm({ ...gastoForm, amount: e.target.value })} placeholder="Ej. 350000" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30" />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Categoría</label>
+            <select value={gastoForm.category} onChange={(e) => setGastoForm({ ...gastoForm, category: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30">
+              {Object.entries(gastos?.categorias ?? { otro: "Otro" }).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Detalle <span className="font-normal text-slate-400">(opcional)</span></label>
+            <input type="text" value={gastoForm.description} onChange={(e) => setGastoForm({ ...gastoForm, description: e.target.value })} placeholder="Ej. Arriendo sala octubre" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30" />
+          </div>
+        </div>
       </Modal>
 
       {/* Vender paquete */}

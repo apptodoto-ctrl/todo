@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Upload, Search, FileText, File, Image, Archive, Download, Trash2, Eye, FolderOpen, Loader2 } from "lucide-react";
+import { Upload, Search, FileText, File, Image, Archive, Download, Trash2, Eye, FolderOpen, Loader2, Tag } from "lucide-react";
 
 const categories = ["Todas", "Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios", "Factura / Boleta", "Historia clínica externa", "Consentimientos"];
 const UPLOAD_CATEGORIES = ["Sin categoría", "Evaluaciones", "Protocolos", "Guías", "Actividades", "Formularios", "Factura / Boleta", "Historia clínica externa", "Consentimientos"];
@@ -16,6 +16,7 @@ interface Doc {
   createdAt: string;
   type: string;
   url: string;
+  specialties: string[];
 }
 
 const fileIcons: Record<string, { icon: typeof FileText; color: string; bg: string }> = {
@@ -37,6 +38,12 @@ export default function BibliotecaPage() {
   const [uploadCategory, setUploadCategory] = useState("Sin categoría");
   const [uploadPatientId, setUploadPatientId] = useState("");
   const [patients, setPatients] = useState<{ id: number; name: string }[]>([]);
+  // En un Centro, la Administradora comparte documentos por especialidad
+  const [centerRole, setCenterRole] = useState("individual");
+  const [catalogo, setCatalogo] = useState<string[]>([]);
+  const [uploadSpecialties, setUploadSpecialties] = useState<string[]>([]);
+  const [espFilter, setEspFilter] = useState("");
+  const esAdminCentro = centerRole === "administradora" && catalogo.length > 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDocuments = useCallback(async () => {
@@ -51,6 +58,10 @@ export default function BibliotecaPage() {
   useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
 
   useEffect(() => {
+    fetch("/api/center").then((r) => r.json()).then((d) => {
+      if (d?.role) setCenterRole(d.role);
+      if (Array.isArray(d?.center?.specialties)) setCatalogo(d.center.specialties);
+    }).catch(() => {});
     fetch("/api/patients")
       .then((r) => r.json())
       .then((d) => setPatients(Array.isArray(d) ? d.map((p: { id: number; name: string }) => ({ id: p.id, name: p.name })) : []))
@@ -66,6 +77,7 @@ export default function BibliotecaPage() {
         fd.append("file", file);
         fd.append("category", uploadCategory);
         if (uploadPatientId) fd.append("patientId", uploadPatientId);
+        if (uploadSpecialties.length) fd.append("specialties", uploadSpecialties.join(","));
         await fetch("/api/documents", { method: "POST", body: fd });
       }
       await fetchDocuments();
@@ -87,7 +99,7 @@ export default function BibliotecaPage() {
     setDragging(true);
   };
 
-  const patchDoc = async (id: number, changes: { category?: string; patientId?: number | null }) => {
+  const patchDoc = async (id: number, changes: { category?: string; patientId?: number | null; specialties?: string[] }) => {
     const prev = documents;
     setDocuments((docs) => docs.map((d) => (d.id === id ? { ...d, ...changes } : d)));
     const res = await fetch(`/api/documents/${id}`, {
@@ -134,7 +146,8 @@ export default function BibliotecaPage() {
     const matchPatient =
       patientFilter === "" ||
       (patientFilter === "sin" ? d.patientId === null : d.patientId === Number(patientFilter));
-    return matchCat && matchSearch && matchPatient;
+    const matchEsp = espFilter === "" || (d.specialties ?? []).includes(espFilter);
+    return matchCat && matchSearch && matchPatient && matchEsp;
   });
 
   return (
@@ -179,6 +192,23 @@ export default function BibliotecaPage() {
             ))}
           </select>
         </div>
+        {esAdminCentro && (
+          <div className="sm:col-span-2">
+            <label className="text-xs font-semibold text-slate-500 block mb-1.5">Compartir con las terapeutas de estas especialidades</label>
+            <div className="flex flex-wrap gap-1.5">
+              {catalogo.map((t) => {
+                const on = uploadSpecialties.includes(t);
+                return (
+                  <button key={t} type="button" onClick={() => setUploadSpecialties(on ? uploadSpecialties.filter((x) => x !== t) : [...uploadSpecialties, t])}
+                    className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${on ? "bg-teal-600 border-teal-600 text-white" : "bg-white border-slate-200 text-slate-600 hover:border-teal-300"}`}>
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1.5">Solo aplica a material general (sin usuario). Las terapeutas con esa etiqueta lo verán en su Biblioteca.</p>
+          </div>
+        )}
       </div>
 
       {/* Header toolbar */}
@@ -193,6 +223,12 @@ export default function BibliotecaPage() {
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all"
           />
         </div>
+        {catalogo.length > 0 && (
+          <select value={espFilter} onChange={(e) => setEspFilter(e.target.value)} className="w-full sm:w-48 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all">
+            <option value="">Todas las especialidades</option>
+            {catalogo.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
         <select
           value={patientFilter}
           onChange={(e) => setPatientFilter(e.target.value)}
@@ -318,6 +354,22 @@ export default function BibliotecaPage() {
                         ))}
                       </select>
                     </div>
+                    {(esAdminCentro || (doc.specialties ?? []).length > 0) && (
+                      <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                        <Tag className="w-3 h-3 text-teal-500" />
+                        {(esAdminCentro ? catalogo : doc.specialties ?? []).map((t) => {
+                          const on = (doc.specialties ?? []).includes(t);
+                          return esAdminCentro ? (
+                            <button key={t} onClick={() => patchDoc(doc.id, { specialties: on ? doc.specialties.filter((x) => x !== t) : [...(doc.specialties ?? []), t] })}
+                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border transition-colors ${on ? "bg-teal-600 border-teal-600 text-white" : "bg-white border-slate-200 text-slate-400 hover:border-teal-300"}`} title={on ? "Dejar de compartir con esta especialidad" : "Compartir con esta especialidad"}>
+                              {t}
+                            </button>
+                          ) : (
+                            <span key={t} className="text-[10px] font-semibold text-teal-700 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded-md">{t}</span>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">

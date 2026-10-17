@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Users, Shield, UserX, UserCheck, Trash2, Building2, Clock, Wallet, Megaphone } from "lucide-react";
+import { Plus, Users, Shield, UserX, UserCheck, Trash2, Building2, Clock, Wallet, Megaphone, Tag, X } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { PERMISSION_LABELS, DEFAULT_PERMISSIONS, type CenterPermissions } from "@/lib/center";
 import { DAY_KEYS, DAY_LABELS, type WeekSchedule } from "@/lib/schedule";
@@ -15,9 +15,10 @@ interface Member {
   schedule: WeekSchedule | null;
   payMode: string;
   payValue: number;
+  specialties: string[];
 }
 interface CenterInfo {
-  center: { id: string; name: string; attendanceMode: string } | null;
+  center: { id: string; name: string; attendanceMode: string; specialties?: string[] } | null;
   role: string;
   canOwnCenter?: boolean;
   plan?: string;
@@ -42,6 +43,10 @@ export default function EquipoPage() {
   const [horario, setHorario] = useState<WeekSchedule>({});
   const [pagoDe, setPagoDe] = useState<Member | null>(null);
   const [showAviso, setShowAviso] = useState(false);
+  // Etiquetas de especialidad: catálogo del Centro, filtro y asignación por terapeuta
+  const [espDe, setEspDe] = useState<Member | null>(null);
+  const [nuevaEsp, setNuevaEsp] = useState("");
+  const [filtroEsp, setFiltroEsp] = useState("");
   const [aviso, setAviso] = useState({ title: "", body: "", audience: [] as string[] });
 
   const load = useCallback(async () => {
@@ -140,6 +145,27 @@ export default function EquipoPage() {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ payMode, payValue }),
     });
+  };
+
+  const catalogo = info?.center?.specialties ?? [];
+
+  const guardarCatalogo = async (specialties: string[]) => {
+    setInfo((prev) => (prev && prev.center ? { ...prev, center: { ...prev.center, specialties } } : prev));
+    await fetch("/api/center", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ specialties }) });
+  };
+
+  const guardarEspecialidades = async (m: Member, specialties: string[]) => {
+    setMembers((prev) => prev.map((x) => (x.id === m.id ? { ...x, specialties } : x)));
+    setEspDe((prev) => (prev && prev.id === m.id ? { ...prev, specialties } : prev));
+    await fetch(`/api/center/members/${m.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ specialties }) });
+  };
+
+  const agregarEspecialidad = async () => {
+    const tag = nuevaEsp.trim();
+    if (!tag || !espDe) return;
+    setNuevaEsp("");
+    if (!catalogo.some((c) => c.toLowerCase() === tag.toLowerCase())) await guardarCatalogo([...catalogo, tag]);
+    if (!espDe.specialties.some((c) => c.toLowerCase() === tag.toLowerCase())) await guardarEspecialidades(espDe, [...espDe.specialties, tag]);
   };
 
   const enviarAviso = async () => {
@@ -253,6 +279,12 @@ export default function EquipoPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {catalogo.length > 0 && (
+            <select value={filtroEsp} onChange={(e) => setFiltroEsp(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30">
+              <option value="">Todas las especialidades</option>
+              {catalogo.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
           <button onClick={() => { setError(""); setShowAviso(true); }} className="flex items-center gap-2 bg-white border border-violet-200 text-violet-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-violet-50 transition-all">
             <Megaphone className="w-4 h-4" /> Avisar al equipo
           </button>
@@ -263,7 +295,7 @@ export default function EquipoPage() {
       </motion.div>
 
       <div className="space-y-3">
-        {members.map((m) => (
+        {members.filter((m) => !filtroEsp || m.specialties.includes(filtroEsp)).map((m) => (
           <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className={`bg-white rounded-2xl border border-slate-200/60 p-4 ${m.active ? "" : "opacity-60"}`}>
             <div className="flex items-start gap-3">
@@ -278,6 +310,11 @@ export default function EquipoPage() {
                   {!m.active && <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Desactivada</span>}
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5 truncate">{m.email}</p>
+                {m.specialties.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {m.specialties.map((t) => <span key={t} className="text-[10px] font-semibold text-teal-700 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded-md">{t}</span>)}
+                  </div>
+                )}
                 <p className="text-[11px] text-slate-400 mt-1">
                   {m.patients} {m.patients === 1 ? "paciente" : "pacientes"} a cargo
                   {m.lastSeenAt ? ` · última entrada ${new Date(m.lastSeenAt).toLocaleDateString("es-CL")}` : m.joinedAt ? "" : " · aún no entra"}
@@ -285,8 +322,12 @@ export default function EquipoPage() {
               </div>
             </div>
 
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button onClick={() => { setNuevaEsp(""); setEspDe(m); }} className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-lg hover:bg-teal-100 transition-colors">
+                <Tag className="w-3 h-3" /> Especialidades
+              </button>
             {m.role !== "administradora" && (
-              <div className="flex flex-wrap gap-2 mt-3">
+              <>
                 <button onClick={() => setPermisosDe(m)} className="flex items-center gap-1.5 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-lg hover:bg-violet-100 transition-colors">
                   <Shield className="w-3 h-3" /> Permisos
                 </button>
@@ -304,8 +345,9 @@ export default function EquipoPage() {
                     <Trash2 className="w-3 h-3" /> Quitar invitación
                   </button>
                 )}
-              </div>
+              </>
             )}
+            </div>
           </motion.div>
         ))}
       </div>
@@ -370,6 +412,36 @@ export default function EquipoPage() {
             </p>
           </div>
         </div>
+      </Modal>
+
+      <Modal open={!!espDe} onClose={() => setEspDe(null)} title={`Especialidades de ${espDe?.name || espDe?.email || ""}`}
+        footer={<button onClick={() => setEspDe(null)} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl transition-all">Listo</button>}>
+        {espDe && (
+          <div className="space-y-4">
+            {catalogo.length === 0 ? (
+              <p className="text-sm text-slate-500">Aún no hay etiquetas. Escribe la primera abajo: por ejemplo «Integración sensorial», «Neurorrehabilitación» o «Salud mental».</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {catalogo.map((t) => {
+                  const on = espDe.specialties.includes(t);
+                  return (
+                    <span key={t} className={`inline-flex items-center gap-1 rounded-lg border text-xs font-semibold transition-colors ${on ? "bg-teal-600 border-teal-600 text-white" : "bg-white border-slate-200 text-slate-600 hover:border-teal-300"}`}>
+                      <button onClick={() => guardarEspecialidades(espDe, on ? espDe.specialties.filter((x) => x !== t) : [...espDe.specialties, t])} className="px-2.5 py-1.5">{t}</button>
+                      <button onClick={() => { if (confirm(`¿Quitar «${t}» del catálogo del Centro? Las terapeutas que la tengan la conservan.`)) guardarCatalogo(catalogo.filter((x) => x !== t)); }} className={`pr-2 ${on ? "text-teal-100 hover:text-white" : "text-slate-300 hover:text-rose-500"}`} title="Quitar del catálogo"><X className="w-3 h-3" /></button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input type="text" value={nuevaEsp} onChange={(e) => setNuevaEsp(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") agregarEspecialidad(); }} placeholder="Nueva etiqueta" className={inputCls} />
+              <button onClick={agregarEspecialidad} disabled={!nuevaEsp.trim()} className="shrink-0 flex items-center gap-1 text-sm font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-3 rounded-xl hover:bg-teal-100 disabled:opacity-40"><Plus className="w-4 h-4" /> Agregar</button>
+            </div>
+            <p className="text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2.5">
+              Las etiquetas sirven para filtrar el equipo y para compartir documentos: en Biblioteca puedes marcar un documento con una especialidad y lo verán todas las terapeutas que la tengan.
+            </p>
+          </div>
+        )}
       </Modal>
 
       <Modal open={!!pagoDe} onClose={() => setPagoDe(null)} title={`Pago de ${pagoDe?.name || pagoDe?.email || ""}`}

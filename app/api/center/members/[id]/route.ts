@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { cleanTags } from "@/lib/documents";
 import { unauthorized, forbidden, notFound } from "@/lib/apiAuth";
 import { getScope, parsePermissions, seatUsage } from "@/lib/center";
 import { parseSchedule } from "@/lib/schedule";
@@ -73,6 +74,7 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
         ...(body.title !== undefined ? { title: String(body.title).slice(0, 120) } : {}),
         ...(body.registryId !== undefined ? { registryId: String(body.registryId).slice(0, 60) } : {}),
         ...(body.specialty !== undefined ? { specialty: String(body.specialty).slice(0, 120) } : {}),
+        ...(body.specialties !== undefined ? { specialties: cleanTags(body.specialties) } : {}),
       },
     });
 

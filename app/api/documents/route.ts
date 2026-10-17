@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db";
 import { uploadToR2 } from "@/lib/r2";
 import { randomUUID } from "crypto";
 import path from "path";
-import { getScope, ownScope, ownerFields } from "@/lib/center";
+import { getScope, ownerFields } from "@/lib/center";
+import { documentScope, cleanTags } from "@/lib/documents";
 
 export async function GET(req: NextRequest) {
   const scope = await getScope();
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
   // ?patientId= devuelve solo los documentos de ese paciente (ficha clínica)
   const patientId = req.nextUrl.searchParams.get("patientId");
   const docs = await prisma.document.findMany({
-    where: { ...ownScope(scope), ...(patientId ? { patientId: Number(patientId) } : {}) },
+    where: { ...(await documentScope(scope)), ...(patientId ? { patientId: Number(patientId) } : {}) },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(docs);
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
   const category = (formData.get("category") as string) || "Sin categoría";
   const patientIdRaw = formData.get("patientId") as string | null;
   const patientId = patientIdRaw && patientIdRaw !== "" ? Number(patientIdRaw) : null;
+  const specialties = scope.centerId && scope.isAdmin ? cleanTags(String(formData.get("specialties") ?? "")) : [];
 
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
   if (file.size > MAX_FILE_SIZE) {
@@ -51,6 +53,7 @@ export async function POST(req: NextRequest) {
       key,
       url,
       patientId,
+      specialties,
       ...ownerFields(scope),
     },
   });

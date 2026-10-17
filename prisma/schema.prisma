@@ -35,6 +35,7 @@ model Pipeline {
   createdBy String           @default("")
   createdAt DateTime         @default(now())
   columns   PipelineColumn[]
+  @@index([centerId])
 }
 
 model Patient {
@@ -83,6 +84,7 @@ model Patient {
   documents      Document[]
   packages       SessionPackage[]
   formResponses  FormResponse[]
+  @@index([centerId])
 }
 
 model Objective {
@@ -116,6 +118,7 @@ model GeneratedReport {
   updatedAt DateTime @updatedAt
 
   @@index([createdBy])
+  @@index([centerId])
 }
 
 model PlanTier {
@@ -234,6 +237,7 @@ model Reminder {
   createdBy   String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  @@index([centerId])
 }
 
 model SessionRecord {
@@ -260,6 +264,7 @@ model SessionRecord {
   updatedAt DateTime @updatedAt
 
   @@index([patientId, date])
+  @@index([packageId])
 }
 
 model Task {
@@ -287,6 +292,8 @@ model Task {
   updatedAt   DateTime @updatedAt
 
   @@index([notify, notifiedAt])
+  @@index([centerId])
+  @@index([assignedTo])
 }
 
 model Appointment {
@@ -315,6 +322,7 @@ model Appointment {
   reminder5dSent Boolean @default(false)
   reminder1dSent Boolean @default(false)
   reminder4hSent Boolean @default(false)
+  @@index([centerId])
 }
 
 model PipelineColumn {
@@ -357,10 +365,30 @@ model Document {
   url       String
   patientId Int?
   patient   Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  /// Especialidades a las que va dirigido: lo ven las terapeutas con esa etiqueta
+  specialties String[] @default([])
   createdBy String   @default("")
   createdAt DateTime @default(now())
 
   @@index([patientId])
+  @@index([centerId])
+}
+
+/// Gastos del Centro (arriendo, insumos, servicios...) para la utilidad del mes
+model CenterExpense {
+  id          Int      @id @default(autoincrement())
+  centerId    String
+  center      Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  /// AAAA-MM-DD y AAAA-MM, como el resto de las fechas
+  date        String
+  month       String
+  category    String   @default("otro")
+  description String   @default("")
+  amount      Int
+  createdBy   String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@index([centerId, month])
 }
 
 model SessionPackage {
@@ -386,6 +414,7 @@ model SessionPackage {
 
   @@index([createdBy, status])
   @@index([patientId])
+  @@index([centerId])
 }
 
 /// Formulario propio de la terapeuta: ficha de admisión, entrevista, pauta
@@ -406,6 +435,7 @@ model FormTemplate {
   responses FormResponse[]
 
   @@index([createdBy, archived])
+  @@index([centerId])
 }
 
 /// Una plantilla llenada para un paciente
@@ -443,10 +473,13 @@ model Center {
   extraSeats     Int      @default(0)
   /// Correo de la Administradora: hay una sola por Centro
   adminEmail     String
+  /// Etiquetas de especialidad que usa el Centro: se asignan a terapeutas y a documentos
+  specialties    String[] @default([])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   members     CenterMember[]
+  expenses    CenterExpense[]
   patients    Patient[]
   appointments Appointment[]
   tasks       Task[]
@@ -477,6 +510,8 @@ model CenterMember {
   title       String    @default("")
   registryId  String    @default("")
   specialty   String    @default("")
+  /// Etiquetas de especialidad del Centro (filtro y documentos)
+  specialties String[]  @default([])
   signatureUrl String   @default("")
   /// porcentaje | fijo_sesion | sueldo
   payMode     String    @default("porcentaje")

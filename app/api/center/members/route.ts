@@ -41,6 +41,7 @@ export async function GET() {
       title: m.title,
       registryId: m.registryId,
       specialty: m.specialty,
+      specialties: m.specialties,
       pending: m.joinedAt === null,
       invitedAt: m.invitedAt,
       joinedAt: m.joinedAt,

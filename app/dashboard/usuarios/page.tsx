@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen, Package, Building2, Home, Lock, FileSignature, Send, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Phone, Mail, MoreVertical, Calendar, ClipboardList, User, Activity, Hash, Pencil, Trash2, NotebookPen, Loader2, Target, Download, DollarSign, FolderOpen, Package, Building2, Home, Lock, FileSignature, Send, CheckCircle2, Upload, FileSpreadsheet } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { CURRENCIES, CURRENCY_LABELS } from "@/lib/currency";
@@ -119,6 +119,13 @@ export default function UsuariosPage() {
   const [filter, setFilter] = useState("todos");
   const [therapistFilter, setTherapistFilter] = useState("todas");
   const [showNewPatient, setShowNewPatient] = useState(false);
+  // Importar usuarios desde la planilla tipo
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<{ willCreate: number; duplicates: number; withErrors: number; overLimit: number; unrecognized: string[]; rows: { row: number; data: Record<string, string>; errors: string[]; duplicate: boolean }[] } | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importDone, setImportDone] = useState<{ created: number; duplicates: number; withErrors: number; overLimit: number } | null>(null);
   const [newPatient, setNewPatient] = useState({ name: "", age: 0, birthDate: "", guardian: "", guardianPhone: "", guardianEmail: "", prevision: "", coverageEntity: "", therapistEmail: "", attendanceMode: "centro", homeAddress: "", consultReason: "", sessionValue: 0, diagnosis: "", status: "activo", nextSession: "", nextSessionTime: "", phone: "", email: "", rut: "" });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
@@ -440,6 +447,30 @@ export default function UsuariosPage() {
     if (res.ok) setObjectives((prev) => prev.filter((o) => o.id !== id));
   };
 
+  const revisarPlanilla = async (file: File) => {
+    setImportFile(file); setImportPreview(null); setImportError(""); setImportDone(null); setImportBusy(true);
+    const fd = new FormData(); fd.append("file", file);
+    const res = await fetch("/api/patients/import?dryRun=1", { method: "POST", body: fd });
+    const d = await res.json().catch(() => null);
+    setImportBusy(false);
+    if (!res.ok) { setImportError(d?.error ?? "No se pudo leer la planilla."); return; }
+    setImportPreview(d);
+  };
+
+  const importarPlanilla = async () => {
+    if (!importFile) return;
+    setImportBusy(true); setImportError("");
+    const fd = new FormData(); fd.append("file", importFile);
+    const res = await fetch("/api/patients/import", { method: "POST", body: fd });
+    const d = await res.json().catch(() => null);
+    setImportBusy(false);
+    if (!res.ok) { setImportError(d?.error ?? "No se pudo importar."); return; }
+    setImportDone(d); setImportPreview(null); setImportFile(null);
+    if (currentUserEmail) {
+      fetch(`/api/patients?createdBy=${encodeURIComponent(currentUserEmail)}`).then((r) => r.json()).then((data) => setPatients(Array.isArray(data) ? data : [])).catch(() => {});
+    }
+  };
+
   const exportCSV = () => {
     const headers = ["Nombre", "Edad", "Fecha nacimiento", "Documento", "Diagnóstico", "Estado", "Tutor", "Teléfono tutor", "Cobertura", "Entidad", "Teléfono", "Email", "Sesiones", "Próxima sesión"];
     const rows = patients.map((p) => [
@@ -681,6 +712,9 @@ export default function UsuariosPage() {
           <p className="text-slate-500 text-sm">{patients.length} usuarios registrados</p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button onClick={() => { setImportFile(null); setImportPreview(null); setImportError(""); setImportDone(null); setShowImport(true); }} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl font-medium text-sm hover:border-violet-300 hover:text-violet-700 transition-all">
+            <Upload className="w-4 h-4" /> Importar
+          </button>
           <button onClick={exportCSV} disabled={patients.length === 0} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl font-medium text-sm hover:border-violet-300 hover:text-violet-700 disabled:opacity-50 transition-all">
             <Download className="w-4 h-4" /> Exportar
           </button>
@@ -1705,6 +1739,87 @@ export default function UsuariosPage() {
               <option value="no_continua">No continúa</option>
             </select>
           </div>
+        </div>
+      </Modal>
+
+      {/* Importar usuarios desde Excel */}
+      <Modal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        title="Importar usuarios desde Excel"
+        maxWidth="max-w-2xl"
+        footer={
+          importDone ? (
+            <button onClick={() => setShowImport(false)} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl transition-all">Listo</button>
+          ) : (
+            <button onClick={importarPlanilla} disabled={!importPreview || importPreview.willCreate === 0 || importBusy} className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-xl hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 transition-all">
+              {importBusy ? "Procesando..." : importPreview ? `Importar ${importPreview.willCreate} ${importPreview.willCreate === 1 ? "usuario" : "usuarios"}` : "Elige la planilla"}
+            </button>
+          )
+        }
+      >
+        <div className="space-y-4">
+          {importDone ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+              <p className="font-bold text-emerald-900 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> {importDone.created} {importDone.created === 1 ? "usuario importado" : "usuarios importados"}</p>
+              <p className="text-sm text-emerald-800 mt-1">
+                {importDone.duplicates > 0 && <>{importDone.duplicates} ya existían y se saltaron. </>}
+                {importDone.withErrors > 0 && <>{importDone.withErrors} con errores no se importaron. </>}
+                {importDone.overLimit > 0 && <>{importDone.overLimit} quedaron fuera por el tope del plan. </>}
+                Ya aparecen en la lista; revisa y completa lo que falte en cada ficha.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <FileSpreadsheet className="w-8 h-8 text-violet-500 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-slate-800">1. Descarga la planilla tipo</p>
+                  <p className="text-xs text-slate-500">Una fila por usuario; solo el nombre es obligatorio. Trae una hoja con las instrucciones.</p>
+                </div>
+                <button type="button" onClick={() => window.location.assign("/api/patients/import/template")} className="shrink-0 flex items-center justify-center gap-1.5 text-xs font-semibold text-violet-700 bg-white border border-violet-200 px-3 py-2 rounded-lg hover:bg-violet-100 transition-colors">
+                  <Download className="w-3.5 h-3.5" /> Planilla tipo (.xlsx)
+                </button>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800 mb-1.5">2. Sube la planilla llena</p>
+                <label className="flex items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-xl px-4 py-6 text-sm text-slate-500 hover:border-violet-300 hover:bg-violet-50/30 cursor-pointer transition-all">
+                  <Upload className="w-4 h-4" />
+                  {importFile ? importFile.name : "Elegir archivo .xlsx o .csv"}
+                  <input type="file" accept=".xlsx,.csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) revisarPlanilla(f); e.target.value = ""; }} />
+                </label>
+              </div>
+              {importBusy && !importPreview && <p className="text-sm text-slate-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Revisando la planilla...</p>}
+              {importError && <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl px-3 py-2.5">{importError}</div>}
+              {importPreview && (
+                <div className="space-y-3">
+                  <p className="text-sm font-bold text-slate-800">3. Revisa antes de guardar</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="bg-emerald-50 rounded-xl p-3 text-center"><p className="text-lg font-bold text-emerald-700">{importPreview.willCreate}</p><p className="text-[11px] text-emerald-800">Entrarán</p></div>
+                    <div className="bg-slate-50 rounded-xl p-3 text-center"><p className="text-lg font-bold text-slate-600">{importPreview.duplicates}</p><p className="text-[11px] text-slate-500">Ya existen</p></div>
+                    <div className="bg-amber-50 rounded-xl p-3 text-center"><p className="text-lg font-bold text-amber-700">{importPreview.withErrors}</p><p className="text-[11px] text-amber-800">Con errores</p></div>
+                    <div className="bg-rose-50 rounded-xl p-3 text-center"><p className="text-lg font-bold text-rose-700">{importPreview.overLimit}</p><p className="text-[11px] text-rose-800">Fuera del tope</p></div>
+                  </div>
+                  {importPreview.unrecognized.length > 0 && (
+                    <p className="text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2">Columnas que no reconocí y se ignoran: {importPreview.unrecognized.join(", ")}.</p>
+                  )}
+                  {importPreview.rows.some((r) => r.errors.length > 0 && !r.duplicate) && (
+                    <div className="border border-amber-200 rounded-xl overflow-hidden">
+                      <p className="text-xs font-semibold text-amber-800 bg-amber-50 px-3 py-2">Filas con problemas (corrígelas en la planilla y vuelve a subirla)</p>
+                      <div className="max-h-40 overflow-y-auto divide-y divide-slate-100">
+                        {importPreview.rows.filter((r) => r.errors.length > 0 && !r.duplicate).slice(0, 30).map((r) => (
+                          <div key={r.row} className="px-3 py-1.5 text-xs"><span className="font-semibold text-slate-700">Fila {r.row + 1}{r.data.name ? ` · ${r.data.name}` : ""}:</span> <span className="text-slate-500">{r.errors.join("; ")}</span></div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {importPreview.overLimit > 0 && (
+                    <p className="text-xs text-rose-700 bg-rose-50 rounded-xl px-3 py-2">Tu plan no alcanza para todos: {importPreview.overLimit} quedarán fuera. Puedes subir de plan en Mi plan e importar el resto después.</p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </Modal>
 

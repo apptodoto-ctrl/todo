@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { cleanTags } from "@/lib/documents";
 import { getSessionInfo, unauthorized, forbidden } from "@/lib/apiAuth";
 import { getScope, seatUsage, DEFAULT_PERMISSIONS, parsePermissions, canOwnCenter } from "@/lib/center";
 import { countryConfig } from "@/lib/countries";
@@ -119,6 +120,7 @@ export async function PATCH(req: Request) {
         ...(body.phone !== undefined ? { phone: String(body.phone).slice(0, 40) } : {}),
         ...(body.logoUrl !== undefined ? { logoUrl: String(body.logoUrl).slice(0, 500) } : {}),
         ...(["centro", "domicilio", "ambos"].includes(body.attendanceMode) ? { attendanceMode: body.attendanceMode } : {}),
+        ...(body.specialties !== undefined ? { specialties: cleanTags(body.specialties) } : {}),
       },
     });
     return NextResponse.json(center);
